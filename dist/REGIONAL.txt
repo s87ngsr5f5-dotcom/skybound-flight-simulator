@@ -1,0 +1,69 @@
+SKYBOUND GLOBAL｜台灣區域飛行 · 第二階段
+
+開始遊戲
+解壓縮後雙擊 dist/index.html。所有程式與區域高程都已包含。Chrome 或 Edge 需支援 WebGL。
+也可執行 python -m http.server 8765 --directory dist，開啟 http://localhost:8765。無需建置。
+
+松山 → 花蓮
+1. 選 SB-172、松山、花蓮與停機位冷艙，按開始飛行。
+2. 開電瓶、開引擎 1、鬆開停機煞車。小幅加油，依 VFR 指示滑到跑道端再轉入跑道。
+3. 對正跑道 10 真航向約 092°。按 W 加油門，約 51 節按 ↑ 拉升。依導航飛東北角外海、宜蘭外海、南澳外海，再往花蓮 21 的進場定位點。此路線供模擬使用。
+4. 收油並放襟翼，約 59 節進場。花蓮 21 真航向約 206°。跑道內接地後，按 S 收油並視需要以空白鍵煞車。
+5. 依序前往跑道出口、滑行道、停機位。停機位提示範圍約 22 公尺；減速至 1 m/s 內並按 B 拉停機煞車，才會自動儲存。返回主選單可查看紀錄。
+冷艙開關在畫面左上角，檢查表可勾選。C 切換視角；Q/E 方向舵、↑↓ 俯仰、←→ 坡度或地面轉向、F 襟翼、G 起落架、L 燈光、P 暫停、R 重飛、Z/X 配平。
+可在設定內重新綁定鍵盤，調整手把死區、靈敏度和俯仰反轉，或開啟按住畫面拖曳操控。Web Gamepad 一般配置：軸 0/1/2 為橫滾、俯仰、方向舵，肩鍵加減油門，A 鍵煞車，X/Y 切換襟翼及視角。裝置軸序可能不同。
+自訂航點每行輸入一組十進位 WGS84 緯度,經度；增刪或移動該行即可修改順序。目的地最後兩個進場航點由程式保留。
+
+機隊完成度
+機型｜本版功能｜未完成的細節
+SB-152 Lark｜雙座、高翼、圓形讀值、固定起落架｜完整機械儀表與真實啟動程序
+SB-172 Meridian｜四座、高翼、固定起落架、獨立質量與功率｜完整機械儀表與實機校準
+SB-40 Swift｜低翼、數位讀值、單桿功率｜真實玻璃航電頁面
+SB-42 Twin｜雙發、分開啟停與推力差、收放起落架｜實機單發包線和失效程序
+SB-930 Stratus｜單發渦槳、扭矩指示、槳速切換與反推｜真實起動、超限與槳速調速器
+SB-4 Vector｜後置雙渦扇、擾流板、簡化航向及高度保持｜實機渦扇響應與自動駕駛模式
+六架使用不同程序化外形及物理設定，共用座艙框架與主要 HUD。儀表採圓形／數位樣式與機型引擎讀值；全 3D 專屬座艙、擬真儀表、精細活動舵面及音效待補。
+
+機場覆蓋
+ICAO｜使用跑道｜長×寬（m）｜真方位｜場面
+RCSS 松山｜10/28｜2605×60｜092.22°｜生成跑道、燈、滑行道、停機位
+RCYU 花蓮｜21/03｜2751×45｜206.29°｜生成跑道、燈、滑行道、停機位
+RCTP 桃園｜05L/23R｜3660×60｜049.08°｜生成一條跑道及地面起點
+RCMQ 臺中｜18/36｜3659×61｜176.69°｜生成跑道及地面起點
+RCKH 高雄｜09/27｜3150×60｜091.90°｜生成跑道及地面起點
+RCFN 臺東｜04/22｜2438×45｜038.64°｜生成跑道及地面起點
+RCQC 澎湖｜02/20｜3000×45｜018.22°｜生成跑道及地面起點
+每座機場目前只以表中首個方向作為起降方向，反向編號顯示在跑道上。場面由數值資料生成並平整接合高程。停機坪、滑行道和跑道燈位置是模擬配置；跑道縱坡、移位門檻與第二條桃園跑道尚待重建。
+
+地理及素材來源
+Terrain Tiles on AWS / Mapzen / Tilezen，Skadi WGS84，2026-11-07 擷取。主島及澎湖採 240 m 取樣，松山周邊保留第一階段的 120 m 高程資料供碰撞及近區採樣。海岸由高程網格推估；海面及地表材質為生成內容。區域資料全部內嵌；畫面按位置建立與回收網格區塊。未獨立驗證垂直基準差；機場以門檻平均高度平整接合。
+https://registry.opendata.aws/terrain-tiles/
+https://github.com/tilezen/joerd/blob/master/docs/attribution.md
+臺北飛航情報區 AIP AD 2.12：RCSS、RCTP 為 03-25（2025-05-15）；RCYU、RCMQ 為 05-26（2026-10-29）；RCKH 為 02-26（2026-05-14）；RCFN 為 05-25（2025-09-04）；RCQC 為 06-25（2025-12-25）。
+https://ais.caa.gov.tw/eaip/
+機體、材質和介面為程式生成，未附製造商圖表或模型。Three.js r160.1，MIT，見 THREE-LICENSE.txt。
+
+公開性能參考
+Cessna 152 1981 POH，滑跑 221 m、巡航性能摘要 107 KTS。
+https://www.racecityfo.com/wp-content/uploads/2021/12/1981-C152-POH.pdf
+Textron Skyhawk，滑跑 293 m、最大巡航 124 KTAS。
+https://cessna.txtav.com/piston/cessna-skyhawk
+Diamond DA40 NG，標準海平面滑跑 397 m、最大巡航 154 KTAS。
+https://www.diamondaircraft.com/fileadmin/diamondaircraft/documents/da40/DA40_NG_Product_Folder_2023_SCREEN.pdf
+Diamond DA42-VI，短場滑跑 375 m、最大巡航 190 KTAS。
+https://www.diamondaircraft.com/en/twin-engine-aircraft/da42/tech-specs/
+Daher TBM 930，起飛距離約 726 m、最大巡航 330 KTAS。
+https://www.tbm.aero/news/card/DaherdeliversitsfirstTBM930ModelYear2017aircraftwithahostofnewfeatures/92
+Textron CJ4 Gen2，起飛場長 1039 m、最大巡航 451 KTAS。
+https://cessna.txtav.com/-/media/cessna/files/product-cards/citation/citation_cj4_gen2_product_card.ashx
+這些是不同條件的公開基準。試飛採遊戲重量、松山、無風、約 1,050 m 巡航和鍵盤等效輸入。從跑道門檻量至離地約 300–463 m，包含門檻至起飛滑跑起點的距離，不能直接等同於製造商滑跑或越障距離。尚未完成同重量、同高度和同程序的性能校準。
+
+驗收方式
+node verify-flight.cjs 重跑第一階段物理測試。
+node verify-regional.cjs --all 執行六架松山至花蓮及 SB-172 高雄至澎湖，從冷艙啟動、滑行、起飛、導航到接地及停妥，使用測試控制器代打輸入。
+實體飛行搖桿、夜航完整航班、低能見度完整進場、詳細效能測量與逐項專屬系統驗收仍待補。
+
+瀏覽器驗收：Chrome 1280×800、軟體 WebGL。SB-172 的松山至花蓮全程用測試輸入走完，紀錄重載可讀取。七座機場的冷艙及跑道待命共 14 種起點均已載入。電瓶與引擎連鎖、雙發開關、視角、暫停及重飛通過。物理腳本驗證其餘五架松山至花蓮及 SB-172 高雄至澎湖。這些測試不代表實機性能校準。
+目前缺少獨立道路和河流向量圖層、實景影像、精細機場與全真座艙。航線與資料只供遊戲。航圖及原始外部高程壓縮檔未隨包分發。
+高程可用 build-elevation.py 和 build-regional-elevation.py 重建。原始資料放 terrain-input，網址格式：https://s3.amazonaws.com/elevation-tiles-prod/skadi/Nxx/NxxEyyy.hgt.gz；所需圖磚清單見重建程式。
+最終離線瀏覽器抽查通過鍵盤重綁與存檔、夜間照明及油門。軟體 WebGL 跑道待機取樣約 2.4 FPS；實際 GPU 與控制器待實機驗證。

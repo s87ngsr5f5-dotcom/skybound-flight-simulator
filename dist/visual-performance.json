@@ -1,0 +1,11 @@
+{
+  "fps": 0.5075626839914006,
+  "heapMB": 103.95050048828125,
+  "loadSeconds": 17.17200000000048,
+  "viewport": "1440x900",
+  "renderer": "Chrome software WebGL",
+  "osm": {
+    "roads": 4523,
+    "buildings": 2200
+  }
+}
