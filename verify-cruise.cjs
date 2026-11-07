@@ -50,3 +50,29 @@ for(const plane of benchmarkFleet.filter(aircraft=>aircraft.cruiseMach)){
   assert(Math.abs(f.y-f.hold.altitude)<50,plane.id);
   assert(Math.abs(speeds.mach-plane.cruiseMach)<.008,plane.id);
 }
+
+const {smoothControls}=require('./dist/controls.js');
+const jet=fleet.find(a=>a.id==='b773');
+const lessonResults=[];
+for(const wind of [0,60,-60]){
+  const f=makeClimbLesson(from,jet,wind);
+  let recordedResult;
+  for(let i=0;i<120*1800&&!f.finished;i++){
+    const ias=flightSpeeds(f).ias*knotsPerMps;
+    if(!f.ground&&f.y>from.elevation+40) f.gear=false;
+    if(!f.hold&&climbReady(f)) f.hold={heading:f.heading,altitude:35000*.3048,mach:jet.cruiseMach,climb:true};
+    const pitch=ias<jet.rotation?0:f.ground?.50:f.vy>8?.20:.38;
+    const input={pitch,throttle:.48,roll:0,rudder:0,trim:0,brake:false,response:.55,maneuver:f.ground?1.12:1.38};
+    if(f.hold) Object.assign(input,climbCruiseControls(f),{maneuver:1});
+    stepTrainer(f,smoothControls(f,input,simTick));
+    updateRegionalFlight(f,(_,result)=>{recordedResult=result;return true;});
+  }
+  assert(f.finished&&f.recorded&&!f.climbLesson.failed,recordedResult);
+  assert(f.climbLesson.stable>=60);
+  assert(f.fuel>0&&f.fuel<f.fuelStart);
+  const gs=flightSpeeds(f).gs*knotsPerMps;
+  console.log('Runway lesson', {wind,gs,seconds:Math.round(f.elapsed),recordedResult});
+  lessonResults.push(gs);
+}
+assert(lessonResults[1]>500&&lessonResults[1]<600);
+assert(lessonResults[1]-lessonResults[0]>55&&lessonResults[0]-lessonResults[2]>55);

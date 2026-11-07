@@ -18,8 +18,15 @@ function atmosphere(height,temperatureOffset=0){
   const temperature=standardTemperature+temperatureOffset;
   return {pressure,density:pressure/(287.05*temperature),sound:Math.sqrt(1.4*287.05*temperature)};
 }
+function flightWind(f){
+  if(f.climbLesson){
+    const strength=limit((f.y-1500)/7500,0,1);
+    return {x:f.windVector.x*strength,z:f.windVector.z*strength};
+  }
+  return f.windVector||(f.departure?airportPoint({...f.departure,x:0,z:0},0,f.wind):worldRunway(0,f.wind));
+}
 function flightSpeeds(f){
-  const wind=f.windVector||(f.departure?airportPoint({...f.departure,x:0,z:0},0,f.wind):worldRunway(0,f.wind));
+  const wind=flightWind(f);
   const air=atmosphere(f.y,f.temperatureOffset);
   const tas=Math.hypot(f.vx-wind.x,f.vy,f.vz-wind.z);
   const mach=tas/air.sound;
@@ -68,7 +75,7 @@ function flightMass(f){
   const aircraft=f.aircraft||trainer;
   return aircraft.mass+(f.cargoState?.mass||0)+(f.voyage?f.fuel-56000:0)+
     (f.service?f.fuel+f.service.boarded*95-f.service.referencePayload:0)+
-    (f.cruiseTrial?f.fuel-f.fuelStart:0);
+    (f.cruiseTrial||f.climbLesson?f.fuel-f.fuelStart:0);
 }
 const limit = (n,a,b)=>Math.min(b,Math.max(a,n));
 const wrapAngle = angle=>Math.atan2(Math.sin(angle),Math.cos(angle));
@@ -111,7 +118,7 @@ function stepTrainer(f, input, dt=simTick){
   f.elapsed+=dt;
   f.power=limit(f.power+input.throttle*dt*.55,0,1);
   f.trim=limit(f.trim+input.trim*dt*.08,-.12,.15);
-  const wind=f.windVector||(f.departure?airportPoint({...f.departure,x:0,z:0},0,f.wind):worldRunway(0,f.wind));
+  const wind=flightWind(f);
   const airX=f.vx-wind.x, airY=f.vy, airZ=f.vz-wind.z;
   const speed=Math.hypot(airX,airY,airZ);
   const track=Math.atan2(airX,-airZ);

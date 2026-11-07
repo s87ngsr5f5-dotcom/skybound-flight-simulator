@@ -544,7 +544,8 @@ function initialize(){
   function drawPlan(){
     updateAirlinePlan();
     const isVoyage=byId('lesson').value==='naritaCargo';
-    const isCruise=byId('lesson').value==='cruiseTrial';
+    const isClimb=byId('lesson').value==='climbLesson';
+    const isCruise=isClimb||byId('lesson').value==='cruiseTrial';
     byId('cruiseWeather').hidden=!isCruise;
     byId('voyageOptions').hidden=!isVoyage;
     const model=selectedAircraft();
@@ -559,7 +560,10 @@ function initialize(){
       if(isCruise){
         departure=airports.find(a=>a.code==='RCTP');
         destination=airports.find(a=>a.code==='RCKH');
-        route=makeCruiseTrial(departure,destination,fleet.find(a=>a.id==='b773'),Number(byId('cruiseWind').value)).route;
+        const profile=fleet.find(a=>a.id==='b773');
+        const wind=Number(byId('cruiseWind').value);
+        route=isClimb?makeClimbLesson(departure,profile,wind).route:makeCruiseTrial(departure,destination,profile,wind).route;
+        if(isClimb) destination=departure;
       }
       if(isVoyage){
         departure=airports.find(a=>a.code==='RCTP');
@@ -571,7 +575,7 @@ function initialize(){
         destination=airports.find(a=>a.code===mission.to);
         route=benchmarkRoute(model.role,departure,destination);
       }
-      const points=[departure,...route,destination];
+      const points=isClimb?[departure,...route]:[departure,...route,destination];
       planMap.fillStyle='#12364d';planMap.fillRect(0,0,430,440);
       for(let y=0;y<440;y+=4){
         for(let x=0;x<430;x+=4){
@@ -594,11 +598,11 @@ function initialize(){
         planMap.fillRect(x-2,y-2,4,4);
         planMap.fillText(r.code,x+7,y+3);
       }
-      byId('routePreview').textContent=departure.name+' → '+destination.name+' · '+route.map(p=>p.name).join(' → ');
-      byId('message').textContent=isVoyage?'桃園及成田周邊高程可離線使用。夜航任務固定夜間開始。':'區域高程可離線使用。模擬航線供遊戲練習。';
+      byId('routePreview').textContent=isClimb?'777-300ER · 桃園 05L 起飛 · 35,000 ft 巡航練習':departure.name+' → '+destination.name+' · '+route.map(p=>p.name).join(' → ');
+      byId('message').textContent=isClimb?'從跑道靜止開始，手動起飛。巡航高度與速度維持 60 秒後儲存成績。':isVoyage?'桃園及成田周邊高程可離線使用。夜航任務固定夜間開始。':'區域高程可離線使用。模擬航線供遊戲練習。';
     }catch(error){byId('message').textContent=error.message;}
   }
-  for(const name of ['aircraft','departure','destination','waypoints','lesson']) byId(name).addEventListener('change',drawPlan);
+  for(const name of ['aircraft','departure','destination','waypoints','lesson','cruiseWind']) byId(name).addEventListener('change',drawPlan);
   function showLog(){
     const rows=readFlightLog();
     byId('log').replaceChildren();
@@ -736,10 +740,6 @@ function initialize(){
       (f.airborne&&f.fuel<service.brief.reserve?' · 低油量，請檢查備降':'')+
       (service.announcement?' · 廣播：'+service.announcement:'');
   }
-  function climbReady(f){
-    return !f.ground&&f.battery&&!f.flaps&&!f.gear&&!f.spoilers&&f.engines.every(Boolean)&&
-      f.y>f.departure.elevation+150&&flightSpeeds(f).ias*knotsPerMps>f.aircraft.rotation+15;
-  }
   function showSystems(f){
     switches.replaceChildren();special.replaceChildren();
     const entries=[
@@ -839,6 +839,11 @@ function initialize(){
         if(!compatibleAirline(profile,from,to)) throw new Error('此機型不適用所選機位或跑道。');
         flight=makePassengerFlight(from,to,profile,wind,Number(byId('airlineFuel').value),weather,byId('time').value);
         savePassenger(flight);
+      }else if(lesson==='climbLesson'){
+        if(approach) throw new Error('請按開始飛行，從桃園跑道開始練習。');
+        const profile=fleet.find(a=>a.id==='b773');
+        byId('aircraft').value=profile.id;
+        flight=makeClimbLesson(airports.find(a=>a.code==='RCTP'),profile,Number(byId('cruiseWind').value));
       }else if(lesson==='cruiseTrial'){
         if(approach) throw new Error('請按開始飛行進入巡航驗證。');
         const profile=fleet.find(a=>a.id==='b773');
@@ -1054,6 +1059,19 @@ function initialize(){
       if(!byId('voyageGuided').checked&&!paused) return '貨運任務 · '+Math.round(f.fuel)+' kg 燃油';
     }
     if(paused) return '已暫停 · P 繼續';
+    if(f.climbLesson){
+      if(f.finished){
+        if(f.climbLesson.failed) return '巡航練習失敗 · R 重飛';
+        const {gs,mach}=flightSpeeds(f);
+        return '巡航練習完成 · Mach '+mach.toFixed(3)+' · GS '+Math.round(gs*knotsPerMps)+' kt · '+
+          (f.recorded?'已儲存紀錄':'未能儲存')+' · R 重飛';
+      }
+      if(f.ground) return knots<f.aircraft.rotation?'桃園 05L · 增加油門，達到 '+f.aircraft.rotation+' IAS kt 再抬頭':'抬頭離地 · 正爬升後收起落架';
+      if(f.stall) return '失速 · 放低機鼻';
+      if(f.hold?.climb||f.climbLesson.stable>0) return '目標 35,000 ft · Mach 0.84 · 穩定 '+Math.floor(f.climbLesson.stable)+'/60 秒 · 剩油 '+Math.round(f.fuel)+' kg';
+      if(f.gear||f.flaps||f.spoilers) return '保持正爬升 · 收起落架、襟翼及擾流板';
+      return climbReady(f)?'接通「爬升／巡航 35,000 ft」':'保持正爬升 · 離地約 500 呎且至少 164 IAS kt 後接通爬升';
+    }
     if(f.finished&&f.service) return '載客航班已結算 · 請查看地勤面板';
     if(f.finished) return (f.ended?'落地失敗':f.mission?'任務完成'+(f.rewardPaid?' · 獎金 $'+f.reward.toLocaleString():''):'已落地並停妥')+' · '+(f.recorded?'已儲存紀錄':'未能儲存')+' · R 重飛';
     if(f.ended) return '落地失敗 · R 重飛';

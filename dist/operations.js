@@ -171,6 +171,37 @@ function makeCruiseTrial(departure,destination,aircraft,tailwind){
     hold:{heading,altitude,mach:aircraft.cruiseMach}
   });
 }
+function makeClimbLesson(airport,aircraft,tailwind){
+  const route=[{...airportPoint(airport,300000,0),name:'05L 延伸航向 · 巡航練習'}];
+  const f=makeRegionalFlight(airport,airport,aircraft,'runway',0,route);
+  const wind=tailwind/knotsPerMps;
+  return Object.assign(f,{lesson:'climbLesson',climbLesson:{stable:0},
+    fuel:45000,fuelStart:45000,
+    windVector:{x:Math.sin(f.heading)*wind,z:-Math.cos(f.heading)*wind}
+  });
+}
+function climbReady(f){
+  return !f.ground&&f.battery&&!f.flaps&&!f.gear&&!f.spoilers&&f.engines.every(Boolean)&&f.fuel!==0&&
+    f.y>f.departure.elevation+150&&flightSpeeds(f).ias*knotsPerMps>f.aircraft.rotation+15;
+}
+function updateClimbLesson(f,save){
+  const lesson=f.climbLesson;
+  if(f.ended||f.landed||f.fuel<=0){
+    f.finished=true;
+    lesson.failed=true;
+    f.recorded=save(f,f.fuel<=0?'巡航練習失敗 · 燃油耗盡':'巡航練習失敗 · 中途接地');
+    return;
+  }
+  if(!f.airborne) return;
+  const speeds=flightSpeeds(f);
+  const stable=Math.abs(f.y-35000*.3048)<60&&Math.abs(f.vy)<2&&
+    Math.abs(speeds.mach-f.aircraft.cruiseMach)<.015&&!f.gear&&!f.flaps&&!f.spoilers;
+  lesson.stable=stable?lesson.stable+simTick:0;
+  if(lesson.stable<60) return;
+  f.finished=true;
+  f.recorded=save(f,'巡航練習完成 · Mach '+speeds.mach.toFixed(3)+' · GS '+
+    Math.round(speeds.gs*knotsPerMps)+' kt · 耗油 '+Math.round(f.fuelStart-f.fuel)+' kg');
+}
 function startEngine(f,index){
   if(f.engines[index]){
     f.engines[index]=false;
@@ -183,6 +214,7 @@ function startEngine(f,index){
 }
 function updateRegionalFlight(f,save=recordFlight){
   if(f.finished) return;
+  if(f.climbLesson){updateClimbLesson(f,save);return;}
   if(f.ended){
     f.finished=true;
     f.recorded=save(f,'落地失敗');
@@ -233,6 +265,6 @@ function activeTarget(f){
   if(f.phase==='taxi'||f.phase==='cold') return f.taxi[f.taxiIndex];
   return f.route[f.waypoint];
 }
-if(typeof module!=='undefined') Object.assign(globalThis,{makeRegionalFlight,startEngine,updateRegionalFlight,activeTarget,readFlightLog,makeCruiseTrial,makePassengerFlight,updatePassengerService,savePassenger,readCareer,recordFlight,passengerBrief});
+if(typeof module!=='undefined') Object.assign(globalThis,{makeRegionalFlight,startEngine,updateRegionalFlight,activeTarget,readFlightLog,makeCruiseTrial,makeClimbLesson,climbReady,makePassengerFlight,updatePassengerService,savePassenger,readCareer,recordFlight,passengerBrief});
 
 
