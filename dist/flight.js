@@ -429,7 +429,7 @@ function initialize(){
     byId('sound').textContent=audioEnabled?'關閉音效':'音效';
     byId('sound').blur();
   };
-  const statLabels=['IAS kt','高度 FT','升降 FT/M','航向','功率','襟翼／配平'];
+  const statLabels=['IAS kt','高度 FT','升降 FT/M','航向','功率','襟翼／配平','地速 GS kt','真空速 TAS kt','Mach'];
   byId('stats').innerHTML=statLabels.map(label=>'<div class="stat"><small>'+label+'</small><b></b></div>').join('');
   const statValues=Array.from(byId('stats').querySelectorAll('b'));
   const labelAirport=r=>r.code+' '+r.name+' · '+r.designator;
@@ -736,6 +736,10 @@ function initialize(){
       (f.airborne&&f.fuel<service.brief.reserve?' · 低油量，請檢查備降':'')+
       (service.announcement?' · 廣播：'+service.announcement:'');
   }
+  function climbReady(f){
+    return !f.ground&&f.battery&&!f.flaps&&!f.gear&&!f.spoilers&&f.engines.every(Boolean)&&
+      f.y>f.departure.elevation+150&&flightSpeeds(f).ias*knotsPerMps>f.aircraft.rotation+15;
+  }
   function showSystems(f){
     switches.replaceChildren();special.replaceChildren();
     const entries=[
@@ -752,6 +756,12 @@ function initialize(){
     }
     if(f.aircraft.jet){
       entries.push(['擾流板',()=>f.spoilers,()=>f.spoilers=!f.spoilers]);
+      if(f.aircraft.cruiseMach) entries.push(['爬升／巡航 35,000 ft',()=>Boolean(f.hold?.climb),()=>{
+        if(f.hold?.climb){f.hold=null;return;}
+        if(climbReady(f)){
+          f.hold={heading:f.heading,altitude:35000*.3048,mach:f.aircraft.cruiseMach,climb:true};
+        }
+      }]);
       entries.push(['航向／高度保持',()=>Boolean(f.hold),()=>{f.hold=f.hold?null:!f.ground&&f.battery?{heading:f.heading,altitude:f.y,mach:f.y>7000&&!f.flaps&&!f.gear?f.aircraft.cruiseMach:null}:null;}]);
     }
     if(f.aircraft.role==='fighter') entries.push(['加力待命',()=>f.boost,()=>{if(f.engines[0]) f.boost=!f.boost;}]);
@@ -785,7 +795,13 @@ function initialize(){
     for(const [label,get,toggle] of entries){
       const b=document.createElement('button');
       b.textContent=label;
-      b.update=()=>b.setAttribute('aria-pressed',get()?'true':'false');
+      b.update=()=>{
+        b.setAttribute('aria-pressed',String(Boolean(get())));
+        if(label==='爬升／巡航 35,000 ft'){
+          b.disabled=!get()&&!climbReady(f);
+          b.title='離地至少 500 呎，收起落架、襟翼與擾流板，並加速至抬輪速度以上 15 節';
+        }
+      };
       b.onclick=()=>{
         const before=get();
         toggle();b.update();b.blur();
@@ -989,20 +1005,22 @@ function initialize(){
       rudder:axis('KeyE','KeyQ')+padAxis(pad?.axes[2])},settings);
     let {roll,pitch}=manual;
     let throttle=clamp(axis(up,down)+Number(Boolean(buttons[5]?.pressed))-Number(Boolean(buttons[4]?.pressed)),-1,1)*.48;
+    if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
+      f.hold=null;
+    }
     if(f.ground||!settings.keepBank||f.hold) f.bankCommand=0;
     else if(Math.abs(roll)>.04) f.bankCommand=roll;
     else roll=f.bankCommand||0;
-    const maneuver=f.hold?1:(f.ground?1.12:1.38);
     if(f.hold){
       if(Math.abs(roll)+Math.abs(pitch)+Math.abs(manual.rudder)+Math.abs(throttle)>.15) f.hold=null;
       else {
         roll=clamp(wrapAngle(f.hold.heading-f.heading)*2,-.45,.45);
         const desiredVS=clamp((f.hold.altitude-f.y)*.14,-5,5);
         pitch=clamp(.36+(desiredVS-f.vy)*.11,-.7,.85);
-        if(f.hold.mach) ({pitch,throttle}=cruiseControls(f));
+        if(f.hold.mach) ({pitch,throttle}=f.hold.climb?climbCruiseControls(f):cruiseControls(f));
       }
     }
-    return {response:settings.sensitivity,maneuver,pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
+    return {response:settings.sensitivity,maneuver:f.hold?1:(f.ground?1.12:1.38),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
       rudder:clamp(manual.rudder+(f.ground?roll:0),-1,1),
       throttle,
       trim:axis('KeyX','KeyZ')*.22,brake:keys.has('Space')||Boolean(buttons[0]?.pressed)};
@@ -1293,8 +1311,9 @@ function initialize(){
         camera.position.copy(eye);camera.up.set(0,1,0);
         camera.lookAt(pos.clone().addScaledVector(dir,11).add(new THREE.Vector3(0,.44,0)));
       }
-      const knots=Math.round(flightSpeeds(f).ias*knotsPerMps), live=!f.regional||f.battery;
-      const values=[knots,Math.round(f.y*3.28084),Math.round(f.vs*196.85),String(Math.round(((f.heading/rad)%360+360)%360)%360).padStart(3,'0')+'°',Math.round(f.power*100)+'%',f.flaps+' / '+Math.round(f.trim/rad)+'°'];
+      const speeds=flightSpeeds(f);
+      const knots=Math.round(speeds.ias*knotsPerMps), live=!f.regional||f.battery;
+      const values=[knots,Math.round(f.y*3.28084),Math.round(f.vs*196.85),String(Math.round(((f.heading/rad)%360+360)%360)%360).padStart(3,'0')+'°',Math.round(f.power*100)+'%',f.flaps+' / '+Math.round(f.trim/rad)+'°',Math.round(speeds.gs*knotsPerMps),Math.round(speeds.tas*knotsPerMps),speeds.mach.toFixed(2)];
       values.forEach((value,i)=>statValues[i].textContent=live?value:'—');
       byId('benchmarkHUD').hidden=!profile.role||cameraMode!==1||!live||Boolean(f.cabinView);
       if(profile.role&&cameraMode===1&&live&&!f.cabinView){
@@ -1305,7 +1324,7 @@ function initialize(){
       if(f.regional){
         for(const b of switches.children) b.update();
         byId('instrumentType').textContent=live?
-          f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+(f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+(f.hold?' · 保持接通':''):'航電未供電';
+          f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+(f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+(f.hold?.climb?(f.hold.levelOff?' · 巡航保持':' · 爬升至 35,000 ft'):(f.hold?' · 保持接通':'')):'航電未供電';
         if(profile.role&&live){
           const guide=approachGuidance(f);
           byId('instrumentType').textContent+=' · VAPP '+profile.approach+(f.boost&&f.power>.89?' · 加力':'');

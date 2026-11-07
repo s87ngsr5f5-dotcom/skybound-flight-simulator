@@ -42,6 +42,28 @@ function cruiseControls(f){
     throttle:limit((hold.mach-mach)*15,-.7,.7)
   };
 }
+function climbCruiseControls(f){
+  const hold=f.hold;
+  const remaining=hold.altitude-f.y;
+  if(remaining<150 && !hold.levelOff) hold.levelOff=true;
+  if(hold.levelOff) return cruiseControls(f);
+  const air=atmosphere(f.y,f.temperatureOffset);
+  const {tas,ias,mach}=flightSpeeds(f);
+  const aircraft=f.aircraft;
+  // Accelerate before climbing and ease into the cruise Mach target as density falls.
+  const climbIAS=limit(aircraft.rotation+45+(f.y-500)*.035,aircraft.rotation+45,245)
+    +40*limit((f.y-3048)/1100,0,1);
+  const speedError=Math.max((ias-climbIAS/knotsPerMps)*1.45,(mach-hold.mach)*air.sound);
+  const desiredVS=limit(speedError*.85+5,-3,Math.min(18,remaining*.045));
+  const blend=limit((f.y-2500)/5500,0,1);
+  const density=1.225*Math.exp(-Math.max(0,f.y)/8500)*(1-blend)+air.density*blend;
+  const q=.5*density*Math.max(tas*tas,1);
+  const liftPitch=(flightMass(f)*9.80665/(q*aircraft.wingArea)-.27)/5.05-.036;
+  const path=Math.atan2(f.vy,Math.max(tas,1));
+  const pitch=liftPitch+path+(desiredVS-f.vy)*.022;
+  const throttle=speedError>12 ? limit((12-speedError)*.10,-1,0) : 1;
+  return {pitch:limit((pitch-.015-f.trim)/.24,-.7,.65),throttle};
+}
 function flightMass(f){
   const aircraft=f.aircraft||trainer;
   return aircraft.mass+(f.cargoState?.mass||0)+(f.voyage?f.fuel-56000:0)+
@@ -178,5 +200,5 @@ function stepTrainer(f, input, dt=simTick){
   f.speed=speed;
   f.vs=f.vy;
 }
-if(typeof module!=='undefined') module.exports={trainer,runway10,simTick,localRunway,worldRunway,groundHeight,createTrainer,stepTrainer,wrapAngle,flightSpeeds,atmosphere,cruiseControls,flightMass,knotsPerMps};
+if(typeof module!=='undefined') module.exports={trainer,runway10,simTick,localRunway,worldRunway,groundHeight,createTrainer,stepTrainer,wrapAngle,flightSpeeds,atmosphere,cruiseControls,climbCruiseControls,flightMass,knotsPerMps};
 

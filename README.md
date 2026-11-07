@@ -21,3 +21,10 @@
 - [Boeing 767 機場規劃資料](https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/767_REV_K.pdf)
 - [F-5E 參考資料](https://www.aerospaceutah.org/museum/our-collections/aircraft-collection/f-5e-tiger-ii/)
 - [金門機場 AIP](https://ais.caa.gov.tw/eaip/AIRAC%20AIP%20AMDT%2005-26_2026_10_29/eAIP/RC-AD%202%20RCBS%20%E9%87%91%E9%96%80KINMEN-en-GB.html)
+
+
+## 跑道起飛與巡航
+
+自由飛行選 777-300ER 或其他有巡航設定的客貨機，從跑道待命開始。W 增加推力。離地至少約 500 呎並加速到抬輪速度以上 15 節後，收起落架、襟翼及擾流板，按「爬升／巡航 35,000 ft」。此模式沿接通時的航向加速並爬升，接近目標高度時轉入定高與 Mach 保持，不會追蹤航線或避讓地形。手動俯仰、轉向、方向舵或油門可解除。主畫面同時顯示 IAS、GS、TAS 和 Mach。
+
+`node verify-cruise.cjs` 會先核對 777 的無風、順風與逆風巡航，再從桃園跑道靜止狀態測試六架具巡航設定的客貨機，確認滑跑距離、離地、爬升和速度。標準重量的 777 無風約 14 分鐘抵達 34,836 呎，測得 Mach 0.842、地速 486 節。載重、風和高度會影響結果。
