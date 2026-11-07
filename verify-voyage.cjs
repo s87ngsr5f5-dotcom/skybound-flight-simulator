@@ -15,7 +15,7 @@ const controller=raw
   .replace('(final?.19:.54)+(goalSpeed-f.speed)*.095','(final?.14:.44)+(goalSpeed-f.speed)*.095');
 vm.runInThisContext(controller);
 const storage=new Map();
-globalThis.localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)};
+globalThis.localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)};
 const from=taiwanAirports.find(a=>a.code==='RCTP');
 const profile=fleet.find(a=>a.id==='sf748');
 for(const node of ['taxi','descent','approach','warning']){
@@ -23,7 +23,8 @@ for(const node of ['taxi','descent','approach','warning']){
   assert.deepEqual(one,makeCargoVoyage(from,profile,node,0));
 }
 for(const mass of [[9000,18000,8000],[26000,28000,30000]]){
-  const f=makeCargoVoyage(from,profile,'load',0);
+  let f=makeCargoVoyage(from,profile,'load',0);
+  f.checkpointId=crypto.randomUUID();
   f.fuelStart=f.fuel;
   attachContract(f,'cargo',40000);
   const beforeMoney=readCareer().money;
@@ -58,6 +59,15 @@ for(const mass of [[9000,18000,8000],[26000,28000,30000]]){
     }
     stepTrainer(f,pilot(f));
     captureVoyage(f,replay);
+    if(tick===120*7000){
+      assert(f.airborne&&replay.length>10);
+      assert(writeMissionCheckpoint(f,{lesson:'naritaCargo',rate:'8'},replay));
+      const saved=readMissionCheckpoint();
+      assert.deepEqual(saved.flight,f);
+      assert.deepEqual(saved.frames,JSON.parse(JSON.stringify(replay)));
+      f=saved.flight;
+      replay.splice(0,replay.length,...saved.frames);
+    }
   }
   captureVoyage(f,replay,true);
   const restored=makeCargoVoyage(from,profile,'load',0);
@@ -67,6 +77,8 @@ for(const mass of [[9000,18000,8000],[26000,28000,30000]]){
   assert(replay.some(row=>row.includes('approach')));
   console.log(JSON.stringify({cargo:initial.mass,cg:initial.shift,seconds:Math.round(f.elapsed),remainingFuel:Math.round(f.fuel),roll:Math.round(liftoff-rollStart),climb:Math.round(climb*196.85),touchdown:f.touchdown,result,frames:replay.length,waypoint:f.waypoint,geo:latLon(f.x,f.z)}));
   assert.equal(result,'任務完成');
+  assert.equal(readMissionCheckpoint(),null);
+  assert(clearMissionCheckpoint(f.checkpointId));
   assert.equal(f.contract.cargoAtTakeoff,initial.mass);
   assert.equal(f.receipt.base,40000+Math.round(initial.mass*.28));
   assert.equal(readCareer().money,beforeMoney+f.receipt.net);

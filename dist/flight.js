@@ -411,9 +411,9 @@ function initialize(){
     byId('aircraft').value='sf748';
     byId('lesson').value='naritaCargo';
     byId('time').value=data.time||'21:00';
-    start(false);
-    if(!flight?.voyage) return;
+    flight=makeCargoVoyage(airports.find(a=>a.code==='RCTP'),selectedAircraft(),data.node||'load',data.wind||0);
     replay={...data,time:0,duration:data.frames.at(-1)[0],rate:60,paused:false};
+    beginFlight();
     replaySeek.max=replay.duration;replaySeek.value=0;
     byId('replayToggle').textContent='暫停回放';
     byId('replayRate').textContent='倍率 60×';
@@ -495,6 +495,12 @@ function initialize(){
     const career=readCareer();
     byId('wallet').textContent='遊戲金幣 '+career.money.toLocaleString()+' · 存在目前瀏覽器';
     byId('resumeAirline').hidden=!career.active;
+    const checkpoint=readMissionCheckpoint();
+    byId('resumeMission').hidden=byId('discardMission').hidden=!checkpoint;
+    if(checkpoint){
+      const f=checkpoint.flight;
+      byId('resumeMission').textContent='繼續任務 · '+f.aircraft.name+' · '+f.departure.code+' → '+f.destination.code;
+    }
     if(!active) return;
     const aircraft=selectedAircraft();
     const field=byId('airlineFuel');
@@ -540,6 +546,38 @@ function initialize(){
     byId('weather').value=saved.service.weather;byId('time').value=saved.service.time;
     flight=saved;
     beginFlight();
+  };
+  byId('resumeMission').onclick=()=>{
+    const checkpoint=readMissionCheckpoint();
+    if(!checkpoint) return;
+    const {flight:saved,options,frames}=checkpoint;
+    const aircraft=fleet.find(a=>a.id===saved.aircraft.id);
+    if(!aircraft){byId('message').textContent='此存檔的機型目前無法載入。';return;}
+    saved.aircraft=aircraft;
+    byId('aircraft').value=aircraft.id;
+    byId('lesson').value=options.lesson;
+    byId('weather').value=options.weather;
+    byId('time').value=options.time;
+    if(saved.voyage){
+      byId('voyageNode').value=saved.node;
+      byId('voyageRate').value=options.rate;
+      byId('voyageGuided').checked=options.guided;
+    }
+    byId('cruiseWind').value=options.cruiseWind;
+    replay=null;
+    replayControls.hidden=true;
+    voyageFrames=saved.voyage?frames:[];
+    flight=saved;
+    beginFlight();
+    cameraMode=options.camera;
+    changeView();
+    paused=true;
+    nextCheckpoint=performance.now()+15000;
+  };
+  byId('discardMission').onclick=()=>{
+    const checkpoint=readMissionCheckpoint();
+    if(!checkpoint||!confirm('刪除尚未完成的任務進度與其未完成的回放？')) return;
+    if(clearMissionCheckpoint(checkpoint.flight.checkpointId)) drawPlan();
   };
   function drawPlan(){
     updateAirlinePlan();
@@ -647,7 +685,17 @@ function initialize(){
     return day;
   }
   let activeDay=1;
-  addEventListener('pagehide',()=>{if(flight?.service) savePassenger(flight);});
+  let nextCheckpoint=0;
+  function saveCurrentMission(f,replaces){
+    if(!f||replay) return;
+    if(f.service){savePassenger(f);return;}
+    if(!f.checkpointId||f.finished) return;
+    const options={lesson:byId('lesson').value,weather:byId('weather').value,time:byId('time').value,
+      rate:byId('voyageRate').value,guided:byId('voyageGuided').checked,cruiseWind:byId('cruiseWind').value,camera:cameraMode};
+    f.checkpointFailed=!writeMissionCheckpoint(f,options,f.voyage?voyageFrames:[],replaces);
+    nextCheckpoint=performance.now()+15000;
+  }
+  addEventListener('pagehide',()=>saveCurrentMission(flight));
   function addPassengerSystems(f,entries){
     const service=f.service;
     const atGate=()=>!f.finished&&groundServiceAllowed(f)&&!service.pushing&&(!service.pushed||f.awaitingService);
@@ -825,11 +873,17 @@ function initialize(){
     byId('hud').hidden=byId('menu').hidden=false;
     changeView();
   }
-  function start(approach){
+  function start(approach,restart=false){
     try{
       const lesson=byId('lesson').value;
       const selection=regionalContracts[lesson]?regionalContractPlan(lesson):parsePlan();
       const weather=byId('weather').value;
+      const savesMission=Boolean(regionalContracts[lesson]||lesson==='climbLesson'||lesson==='naritaCargo'||
+        lesson==='benchmark'&&['fighter','cargo'].includes(selectedAircraft().role));
+      const checkpoint=readMissionCheckpoint();
+      if(savesMission&&checkpoint&&!(restart&&checkpoint.flight.checkpointId===flight?.checkpointId)){
+        throw new Error('已有任務存檔，請先繼續或刪除該存檔。');
+      }
       const wind=lesson==='crosswind'?5.144:['fog','wet'].includes(weather)?0:Number(weather);
       replay=null;replayControls.hidden=true;
       if(regionalContracts[lesson]){
@@ -909,11 +963,15 @@ function initialize(){
           flight.engines.fill(true);
         }
       }
+      if(savesMission){
+        flight.checkpointId=crypto.randomUUID();
+        saveCurrentMission(flight,restart?checkpoint?.flight.checkpointId:undefined);
+      }
       beginFlight();
     }catch(error){byId('message').textContent=error.message;}
   }
   function menu(){
-    if(flight?.service) savePassenger(flight);
+    saveCurrentMission(flight);
     replay=null;replayControls.hidden=true;updateReplayButton();
     flight=null;pointer.active=false;keys.clear();
     byId('hud').hidden=byId('menu').hidden=true;
@@ -927,7 +985,7 @@ function initialize(){
     if(code==='KeyC'){if(flight.cabinView) flight.cabinView=false;else cameraMode=1-cameraMode;changeView();}
     if(code==='KeyP') paused=!paused;
     if(code==='KeyF') flight.flaps=(flight.flaps+1)%3;
-    if(code==='KeyR'&&!flight.service) start(flight.approach);
+    if(code==='KeyR'&&!flight.service) start(flight.approach,true);
     if(!flight.regional) return;
     if(code==='KeyB') flight.parkingBrake=!flight.parkingBrake;
     if(code==='KeyI') startEngine(flight,0);
@@ -1066,6 +1124,8 @@ function initialize(){
   }
   function status(f,knots,target){
     if(replay) return '貨運回放 · '+Math.floor(replay.time/60)+' 分鐘 · '+f.phase;
+    if(paused) return '已暫停 · P 繼續';
+    if(f.checkpointFailed&&!f.finished) return '任務存檔未更新 · 請檢查瀏覽器儲存空間或其他分頁';
     if(f.contract&&f.finished){
       const receipt=f.receipt;
       const payout=receipt?' · 收入 '+receipt.base+' − 燃油 '+receipt.fuel+' = '+receipt.net+' 金幣':'';
@@ -1077,7 +1137,6 @@ function initialize(){
       if(f.noseDoor||f.sideDoor) return '貨門警告 · 關門前禁止滑行及啟動引擎';
       if(!byId('voyageGuided').checked&&!paused) return '貨運任務 · '+Math.round(f.fuel)+' kg 燃油';
     }
-    if(paused) return '已暫停 · P 繼續';
     if(f.climbLesson){
       if(f.finished){
         if(f.climbLesson.failed) return '巡航練習失敗 · R 重飛';
@@ -1223,10 +1282,12 @@ function initialize(){
           accumulator-=simTick;
           if(f.finished){
             if(f.voyage) f.replaySaved=storeVoyage(voyageFrames,f);
+            if(f.checkpointId) clearMissionCheckpoint(f.checkpointId);
             accumulator=0;break;
           }
         }
       }
+      if(f.checkpointId&&!replay&&!f.finished&&!paused&&now>=nextCheckpoint) saveCurrentMission(f);
       if(f.service){
         if(Math.floor(f.elapsed/5)!==f.service.checkpoint){
           f.service.checkpoint=Math.floor(f.elapsed/5);

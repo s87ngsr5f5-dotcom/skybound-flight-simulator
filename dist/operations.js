@@ -32,6 +32,32 @@ function savePassenger(f){
   career.active=f;
   try{localStorage.setItem(careerKey,JSON.stringify(career));}catch{}
 }
+const missionSaveKey='skybound.missionCheckpoint.v1';
+function readMissionCheckpoint(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(missionSaveKey)||'null');
+    if(!saved?.flight?.checkpointId||saved.flight.finished||!saved.options||!Array.isArray(saved.frames)) return null;
+    if(saved.flight.contract&&readCareer().receipts[saved.flight.contract.id]) return null;
+    return saved;
+  }catch{return null;}
+}
+function writeMissionCheckpoint(f,options,frames=[],replaces){
+  if(f.finished||!f.checkpointId||f.contract&&readCareer().receipts[f.contract.id]) return false;
+  const current=readMissionCheckpoint();
+  if(current&&![f.checkpointId,replaces].includes(current.flight.checkpointId)) return false;
+  try{
+    localStorage.setItem(missionSaveKey,JSON.stringify({flight:f,options,frames}));
+    return true;
+  }catch{return false;}
+}
+function clearMissionCheckpoint(id){
+  try{
+    const current=JSON.parse(localStorage.getItem(missionSaveKey)||'null');
+    if(current?.flight?.checkpointId!==id) return false;
+    localStorage.removeItem(missionSaveKey);
+    return true;
+  }catch{return false;}
+}
 function passengerBrief(aircraft,departure,destination){
   const passengers=aircraft.passengers??320;
   const route=destination.code==='RJAA'?cargoVoyageRoute:
