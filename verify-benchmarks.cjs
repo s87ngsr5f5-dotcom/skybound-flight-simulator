@@ -20,15 +20,16 @@ function verifyBenchmark(profile,load){
   const route=benchmarkRoute(profile.role,from,to);
   const f=makeRegionalFlight(from,to,profile,'cold',0,route);
   f.mission=profile.role;
+  const cargoDoor=profile.sideCargo?'sideDoor':'noseDoor';
   if(profile.role==='cargo'){
     assert(!setPallet(f,0,1000));
-    f.noseDoor=true;
+    f[cargoDoor]=true;
     assert(setPallet(f,0,38000));assert(cargoBalance(f).problems.length>0);
     load.forEach((mass,i)=>assert(setPallet(f,i,mass)));
     assert.equal(cargoBalance(f).problems.length,0);
     f.battery=true;
     assert(!startEngine(f,0));
-    f.noseDoor=false;f.loadedAtDeparture=true;
+    f[cargoDoor]=false;f.loadedAtDeparture=true;
   }
   const payload=profile.role==='cargo'?cargoBalance(f):{mass:0,shift:0};
   f.battery=true;f.engines.forEach((_,i)=>assert(startEngine(f,i)));
@@ -48,9 +49,9 @@ function verifyBenchmark(profile,load){
       f.engines.forEach((on,index)=>{if(on) startEngine(f,index);});
       if(profile.role==='passenger'){assert(groundServiceAllowed(f));f.bridge=true;}
       if(profile.role==='cargo'){
-        f.noseDoor=true;
+        f[cargoDoor]=true;
         f.pallets.forEach((_,index)=>assert(setPallet(f,index,0)));
-        f.noseDoor=false;
+        f[cargoDoor]=false;
       }
     }
     stepTrainer(f,pilot(f));
@@ -63,7 +64,7 @@ function verifyBenchmark(profile,load){
 for(const plane of benchmarkFleet){
   if(process.argv.length>2&&!process.argv.includes(plane.id)) continue;
   verifyBenchmark(plane,[9000,18000,8000]);
-  if(plane.role==='cargo') verifyBenchmark(plane,[26000,28000,30000]);
+  if(plane.role==='cargo') verifyBenchmark(plane,plane.sideCargo?[15000,18000,17000]:[26000,28000,30000]);
 }
 
 

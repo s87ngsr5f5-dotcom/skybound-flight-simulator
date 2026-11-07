@@ -5,7 +5,8 @@ function buildBenchmarkAirframe(profile,scene){
   const fighter=profile.role==='fighter', freight=profile.role==='cargo';
   const color=fighter?0x778798:freight?0xd9e2e4:0xf2f5f7;
   const surface=new THREE.MeshStandardMaterial({color,roughness:.57,metalness:fighter?.19:.08});
-  const paint=new THREE.MeshStandardMaterial({color:freight?0x173d5d:0x146a80,roughness:.48});
+  const stockColor=profile.trimColor??(freight?0x173d5d:0x146a80);
+  const paint=new THREE.MeshStandardMaterial({color:stockColor,roughness:.48});
   const rubber=new THREE.MeshStandardMaterial({color:0x151a1e,roughness:.94});
   const metal=new THREE.MeshStandardMaterial({color:0x667886,roughness:.33,metalness:.59});
   const dark=new THREE.MeshStandardMaterial({color:0x14212b,roughness:.66});
@@ -44,14 +45,25 @@ function buildBenchmarkAirframe(profile,scene){
     const canopy=mesh(group,new THREE.SphereGeometry(1,36,20),glazing,0,.69,-half*.33);
     canopy.scale.set(.67,.57,1.86);
     block(group,metal,.12,.14,1.8,0,1.15,-half*.28);
+    if(profile.sideIntakes){
+      for(const side of [-1,1]){
+        const nacelle=hull(group,[[-half*.32,.33],[-half*.21,.44],[half*.65,.39],[half*.92,.30]],surface,.8);
+        nacelle.position.set(side*.60,-.22,0);
+        const opening=mesh(group,new THREE.CircleGeometry(.30,22),dark,side*.60,-.22,-half*.32-.01);
+        opening.rotation.y=Math.PI;opening.scale.y=.82;
+        hull(group,[[half*.84,.34],[half*.96,.32],[half*1.01,.28]],metal).position.set(side*.38,-.12,0);
+        mesh(group,new THREE.CircleGeometry(.24,24),dark,side*.38,-.12,half*1.01+.02);
+      }
+    }else{
     const intake=hull(group,[[-2.3,.62],[-2.05,.67],[1.35,.59],[1.77,.12]],surface,.65);
     intake.position.y=-.61;
     const opening=mesh(group,new THREE.CircleGeometry(.57,32),dark,0,-.64,-2.32);
     opening.scale.y=.66;opening.rotation.y=Math.PI;
     hull(group,[[half-.7,.63],[half-.55,.68],[half-.1,.57],[half,.54]],metal,.89);
     mesh(group,new THREE.CircleGeometry(.46,24),dark,0,0,half+.013);
+    }
   }else{
-    if(freight){
+    if(freight&&!profile.sideCargo){
       hull(group,body.slice(2),surface,.96);
       noseDoor.position.set(0,radius*.60,-half*.77);
       const nose=hull(noseDoor,body.slice(0,3).map(([z,r])=>[z+half*.77,r]),surface,.96);
@@ -65,6 +77,11 @@ function buildBenchmarkAirframe(profile,scene){
       hull(group,body,surface,1.18);
       const lower=hull(group,body.map(([z,r])=>[z,r*.91]),paint,1.06);
       lower.position.y=-radius*.31;
+      if(profile.sideCargo){
+        sideDoor.position.set(-radius*.96,radius*.49,-half*.49);
+        block(sideDoor,metal,.12,2.58,3.45,0,-1.29,0);
+        block(sideDoor,paint,.14,2.38,3.25,-.06,-1.29,0);
+      }
     }
     const windshield=mesh(group,new THREE.SphereGeometry(1,28,16),glazing,0,radius*(freight?1.04:.75),-half*.79);
     windshield.scale.set(radius*.68,radius*.17,half*.062);
@@ -95,7 +112,7 @@ function buildBenchmarkAirframe(profile,scene){
   }
   const surfaces=[], flaps=[], lamps=[], fans=[];
   for(const side of [-1,1]){
-    const chord=fighter?4.4:half*.51;
+    const chord=fighter?(profile.sideIntakes?2.85:4.4):half*.51;
     const root=-half*(fighter?.29:.24);
     const tip=root+sweep;
     const wingVertices=[],wingIndices=[],sections=12,slices=24;
@@ -128,7 +145,7 @@ function buildBenchmarkAirframe(profile,scene){
     const lamp=mesh(group,new THREE.SphereGeometry(fighter?.085:.19,12,8),
       new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,wingY+.16,tip);
     lamps.push(lamp);
-    if(engineCount>=2){
+    if(!fighter&&engineCount>=2){
       for(const factor of engineCount===4?[.33,.65]:[.38]){
         const engine=new THREE.Group();
         const size=profile.nacelleRadius??(freight?1.43:1.78);
@@ -157,7 +174,7 @@ function buildBenchmarkAirframe(profile,scene){
   block(group,metal,.09,.29,.23,0,-radius*.87,half*.16);
 
   const wheels=[];
-  const bogies=fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:
+  const bogies=fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:engineCount===2?[[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2]]:
     [[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2],[-radius*.82,7.8,3],[radius*.82,7.8,3]];
   for(const [x,z,axles] of bogies){
     const size=fighter?.32:.58;
@@ -191,19 +208,14 @@ function buildBenchmarkAirframe(profile,scene){
   panel.position.set(0,cabinY+.13,-half*.56-.63);
   cabin.add(panel);
 
+  const passengerCabin=profile.role==='passenger'?buildPassengerCabin(profile,cabin,group):null;
   const palletMeshes=[];
   if(!fighter){
     block(cabin,cabinFloor,radius*1.63,.15,half*1.35,0,-.78,0);
     for(let i=0;i<8;i++){
       for(const side of [-1,1]){
         block(cabin,light,.15,.07,1.7,side*radius*.52,radius*.71,-half*.54+i*half*.14);
-        if(!freight){
-          for(const seatOffset of [.67,1.22,1.77]){
-            const x=side*seatOffset,z=-half*.53+i*1.19;
-            block(cabin,seat,.45,.17,.49,x,-.43,z);
-            block(cabin,seat,.45,.66,.15,x,-.15,z+.24);
-          }
-        }
+
       }
     }
     if(freight){
@@ -213,8 +225,85 @@ function buildBenchmarkAirframe(profile,scene){
   }
   cabin.visible=false;
   scene.add(group,cabin);
-  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,wheels,cabin,palletMeshes,half,radius};
+  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,wheels,cabin,palletMeshes,passengerCabin,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
   return group;
 }
 
 
+
+function buildPassengerCabin(profile,cabin,airframe){
+  const [half,radius]=profile.geometry;
+  const count=profile.passengers??320;
+  const [leftSeats,rightSeats]=profile.seatColumns??(radius>2.4?[4,4]:[3,3]);
+  const rowSeats=leftSeats+rightSeats;
+  const rows=Math.ceil(count/rowSeats);
+  const firstZ=-half*.46,lastZ=half*.63;
+  const gap=Math.min(.94,(lastZ-firstZ)/Math.max(1,rows-1));
+  const seatWidth=Math.min(.47,(radius-.63)/Math.max(leftSeats,rightSeats));
+  const seats=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),
+    new THREE.MeshStandardMaterial({color:profile.trimColor??0x235774,roughness:.9}),count*2);
+  const head=new THREE.InstancedMesh(new THREE.SphereGeometry(.105,10,8),
+    new THREE.MeshStandardMaterial({color:0xd9a785,roughness:.94}),count);
+  const body=new THREE.InstancedMesh(new THREE.CapsuleGeometry(.145,.24,4,8),
+    new THREE.MeshStandardMaterial({color:0xffffff,roughness:.95}),count);
+  const matrix=new THREE.Object3D(),colors=[0x477ca9,0x8d424a,0x65816b,0xd3b485,0x624575];
+  const slots=[];
+  const shell=new THREE.MeshStandardMaterial({color:0xd6dfe3,side:THREE.DoubleSide,roughness:.88});
+  const trim=new THREE.MeshStandardMaterial({color:0x516474,roughness:.86});
+  const ceiling=new THREE.MeshStandardMaterial({color:0xe4eef2,emissive:0x91c3de,emissiveIntensity:.4});
+  const cabinLength=lastZ-firstZ+4;
+  const mid=(firstZ+lastZ)/2;
+  function block(mat,x,y,z,width,height,length){
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(width,height,length),mat);
+    mesh.position.set(x,y,z);cabin.add(mesh);return mesh;
+  }
+  block(trim,0,-.72,mid,radius*1.90,.10,cabinLength);
+  block(shell,0,1.52,mid,radius*1.87,.13,cabinLength);
+  block(ceiling,0,1.43,mid,.22,.045,cabinLength-.7);
+  const windows=Math.ceil(cabinLength/1.05);
+  for(const side of [-1,1]){
+    const x=side*radius*.92;
+    block(shell,x,-.23,mid,.07,1.04,cabinLength);
+    block(shell,x,1.18,mid,.07,.52,cabinLength);
+    for(let n=0;n<windows;n++){
+      block(shell,x,.61,mid-cabinLength/2+n*cabinLength/windows,.07,.64,.55);
+    }
+  }
+  const door=new THREE.Group();
+  door.position.set(-radius*.94,-.35,-half*.58-.47);
+  const doorPanel=new THREE.Mesh(new THREE.BoxGeometry(.09,1.7,.94),
+    new THREE.MeshStandardMaterial({color:0xe9f4f9,roughness:.55,metalness:.18}));
+  doorPanel.position.set(0,.47,.47);door.add(doorPanel);airframe.add(door);
+  for(let i=0;i<count;i++){
+    const row=Math.floor(i/rowSeats);
+    const column=i%rowSeats;
+    const side=column<leftSeats?-1:1;
+    const offset=side<0?column:column-leftSeats;
+    const x=side*(.54+offset*seatWidth),z=firstZ+row*gap;
+    slots.push({x,z});
+    matrix.position.set(x,-.46,z);matrix.scale.set(seatWidth*.94,.18,.51);matrix.updateMatrix();seats.setMatrixAt(i*2,matrix.matrix);
+    matrix.position.set(x,-.13,z+.26);matrix.scale.set(seatWidth*.94,.76,.13);matrix.updateMatrix();seats.setMatrixAt(i*2+1,matrix.matrix);
+    body.setColorAt(i,new THREE.Color(colors[i%colors.length]));
+  }
+  head.count=body.count=0;
+  head.frustumCulled=body.frustumCulled=false;
+  cabin.add(seats,head,body);
+  let previous=-1;
+  function update(f,dt){
+    const service=f?.service;
+    const boarded=service?.boarded??0;
+    door.rotation.y+=(Number(Boolean(service?.door))*1.55-door.rotation.y)*Math.min(1,dt*4);
+    ceiling.emissiveIntensity=service?.cabinLights===false?0:.55;
+    if(previous===boarded) return;
+    previous=boarded;
+    head.count=body.count=boarded;
+    matrix.scale.set(1,1,1);
+    for(let i=0;i<boarded;i++){
+      const {x,z}=slots[i];
+      matrix.position.set(x,.31,z+.10);matrix.updateMatrix();head.setMatrixAt(i,matrix.matrix);
+      matrix.position.set(x,-.05,z+.11);matrix.updateMatrix();body.setMatrixAt(i,matrix.matrix);
+    }
+    head.instanceMatrix.needsUpdate=body.instanceMatrix.needsUpdate=true;
+  }
+  return {update,door};
+}

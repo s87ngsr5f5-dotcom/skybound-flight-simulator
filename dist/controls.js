@@ -1,7 +1,7 @@
 'use strict';
 const defaultControls=Object.freeze({
   version:3,deadzone:.12,sensitivity:.55,invert:false,
-  mouse:false,throttleKeys:'KeyW,KeyS'
+  mouse:false,keepBank:false,throttleKeys:'KeyW,KeyS'
 });
 function upgradeControls(saved){
   const controls={...defaultControls,...saved,version:3};

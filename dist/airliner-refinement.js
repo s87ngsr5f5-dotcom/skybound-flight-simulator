@@ -66,7 +66,7 @@ function refineAirliner(model){
     ctx.fillText('HORIZON   FLIGHT DECK',28,36);
     ctx.fillText('BAT   ENG 1    ENG 2    ENG 3    ENG 4    LIGHTS   GEAR   FLAPS',130,491);
     const live=!f||f.battery;
-    const speed=f?Math.round(f.speed*1.94384):0,alt=f?Math.round(f.y*3.28084):0;
+    const speed=f?Math.round(flightSpeeds(f).ias*knotsPerMps):0,alt=f?Math.round(f.y*3.28084):0;
     const bank=f?.bank||0,pitch=f?.pitch||0;
     for(let i=0;i<4;i++){
       const x=25+i*377;

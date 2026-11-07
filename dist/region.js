@@ -13,6 +13,7 @@ const taiwanAirports=[
   airport('RCMQ','臺中',24+15.90367/60,120+37.24308/60,176.69,3659,61,200.56,'18','36'),
   airport('RCKH','高雄',22+34.62258/60,120+21.05717/60,91.90,3150,60,7.93,'09','27'),
   airport('RCFN','臺東',22+45.29233/60,121+6.099/60,38.64,2438,45,41.61,'04','22'),
+  airport('RCBS','金門',24+25.675833/60,118+21.534167/60,63.39,3004,45,17.07,'06','24'),
   airport('RCQC','澎湖',23+34.11742/60,119+37.69433/60,18.22,3000,45,22.71,'02','20'),
 ];
 function runwayCoordinates(x,z,r){
@@ -47,6 +48,16 @@ function regionalHeight(x,z){
     if(i>=0&&j>=0&&i<columns-1&&j<rows-1){
       const a=u-i,b=v-j,k=j*columns+i;
       height=(heights[k]*(1-a)+heights[k+1]*a)*(1-b)+(heights[k+columns]*(1-a)+heights[k+columns+1]*a)*b;
+    }
+  }
+  if(typeof kinmenElevation!=='undefined'&&x< -270000){
+    const {lat,lon}=latLon(x,z);
+    const grid=kinmenElevation;
+    const u=(lon-grid.west)/grid.step,v=(grid.north-lat)/grid.step;
+    const i=Math.floor(u),j=Math.floor(v),n=grid.columns;
+    if(i>=0&&j>=0&&i<n-1&&j<grid.rows-1){
+      const a=u-i,b=v-j,k=j*n+i,h=grid.heights;
+      height=(h[k]*(1-a)+h[k+1]*a)*(1-b)+(h[k+n]*(1-a)+h[k+n+1]*a)*b;
     }
   }
   if(typeof naritaHeight==='function'&&x>1500000) height=naritaHeight(x,z);

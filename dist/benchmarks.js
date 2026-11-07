@@ -3,20 +3,34 @@ const benchmarkFleet=[
   {id:'sf16',name:'SF-16 Kestrel',reference:'F-16C Block 50',type:'單發戰鬥訓練機',role:'fighter',
     mass:10950,wingArea:27.87,inertia:[14000,70000,80000],cgOffset:.022,gearHeight:1.85,stallAngle:.37,
     rotation:126,approach:142,geometry:[7.40,.85,4.90,-.22,1,1.65],thrust:78000,boostThrust:42000,jet:true},
+  {id:'f5e',name:'Northrop F-5E Tiger II',type:'雙發輕型戰鬥機',role:'fighter',
+    mass:6800,wingArea:17.28,inertia:[8400,43600,49200],cgOffset:.022,gearHeight:1.46,stallAngle:.34,
+    rotation:138,approach:151,geometry:[7.23,.69,4.06,-.21,2,1.52],thrust:31000,boostThrust:13500,
+    jet:true,sideIntakes:true,maxMach:1.6,trimColor:0x64775e},
   {id:'sa380',name:'SA-380 Horizon',reference:'A380-800',type:'四發雙層廣體客機',role:'passenger',
     mass:378000,wingArea:845,inertia:[52000000,84000000,115000000],cgOffset:.13,gearHeight:5.1,stallAngle:.28,
-    rotation:146,approach:146,geometry:[36.36,3.57,39.875,-1.0,4,12.1],thrust:1280000,jet:true},
+    rotation:146,approach:146,geometry:[36.36,3.57,39.875,-1.0,4,12.1],thrust:1280000,jet:true,cruiseMach:.85,maxMach:.89,cleanDrag:.020,fuelIdle:.42,fuelPower:4.5},
+  {id:'a223',name:'Airbus A220-300',type:'雙發支線噴射客機',role:'passenger',
+    mass:60500,wingArea:112.3,inertia:[1510000,3900000,4700000],cgOffset:.034,gearHeight:2.12,stallAngle:.28,
+    rotation:132,approach:131,geometry:[19.35,1.76,17.55,-.54,2,4.4],thrust:205000,jet:true,
+    passengers:140,missionFuel:13000,nacelleRadius:.96,cruiseMach:.78,maxMach:.82,cleanDrag:.020,
+    fuelIdle:.16,fuelPower:1.08,regionalGates:true,seatColumns:[2,3],trimColor:0x185b82},
   {id:'a320neo',name:'Airbus A320neo',type:'雙發窄體客機',role:'passenger',
     mass:70000,wingArea:122.6,inertia:[1800000,4300000,5700000],cgOffset:.04,gearHeight:2.25,stallAngle:.28,
     rotation:139,approach:138,geometry:[18.79,1.98,17.9,-.55,2,5.1],thrust:240000,jet:true,
-    passengers:174,missionFuel:14000,nacelleRadius:1.02},
+    passengers:174,missionFuel:14000,nacelleRadius:1.02,cruiseMach:.78,maxMach:.82,cleanDrag:.021,fuelIdle:.18,fuelPower:1.25},
   {id:'b773',name:'Boeing 777-300ER',type:'雙發廣體客機',role:'passenger',
     mass:260000,wingArea:436.8,inertia:[28500000,54000000,73000000],cgOffset:.07,gearHeight:4.1,stallAngle:.28,
     rotation:149,approach:151,geometry:[36.93,3.10,32.4,-.95,2,10.5],thrust:965000,jet:true,
-    passengers:360,missionFuel:45000,nacelleRadius:1.69},
+    passengers:360,missionFuel:45000,nacelleRadius:1.69,cruiseMach:.84,maxMach:.89,cleanDrag:.022,fuelIdle:.32,fuelPower:2.6},
+  {id:'b763f',name:'Boeing 767-300F',type:'雙發側門貨機',role:'cargo',
+    mass:139000,wingArea:283.3,inertia:[12500000,27000000,33700000],cgOffset:.075,gearHeight:3.5,stallAngle:.29,
+    rotation:142,approach:152,geometry:[27.47,2.515,23.785,-.76,2,9.1],thrust:560000,jet:true,
+    cargoLimit:52700,cargoSlotLimit:21000,sideCargo:true,nacelleRadius:1.27,
+    cruiseMach:.80,maxMach:.86,cleanDrag:.023,trimColor:0x87523b},
   {id:'sf748',name:'SF-748 Atlas',reference:'747-8F',type:'四發廣體貨機',role:'cargo',
     mass:286000,wingArea:554,inertia:[35000000,68000000,91000000],cgOffset:.11,gearHeight:4.6,stallAngle:.29,
-    rotation:142,approach:148,geometry:[38.15,3.25,34.2,-1.1,4,13],thrust:1180000,jet:true,cargoLimit:95000}
+    rotation:142,approach:148,geometry:[38.15,3.25,34.2,-1.1,4,13],thrust:1180000,jet:true,cruiseMach:.85,maxMach:.90,cleanDrag:.022,cargoLimit:95000}
 ].map(profile=>({...profile,glass:true,retract:true,reverse:profile.role!=='fighter',flapLift:[0,.25,.49],
   flapDrag:[0,.035,.085],brakeForce:profile.mass*4.8,rollingResistance:profile.mass*.15}));
 fleet.push(...benchmarkFleet);
@@ -31,7 +45,7 @@ function cargoBalance(f){
   const cargo=f.pallets||[0,0,0];
   const mass=cargo.reduce((total,value)=>total+value,0);
   const shift=cargo.reduce((total,value,index)=>total+value*palletStations[index].arm,0)/(f.aircraft.mass+mass);
-  const problems=cargo.map((value,index)=>value<0||value>38000?palletStations[index].name:null).filter(Boolean);
+  const problems=cargo.map((value,index)=>value<0||value>(f.aircraft.cargoSlotLimit??38000)?palletStations[index].name:null).filter(Boolean);
   if(mass>f.aircraft.cargoLimit) problems.push('總載重');
   if(Math.abs(shift)>1.2) problems.push(palletStations[shift>0?2:0].name+' 重心');
   return {mass,shift,problems};
