@@ -14,6 +14,8 @@ const controller=raw
   .replace('Math.max(43,targetSpeed*1.25)','(f.waypoint<4?151:Math.max(43,targetSpeed*1.25))')
   .replace('(final?.19:.54)+(goalSpeed-f.speed)*.095','(final?.14:.44)+(goalSpeed-f.speed)*.095');
 vm.runInThisContext(controller);
+const storage=new Map();
+globalThis.localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)};
 const from=taiwanAirports.find(a=>a.code==='RCTP');
 const profile=fleet.find(a=>a.id==='sf748');
 for(const node of ['taxi','descent','approach','warning']){
@@ -22,6 +24,9 @@ for(const node of ['taxi','descent','approach','warning']){
 }
 for(const mass of [[9000,18000,8000],[26000,28000,30000]]){
   const f=makeCargoVoyage(from,profile,'load',0);
+  f.fuelStart=f.fuel;
+  attachContract(f,'cargo',40000);
+  const beforeMoney=readCareer().money;
   const replay=[];
   captureVoyage(f,replay,true);
   f.battery=true;f.lights=true;f.noseDoor=true;
@@ -34,7 +39,7 @@ for(const mass of [[9000,18000,8000],[26000,28000,30000]]){
   f.engines.forEach((_,i)=>assert(startEngine(f,i)));
   f.parkingBrake=false;
   let result, rollStart, liftoff, climb=0, before='';
-  const save=(_,r)=>{result=r;return true;};
+  const save=(flight,r)=>{result=r;return recordFlight(flight,r);};
   for(let tick=0;tick<120*32000&&!f.finished;tick++){
     updateRegionalFlight(f,save);
     const state=f.phase+f.waypoint+f.taxiIndex;
@@ -62,5 +67,11 @@ for(const mass of [[9000,18000,8000],[26000,28000,30000]]){
   assert(replay.some(row=>row.includes('approach')));
   console.log(JSON.stringify({cargo:initial.mass,cg:initial.shift,seconds:Math.round(f.elapsed),remainingFuel:Math.round(f.fuel),roll:Math.round(liftoff-rollStart),climb:Math.round(climb*196.85),touchdown:f.touchdown,result,frames:replay.length,waypoint:f.waypoint,geo:latLon(f.x,f.z)}));
   assert.equal(result,'任務完成');
+  assert.equal(f.contract.cargoAtTakeoff,initial.mass);
+  assert.equal(f.receipt.base,40000+Math.round(initial.mass*.28));
+  assert.equal(readCareer().money,beforeMoney+f.receipt.net);
+  f.rewardPaid=false;
+  recordFlight(f,'任務完成');
+  assert.equal(readCareer().money,beforeMoney+f.receipt.net);
 }
 

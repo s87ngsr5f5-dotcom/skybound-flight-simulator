@@ -20,6 +20,10 @@ function verifyBenchmark(profile,load){
   const route=benchmarkRoute(profile.role,from,to);
   const f=makeRegionalFlight(from,to,profile,'cold',0,route);
   f.mission=profile.role;
+  if(profile.role==='cargo'){
+    attachContract(f,'cargo',9500);
+    Object.assign(f,{fuel:18000,fuelStart:18000});
+  }
   const cargoDoor=profile.sideCargo?'sideDoor':'noseDoor';
   if(profile.role==='cargo'){
     assert(!setPallet(f,0,1000));

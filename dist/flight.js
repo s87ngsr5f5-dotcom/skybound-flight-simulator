@@ -551,7 +551,8 @@ function initialize(){
     const model=selectedAircraft();
     byId('aircraftInfo').textContent=model.type+' · 起飛 '+model.rotation+' KTS · 進場 '+model.approach+' KTS'+(model.sideCargo?' · 側門貨運 · 高雄至桃園':model.role?' · '+benchmarkMissions[model.role].label:'');
     try{
-      let {departure,destination,route}=parsePlan();
+      const contract=regionalContracts[byId('lesson').value];
+      let {departure,destination,route}=contract?regionalContractPlan(byId('lesson').value):parsePlan();
       const mission=byId('lesson').value==='benchmark'?benchmarkMissions[model.role]:null;
       if(byId('lesson').value==='airline'){
         [departure,destination]=airlineRoute();
@@ -599,7 +600,7 @@ function initialize(){
         planMap.fillText(r.code,x+7,y+3);
       }
       byId('routePreview').textContent=isClimb?'777-300ER · 桃園 05L 起飛 · 35,000 ft 巡航練習':departure.name+' → '+destination.name+' · '+route.map(p=>p.name).join(' → ');
-      byId('message').textContent=isClimb?'從跑道靜止開始，手動起飛。巡航高度與速度維持 60 秒後儲存成績。':isVoyage?'桃園及成田周邊高程可離線使用。夜航任務固定夜間開始。':'區域高程可離線使用。模擬航線供遊戲練習。';
+      byId('message').textContent=contract?'使用 SB-172，從冷艙出發，依序通過航點並停妥。基本報酬 '+contract.base+' 金幣，結算扣除耗油。':isClimb?'從跑道靜止開始，手動起飛。巡航高度與速度維持 60 秒後儲存成績。':isVoyage?'桃園及成田周邊高程可離線使用。夜航任務固定夜間開始。':'區域高程可離線使用。模擬航線供遊戲練習。';
     }catch(error){byId('message').textContent=error.message;}
   }
   for(const name of ['aircraft','departure','destination','waypoints','lesson','cruiseWind']) byId(name).addEventListener('change',drawPlan);
@@ -826,12 +827,16 @@ function initialize(){
   }
   function start(approach){
     try{
-      const selection=parsePlan();
       const lesson=byId('lesson').value;
+      const selection=regionalContracts[lesson]?regionalContractPlan(lesson):parsePlan();
       const weather=byId('weather').value;
       const wind=lesson==='crosswind'?5.144:['fog','wet'].includes(weather)?0:Number(weather);
       replay=null;replayControls.hidden=true;
-      if(lesson==='airline'){
+      if(regionalContracts[lesson]){
+        if(approach) throw new Error('請從機位開始任務。');
+        flight=makeRegionalContract(lesson,wind);
+        byId('aircraft').value=flight.aircraft.id;
+      }else if(lesson==='airline'){
         if(approach) throw new Error('載客任務請從機位開始。');
         if(readCareer().active) throw new Error('已有未完成的載客任務。請選擇繼續載客任務。');
         const profile=selectedAircraft();
@@ -855,6 +860,10 @@ function initialize(){
         byId('aircraft').value=profile.id;
         flight=makeCargoVoyage(airports.find(a=>a.code==='RCTP'),profile,byId('voyageNode').value,wind);
         flight.approach=approach;
+        if(flight.node==='load'){
+          flight.fuelStart=flight.fuel;
+          attachContract(flight,'cargo',40000);
+        }
         flight.voyageTime=byId('time').value;
         if(Number(flight.voyageTime.slice(0,2))>=6&&Number(flight.voyageTime.slice(0,2))<19) flight.voyageTime='21:00';
         byId('time').value=flight.voyageTime;
@@ -882,6 +891,10 @@ function initialize(){
           lesson==='route'?regionalRoute(departure,destination):selection.route;
         flight=makeRegionalFlight(departure,destination,selectedAircraft(),mode,wind,route);
         flight.approach=approach;flight.lesson=lesson;flight.mission=mission?chosen.role:null;
+        if(['cargo','fighter'].includes(flight.mission)){
+          attachContract(flight,flight.mission,flight.mission==='cargo'?9500:6500);
+          if(flight.mission==='cargo') Object.assign(flight,{fuel:18000,fuelStart:18000});
+        }
         if(flight.mission==='passenger'){
           const fuel=chosen.missionFuel??56000;
           Object.assign(flight,{passengers:chosen.passengers??320,fuel,fuelStart:fuel});
@@ -1053,6 +1066,12 @@ function initialize(){
   }
   function status(f,knots,target){
     if(replay) return '貨運回放 · '+Math.floor(replay.time/60)+' 分鐘 · '+f.phase;
+    if(f.contract&&f.finished){
+      const receipt=f.receipt;
+      const payout=receipt?' · 收入 '+receipt.base+' − 燃油 '+receipt.fuel+' = '+receipt.net+' 金幣':'';
+      return (f.ended?'落地失敗':f.contract.result)+payout+' · '+(f.recorded?'已儲存':'未能儲存')+
+        (f.replaySaved?' · 回放已儲存':'')+' · R 重試';
+    }
     if(f.voyage){
       if(f.finished) return (f.landed?'成田貨運任務完成':'落地失敗')+' · '+(f.replaySaved?'回放已儲存':'回放未儲存')+' · R 重試';
       if(f.noseDoor||f.sideDoor) return '貨門警告 · 關門前禁止滑行及啟動引擎';
@@ -1319,7 +1338,7 @@ function initialize(){
       }
       if(f.service&&f.cabinView){
         const window=f.cabinView==='window';
-        const eye=new THREE.Vector3(window?profile.geometry[1]-.4:0,.68,2);
+        const eye=new THREE.Vector3(window?profile.geometry[1]-.4:profile.centerSeats?.89:0,.68,2);
         const look=window?new THREE.Vector3(30,-1,0):new THREE.Vector3(0,.2,-profile.geometry[0]*.55);
         camera.position.copy(eye.applyQuaternion(model.quaternion).add(pos));
         camera.up.set(0,1,0);
@@ -1354,6 +1373,9 @@ function initialize(){
             (balance.problems.length?' · 超限：'+balance.problems.join('、'):'');
         }
         byId('cockpit').style.filter=activeDay<.15&&!f.lights?'brightness(.40)':'none';
+      }
+      if(f.contract&&Number.isFinite(f.fuel)){
+        byId('instrumentType').textContent+=' · 燃油 '+Math.round(f.fuel)+' kg'+(f.passengers?' · '+f.passengers+' 名旅客':'');
       }
       if(f.mission==='passenger') byId('instrumentType').textContent='旅客 '+f.passengers+' 人 · 燃油 '+Math.round(f.fuel).toLocaleString()+' kg · 餘額 $'+readMoney().toLocaleString();
       if(!f.regional&&!f.ground&&f.waypoint<4&&Math.hypot(legacyRoute[f.waypoint].x-f.x,legacyRoute[f.waypoint].z-f.z)<420) f.waypoint++;

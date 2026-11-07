@@ -131,8 +131,14 @@ function buildBenchmarkAirframe(profile,scene){
     }
     const wingGeo=new THREE.BufferGeometry();wingGeo.setAttribute('position',new THREE.Float32BufferAttribute(wingVertices,3));wingGeo.setIndex(wingIndices);wingGeo.computeVertexNormals();
     const wingMat=surface.clone();wingMat.side=THREE.DoubleSide;mesh(group,wingGeo,wingMat);
-    const tipFence=block(group,paint,.11,fighter?.28:1.2,.73,side*span,wingY+.42,tip+.3);
-    tipFence.rotation.z=-side*.17;
+    if(!profile.noWinglet){
+      const tipFence=block(group,paint,.11,fighter?.28:1.2,.73,side*span,wingY+.42,tip+.3);
+      tipFence.rotation.z=-side*.17;
+      if(profile.splitWinglet){
+        const lower=block(group,paint,.10,.72,.55,side*(span-.16),wingY+.06,tip+.39);
+        lower.rotation.z=side*.45;
+      }
+    }
     foil(group,[[0,half*.57],[side*span*.33,half*.72],[side*span*.33,half*.83],[0,half*.83]],surface).position.y=radius*.08;
     const aileron=new THREE.Group();
     aileron.position.set(side*span*.66,wingY,tip+chord*.23);
@@ -174,7 +180,7 @@ function buildBenchmarkAirframe(profile,scene){
   block(group,metal,.09,.29,.23,0,-radius*.87,half*.16);
 
   const wheels=[];
-  const bogies=fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:engineCount===2?[[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2]]:
+  const bogies=fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:engineCount===2?[[0,-half*.71,1],[-span*.128,2,profile.mainAxles??2],[span*.128,2,profile.mainAxles??2]]:
     [[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2],[-radius*.82,7.8,3],[radius*.82,7.8,3]];
   for(const [x,z,axles] of bogies){
     const size=fighter?.32:.58;
@@ -235,11 +241,12 @@ function buildPassengerCabin(profile,cabin,airframe){
   const [half,radius]=profile.geometry;
   const count=profile.passengers??320;
   const [leftSeats,rightSeats]=profile.seatColumns??(radius>2.4?[4,4]:[3,3]);
-  const rowSeats=leftSeats+rightSeats;
+  const centerSeats=profile.centerSeats??0;
+  const rowSeats=leftSeats+centerSeats+rightSeats;
   const rows=Math.ceil(count/rowSeats);
   const firstZ=-half*.46,lastZ=half*.63;
   const gap=Math.min(.94,(lastZ-firstZ)/Math.max(1,rows-1));
-  const seatWidth=Math.min(.47,(radius-.63)/Math.max(leftSeats,rightSeats));
+  const seatWidth=centerSeats?.45:Math.min(.47,(radius-.63)/Math.max(leftSeats,rightSeats));
   const seats=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),
     new THREE.MeshStandardMaterial({color:profile.trimColor??0x235774,roughness:.9}),count*2);
   const head=new THREE.InstancedMesh(new THREE.SphereGeometry(.105,10,8),
@@ -278,8 +285,11 @@ function buildPassengerCabin(profile,cabin,airframe){
     const row=Math.floor(i/rowSeats);
     const column=i%rowSeats;
     const side=column<leftSeats?-1:1;
-    const offset=side<0?column:column-leftSeats;
-    const x=side*(.54+offset*seatWidth),z=firstZ+row*gap;
+    const offset=side<0?column:column-leftSeats-centerSeats;
+    const inCenter=column>=leftSeats&&column<leftSeats+centerSeats;
+    const x=inCenter?(column-leftSeats-(centerSeats-1)/2)*seatWidth:
+      side*((centerSeats?1.33:.54)+offset*seatWidth);
+    const z=firstZ+row*gap;
     slots.push({x,z});
     matrix.position.set(x,-.46,z);matrix.scale.set(seatWidth*.94,.18,.51);matrix.updateMatrix();seats.setMatrixAt(i*2,matrix.matrix);
     matrix.position.set(x,-.13,z+.26);matrix.scale.set(seatWidth*.94,.76,.13);matrix.updateMatrix();seats.setMatrixAt(i*2+1,matrix.matrix);

@@ -75,7 +75,8 @@ function flightMass(f){
   const aircraft=f.aircraft||trainer;
   return aircraft.mass+(f.cargoState?.mass||0)+(f.voyage?f.fuel-56000:0)+
     (f.service?f.fuel+f.service.boarded*95-f.service.referencePayload:0)+
-    (f.cruiseTrial||f.climbLesson?f.fuel-f.fuelStart:0);
+    (f.cruiseTrial||f.climbLesson||(!f.voyage&&f.contract?.kind==='cargo')?f.fuel-f.fuelStart:0)+
+    (['sightseeing','ferry'].includes(f.contract?.kind)?f.fuel-f.fuelStart+f.passengers*82:0);
 }
 const limit = (n,a,b)=>Math.min(b,Math.max(a,n));
 const wrapAngle = angle=>Math.atan2(Math.sin(angle),Math.cos(angle));
@@ -143,7 +144,9 @@ function stepTrainer(f, input, dt=simTick){
   const engines=f.engines||[true];
   let running=engines.filter(Boolean).length/engines.length;
   if(Number.isFinite(f.fuel)){
-    f.fuelFlow=running*(aircraft.fuelIdle??.30)+running*f.power*(aircraft.fuelPower??3.3);
+    const idle=aircraft.fuelIdle??(aircraft.jet?.30:.002);
+    const powerFlow=aircraft.fuelPower??(aircraft.jet?3.3:.009);
+    f.fuelFlow=running*(idle+f.power*powerFlow);
     f.fuel=Math.max(0,f.fuel-dt*f.fuelFlow);
     if(f.fuel===0) f.fuelFlow=0;
     if(f.fuel===0) running=0;

@@ -121,7 +121,50 @@ function settlePassenger(f,result){
   }
   try{localStorage.setItem(careerKey,JSON.stringify(career));return receipt;}catch{return null;}
 }
+const regionalContracts={
+  sightseeing:{label:'臺北觀光 · 松山返場',from:'RCSS',to:'RCSS',base:4200},
+  ferry:{label:'飛機調度 · 松山至花蓮',from:'RCSS',to:'RCYU',base:5700}
+};
+function regionalContractPlan(kind){
+  const contract=regionalContracts[kind];
+  const departure=taiwanAirports.find(a=>a.code===contract.from);
+  const destination=taiwanAirports.find(a=>a.code===contract.to);
+  const route=kind==='sightseeing'?[
+    {name:'臺北東側爬升',...airportPoint(departure,8500,0)},
+    {name:'北海岸轉向',...geoPoint(25.23,121.62)},
+    {name:'淡水河口觀景',...geoPoint(25.185,121.408)},
+    ...regionalRoute(departure,destination).slice(-2)
+  ]:regionalRoute(departure,destination);
+  return {departure,destination,route};
+}
+function attachContract(f,kind,base){
+  f.contract={id:crypto.randomUUID(),kind,base};
+  return f;
+}
+function makeRegionalContract(kind,wind){
+  const {departure,destination,route}=regionalContractPlan(kind);
+  const sightseeing=kind==='sightseeing';
+  const aircraft=fleet.find(a=>a.id==='sb172');
+  const f=makeRegionalFlight(departure,destination,aircraft,'cold',wind,route);
+  Object.assign(f,{lesson:kind,fuel:105,fuelStart:105,passengers:sightseeing?2:0});
+  return attachContract(f,kind,regionalContracts[kind].base);
+}
+function settleContract(f){
+  const career=readCareer();
+  const {id,kind,base,cargoAtTakeoff}=f.contract;
+  if(career.receipts[id]) return career.receipts[id];
+  const gross=kind==='cargo'?base+Math.round((cargoAtTakeoff||0)*.28):base;
+  const fuel=Number.isFinite(f.fuelStart)?Math.round(Math.max(0,f.fuelStart-f.fuel)*.8):0;
+  const receipt={base:gross,fuel,net:Math.max(0,gross-fuel)};
+  career.money+=receipt.net;
+  career.receipts[id]=receipt;
+  try{localStorage.setItem(careerKey,JSON.stringify(career));return receipt;}catch{return null;}
+}
 function recordFlight(f,result){
+  if(f.contract&&result==='任務完成'&&!f.rewardPaid){
+    f.receipt=settleContract(f);
+    if(f.receipt){f.reward=f.receipt.net;f.rewardPaid=true;}
+  }
   if(f.mission==='passenger'&&!f.rewardPaid&&(f.service||result==='任務完成')){
     f.receipt=settlePassenger(f,result);
     if(f.receipt){f.reward=f.receipt.net;f.rewardPaid=true;}
@@ -241,12 +284,19 @@ function updateRegionalFlight(f,save=recordFlight){
           if(!done) return;
         }
         f.finished=true;
-        f.recorded=save(f,f.mission?'任務完成':'已落地並停妥');
+        const completedRoute=f.waypoint===f.route.length-1;
+        const contractReady=completedRoute&&(f.contract?.kind!=='cargo'||f.contract.cargoAtTakeoff>0);
+        const result=f.contract?(contractReady?'任務完成':'航段或貨運條件未完成'):f.mission?'任務完成':'已落地並停妥';
+        if(f.contract) f.contract.result=result;
+        f.recorded=save(f,result);
       }
     }
     return;
   }
   if(f.airborne){
+    if(f.contract?.kind==='cargo'&&f.contract.cargoAtTakeoff===undefined){
+      f.contract.cargoAtTakeoff=cargoBalance(f).mass;
+    }
     f.phase=!f.cruiseTrial&&f.waypoint>=f.route.length-1?'approach':'cruise';
     if(f.mission==='fighter'&&f.waypoint===0&&f.y<610) return;
     const target=f.route[f.waypoint];
@@ -265,6 +315,6 @@ function activeTarget(f){
   if(f.phase==='taxi'||f.phase==='cold') return f.taxi[f.taxiIndex];
   return f.route[f.waypoint];
 }
-if(typeof module!=='undefined') Object.assign(globalThis,{makeRegionalFlight,startEngine,updateRegionalFlight,activeTarget,readFlightLog,makeCruiseTrial,makeClimbLesson,climbReady,makePassengerFlight,updatePassengerService,savePassenger,readCareer,recordFlight,passengerBrief});
+if(typeof module!=='undefined') Object.assign(globalThis,{makeRegionalFlight,startEngine,updateRegionalFlight,activeTarget,readFlightLog,makeCruiseTrial,makeClimbLesson,climbReady,makeRegionalContract,attachContract,makePassengerFlight,updatePassengerService,savePassenger,readCareer,recordFlight,passengerBrief});
 
 
