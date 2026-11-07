@@ -69,7 +69,7 @@ function stepTrainer(f, input, dt=simTick){
   const drag=q*aircraft.wingArea*(.031+.052*cl*cl+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta));
   const engines=f.engines||[true];
   let running=engines.filter(Boolean).length/engines.length;
-  if(f.voyage){
+  if(f.voyage||f.mission==='passenger'){
     f.fuel=Math.max(0,f.fuel-dt*running*(.30+f.power*3.3));
     if(f.fuel===0) running=0;
   }

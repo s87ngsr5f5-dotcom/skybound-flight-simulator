@@ -641,7 +641,7 @@ function initialize(){
       }else{
         const chosen=selectedAircraft();
         const mission=lesson==='benchmark'?benchmarkMissions[chosen.role]:null;
-        if(lesson==='benchmark'&&!mission) throw new Error('請在機庫選擇 SF-16、SA-380 或 SF-748。');
+        if(lesson==='benchmark'&&!mission) throw new Error('請在機庫選擇有基準任務的機型。');
         if(mission&&approach) throw new Error('基準任務請使用「開始飛行」從冷艙開始。');
         const departure=mission?airports.find(a=>a.code===mission.from):lesson==='route'?airports[0]:selection.departure;
         const destination=mission?airports.find(a=>a.code===mission.to):lesson==='route'?airports[1]:selection.destination;
@@ -655,6 +655,10 @@ function initialize(){
           lesson==='route'?regionalRoute(departure,destination):selection.route;
         flight=makeRegionalFlight(departure,destination,selectedAircraft(),mode,wind,route);
         flight.approach=approach;flight.lesson=lesson;flight.mission=mission?chosen.role:null;
+        if(flight.mission==='passenger'){
+          const fuel=chosen.missionFuel??56000;
+          Object.assign(flight,{passengers:chosen.passengers??320,fuel,fuelStart:fuel});
+        }
         if(approach){
           const p=airportPoint(destination,-3700,0);
           const speed=flight.aircraft.approach/1.94384;
@@ -818,7 +822,7 @@ function initialize(){
       if(!byId('voyageGuided').checked&&!paused) return '貨運任務 · '+Math.round(f.fuel)+' kg 燃油';
     }
     if(paused) return '已暫停 · P 繼續';
-    if(f.finished) return (f.ended?'落地失敗':f.mission?'任務完成':'已落地並停妥')+' · '+(f.recorded?'已儲存紀錄':'未能儲存')+' · R 重飛';
+    if(f.finished) return (f.ended?'落地失敗':f.mission?'任務完成'+(f.rewardPaid?' · 獎金 $'+f.reward.toLocaleString():''):'已落地並停妥')+' · '+(f.recorded?'已儲存紀錄':'未能儲存')+' · R 重飛';
     if(f.ended) return '落地失敗 · R 重飛';
     if(!f.regional){
       if(f.landed) return '已接地 · 收油並煞車 · R 重飛';
@@ -1001,6 +1005,7 @@ function initialize(){
         }
         byId('cockpit').style.filter=activeDay<.15&&!f.lights?'brightness(.40)':'none';
       }
+      if(f.mission==='passenger') byId('instrumentType').textContent='旅客 '+f.passengers+' 人 · 燃油 '+Math.round(f.fuel).toLocaleString()+' kg · 餘額 $'+readMoney().toLocaleString();
       if(!f.regional&&!f.ground&&f.waypoint<4&&Math.hypot(legacyRoute[f.waypoint].x-f.x,legacyRoute[f.waypoint].z-f.z)<420) f.waypoint++;
       const target=f.regional?activeTarget(f):legacyRoute[f.waypoint];
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}

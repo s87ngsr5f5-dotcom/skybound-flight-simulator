@@ -3,9 +3,14 @@ const flightLogKey='skybound.flightLog.v2';
 function readFlightLog(){
   try {return JSON.parse(localStorage.getItem(flightLogKey)||'[]');} catch {return [];}
 }
+function readMoney(){try{return Number(localStorage.getItem('skybound.money')||0)||0;}catch{return 0;}}
 function recordFlight(f,result){
+  if(f.mission==='passenger'&&result==='任務完成'&&!f.rewardPaid){
+    f.reward=Math.max(0,f.passengers*180-Math.round((f.fuelStart-f.fuel)*.8));
+    try{localStorage.setItem('skybound.money',String(readMoney()+f.reward));f.rewardPaid=true;}catch{}
+  }
   const row={aircraft:f.aircraft.name,departure:f.departure.code,destination:f.destination.code,
-    seconds:Math.round(f.elapsed),date:new Date().toISOString(),result};
+    reward:f.reward||0,passengers:f.passengers||0,seconds:Math.round(f.elapsed),date:new Date().toISOString(),result};
   try {localStorage.setItem(flightLogKey,JSON.stringify([row,...readFlightLog()].slice(0,50)));}
   catch {return false;}
   return true;

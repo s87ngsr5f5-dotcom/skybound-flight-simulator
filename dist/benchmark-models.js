@@ -70,9 +70,9 @@ function buildBenchmarkAirframe(profile,scene){
     windshield.scale.set(radius*.68,radius*.17,half*.062);
     for(const side of [-1,1]){
       if(!freight){
-        const glassBank=new THREE.InstancedMesh(new THREE.BoxGeometry(.12,.27,.48),glazing,110);
+        const glassBank=new THREE.InstancedMesh(new THREE.BoxGeometry(.12,.27,.48),glazing,engineCount===4?110:55);
         const transform=new THREE.Object3D();
-        for(let i=0;i<110;i++){
+        for(let i=0;i<glassBank.count;i++){
           const y=i<55?radius*.22:radius*.63;
           transform.position.set(side*(radius*(i<55?.98:.86)),y,-half*.64+(i%55)*half*.0225);
           transform.updateMatrix();glassBank.setMatrixAt(i,transform.matrix);
@@ -128,10 +128,10 @@ function buildBenchmarkAirframe(profile,scene){
     const lamp=mesh(group,new THREE.SphereGeometry(fighter?.085:.19,12,8),
       new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,wingY+.16,tip);
     lamps.push(lamp);
-    if(engineCount===4){
-      for(const factor of [.33,.65]){
+    if(engineCount>=2){
+      for(const factor of engineCount===4?[.33,.65]:[.38]){
         const engine=new THREE.Group();
-        const size=freight?1.43:1.78;
+        const size=profile.nacelleRadius??(freight?1.43:1.78);
         hull(engine,[[-2.8,size*.89],[-2.52,size],[.82,size*.94],[1.8,size*.71]],surface);
         const fan=mesh(engine,new THREE.CircleGeometry(size*.82,32),dark,0,0,-2.68);
         fan.rotation.y=Math.PI;
