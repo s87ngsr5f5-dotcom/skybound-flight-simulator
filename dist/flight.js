@@ -928,7 +928,7 @@ function initialize(){
   }
   drawBindings();
   addEventListener('keydown',event=>{
-    if(event.target.closest('input,select,textarea,#quickControls')) return;
+    if(event.target.closest('input,select,textarea,#quickControls[open]')) return;
     const code=boundCode(event.code);
     if(!flight||(!controls.has(code)&&!throttleKeys().includes(event.code))) return;
     if(event.target instanceof HTMLButtonElement&&code==='Space') return;
@@ -1099,6 +1099,27 @@ function initialize(){
     return person;
   });
   scene.add(bridgeQueue);
+  function serviceVehicle(color,truck){
+    const vehicle=new THREE.Group(),paint=material(color),wheel=material('#252932');
+    const length=truck?6.2:3.6;
+    box(vehicle,paint,truck?2.3:2.6,.58,length,0,.58,0);
+    box(vehicle,paint,2.05,truck?1.68:.95,1.6,0,truck?1.55:1.23,-length*.31);
+    box(vehicle,material('#405d76'),1.72,.35,.08,0,truck?2:1.56,-length*.44);
+    for(const side of [-1,1]) for(const end of [-1,1]){
+      const tire=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.24,12),wheel);
+      tire.rotation.z=Math.PI/2;
+      tire.position.set(side*1.11,.34,end*length*.30);
+      vehicle.add(tire);
+    }
+    if(truck){
+      const tank=new THREE.Mesh(new THREE.CylinderGeometry(.84,.84,3.7,16),material('#ccd8df'));
+      tank.rotation.x=Math.PI/2;tank.position.set(0,1.35,.96);vehicle.add(tank);
+    }
+    vehicle.visible=false;scene.add(vehicle);
+    return vehicle;
+  }
+  const tug=serviceVehicle('#e6b94b',false);
+  const tanker=serviceVehicle('#f1eeea',true);
   const cargoLoader=new THREE.Group();
   const loaderPaint=material('#ebad35'), loaderMetal=material('#667480');
   box(cargoLoader,loaderPaint,4.2,.65,6,0,0,0);
@@ -1123,7 +1144,7 @@ function initialize(){
       if(other.userData.cabin) other.userData.cabin.visible=false;
     }
     bridgeMesh.visible=false;
-    bridgeQueue.visible=false;
+    bridgeQueue.visible=tug.visible=tanker.visible=false;
     cargoLoader.visible=false;
     serviceLamp.intensity=0;
     if(flight){
@@ -1170,6 +1191,19 @@ function initialize(){
       taxiLamp.target.position.copy(pos).addScaledVector(dir,62);
       taxiLamp.target.position.y=f.y-5;
       model.position.copy(pos);model.rotation.set(f.pitch,-f.heading,-f.bank,'YXZ');
+      if(f.ground&&f.service){
+        if(f.service.pushing){
+          tug.position.copy(pos).addScaledVector(dir,profile.geometry[0]*.76+2);
+          tug.position.y=terrainHeight(tug.position.x,tug.position.z);
+          tug.rotation.y=-f.heading;tug.visible=true;
+        }
+        if(f.service.pumping){
+          const side=new THREE.Vector3(Math.cos(f.heading),0,Math.sin(f.heading));
+          tanker.position.copy(pos).addScaledVector(side,profile.geometry[1]+4);
+          tanker.position.y=terrainHeight(tanker.position.x,tanker.position.z);
+          tanker.rotation.y=-f.heading;tanker.visible=true;
+        }
+      }
       const gear=model.userData.gear;
       const gearTarget=f.gear===false?0:1;
       if(!paused) gear.scale.y+=(gearTarget-gear.scale.y)*Math.min(1,dt*4);
