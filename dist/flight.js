@@ -503,6 +503,7 @@ function initialize(){
     if(!replay) return;
     if(replay.time>=replay.duration) replay.time=0;
     replay.paused=!replay.paused;
+    showTouchPause(replay.paused);
     byId('replayToggle').textContent=replay.paused?'播放回放':'暫停回放';
   };
   byId('replayRate').onclick=()=>{
@@ -1039,6 +1040,8 @@ function initialize(){
     }));
   }
   function beginFlight(){
+    touchControls.reset();
+    showTouchPause(false);
     cockpitView.preset=0;
     resetLook();
     if(flight.regional) showSystems(flight);
@@ -1157,6 +1160,7 @@ function initialize(){
     }catch(error){byId('message').textContent=error.message;}
   }
   function menu(){
+    touchControls.reset();
     saveCurrentMission(flight);
     replay=null;replayControls.hidden=true;updateReplayButton();
     flight=null;pointer.active=false;keys.clear();
@@ -1169,6 +1173,11 @@ function initialize(){
     if(f.regional&&!f.ground&&f.battery&&!f.finished&&f.phase==='cruise'&&!f.climbLesson&&!f.cruiseTrial){
       f.hold={nav:true,altitude:f.y};
     }
+  }
+  function showTouchPause(isPaused){
+    const button=touchControls.panel.querySelector('[data-action="KeyP"]');
+    button.textContent=isPaused?'繼續':'暫停';
+    button.setAttribute('aria-pressed',String(isPaused));
   }
   function action(code){
     if(replay&&!['KeyC','KeyP','KeyN','Home'].includes(code)) return;
@@ -1183,7 +1192,7 @@ function initialize(){
       changeView();
     }
     if(code==='KeyC'){if(flight.cabinView) flight.cabinView=false;else cameraMode=1-cameraMode;changeView();}
-    if(code==='KeyP') paused=!paused;
+    if(code==='KeyP'){paused=!paused;touchControls.reset();showTouchPause(paused);}
     if(code==='KeyF') flight.flaps=(flight.flaps+1)%3;
     if(code==='KeyR'&&!flight.service) start(flight.approach,true);
     if(!flight.regional) return;
@@ -1229,7 +1238,7 @@ function initialize(){
   });
   addEventListener('keyup',event=>{keys.delete(event.code);keys.delete(boundCode(event.code));});
   addEventListener('blur',()=>{keys.clear();pointer.active=false;cockpitView.drag=null;});
-  const overControls=target=>target.closest('button,details,input,select,textarea,a,.systems,.right,header');
+  const overControls=target=>target.closest('button,details,input,select,textarea,a,.systems,.right,header,#touchFlight');
   addEventListener('contextmenu',event=>{
     if(cockpitActive()&&!overControls(event.target)) event.preventDefault();
   });
@@ -1280,17 +1289,22 @@ function initialize(){
   byId('fly').onclick=()=>{byId('fly').blur();start(false);};
   byId('approach').onclick=()=>{byId('approach').blur();start(true);};
   byId('menu').onclick=menu;
+  touchControls.panel.addEventListener('click',event=>{
+    const button=event.target.closest('[data-action]');
+    if(flight&&button) action(button.dataset.action);
+  });
   const qualitySelect=byId('quality');
   try{qualitySelect.value=localStorage.getItem('skybound-quality')||'balanced';}catch{}
   if(!qualitySelect.value)qualitySelect.value='balanced';
   qualitySelect.onchange=()=>{try{localStorage.setItem('skybound-quality',qualitySelect.value);}catch{}resize();};
   function resize(){
     const scale={low:.6,balanced:.85,high:1.25}[qualitySelect.value]||.85;
-    renderer.setPixelRatio(Math.min(devicePixelRatio,scale));
+    renderer.setPixelRatio(Math.min(devicePixelRatio,scale,touchControls.mode.value==='mobile'?.85:Infinity));
     renderer.setSize(innerWidth,innerHeight);
     camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
   }
   addEventListener('resize',resize);resize();
+  touchControls.mode.addEventListener('change',resize);
   const forward=heading=>new THREE.Vector3(Math.sin(heading),0,-Math.cos(heading));
   const axis=(positive,negative)=>Number(keys.has(positive))-Number(keys.has(negative));
   const padAxis=value=>gamepadAxis(value,settings.deadzone);
@@ -1303,12 +1317,13 @@ function initialize(){
     }
     previousButtons=Array.from(buttons,button=>button.pressed);
     const [up,down]=throttleKeys();
-    const rawRoll=axis('ArrowRight','ArrowLeft')+padAxis(pad?.axes[0])+(pointer.active?pointer.x:0);
-    const rawPitch=axis('ArrowUp','ArrowDown')-padAxis(pad?.axes[1])+(pointer.active?pointer.y:0);
+    const touch=touchControls.input;
+    const rawRoll=axis('ArrowRight','ArrowLeft')+padAxis(pad?.axes[0])+(pointer.active?pointer.x:0)+touch.roll;
+    const rawPitch=axis('ArrowUp','ArrowDown')-padAxis(pad?.axes[1])+(pointer.active?pointer.y:0)+touch.pitch;
     const manual=manualAxes({pitch:rawPitch,roll:rawRoll,
       rudder:axis('KeyE','KeyQ')+padAxis(pad?.axes[2])},settings);
     let {roll,pitch}=manual;
-    let throttle=clamp(axis(up,down)+Number(Boolean(buttons[5]?.pressed))-Number(Boolean(buttons[4]?.pressed)),-1,1)*.48;
+    let throttle=clamp((axis(up,down)+Number(Boolean(buttons[5]?.pressed))-Number(Boolean(buttons[4]?.pressed)))*.48+touch.throttle,-.48,.48);
     if(f.hold?.nav&&(f.phase!=='cruise'||!f.battery||f.ground)) f.hold=null;
     if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
       f.hold=null;
@@ -1333,7 +1348,7 @@ function initialize(){
     return {response:settings.sensitivity,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
       rudder:clamp(manual.rudder+(f.ground?roll:0),-1,1),
       throttle,
-      trim:axis('KeyX','KeyZ')*.22,brake:keys.has('Space')||Boolean(buttons[0]?.pressed)};
+      trim:axis('KeyX','KeyZ')*.22,brake:touch.brake||keys.has('Space')||Boolean(buttons[0]?.pressed)};
   }
   const trail=[];
   let trailFrame=0;
@@ -1358,7 +1373,7 @@ function initialize(){
   }
   function status(f,knots,target){
     if(replay) return '貨運回放 · '+Math.floor(replay.time/60)+' 分鐘 · '+f.phase;
-    if(paused) return '已暫停 · P 繼續';
+    if(paused) return touchControls.mode.value==='mobile'?'已暫停 · 點「繼續」':'已暫停 · P 繼續';
     if(f.tow) return '拖車牽引中 · 對正跑道後自動停住';
     if(f.ground&&f.towMessage) return f.towMessage;
     if(f.ground&&f.start==='runway'&&f.parkingBrake&&f.taxiIndex>=f.taxi.length) return '已對正跑道 · 啟動引擎後按 B 鬆開煞車';
@@ -1504,7 +1519,7 @@ function initialize(){
         applyVoyageFrame(f,replay.frames,replay.time);
         replaySeek.value=replay.time;
         if(replay.time>=replay.duration){
-          replay.paused=true;byId('replayToggle').textContent='重新播放';
+          replay.paused=true;showTouchPause(true);byId('replayToggle').textContent='重新播放';
         }
         special.querySelectorAll('input').forEach((field,i)=>field.value=f.pallets[i]);
       }else{
