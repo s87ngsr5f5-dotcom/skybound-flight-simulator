@@ -719,6 +719,9 @@ function initialize(){
   };
   function drawPlan(){
     updateAirlinePlan();
+    const isTactical=byId('lesson').value==='tactical';
+    byId('tacticalSetup').hidden=!isTactical;
+    if(isTactical) byId('aircraft').value='sf16';
     const isVoyage=byId('lesson').value==='naritaCargo';
     const isClimb=byId('lesson').value==='climbLesson';
     const isCruise=isClimb||byId('lesson').value==='cruiseTrial';
@@ -731,6 +734,10 @@ function initialize(){
       const contract=regionalContracts[byId('lesson').value];
       let {departure,destination,route}=contract?regionalContractPlan(byId('lesson').value):parsePlan();
       const mission=byId('lesson').value==='benchmark'?benchmarkMissions[model.role]:null;
+      if(isTactical){
+        departure=destination=airports.find(a=>a.code==='RCMQ');
+        route=tacticalRoute(departure,tacticalSelection);
+      }
       if(byId('lesson').value==='airline'){
         [departure,destination]=airlineRoute();
         route=passengerBrief(model,departure,destination).route;
@@ -782,6 +789,7 @@ function initialize(){
       }
       byId('routePreview').textContent=isClimb?'777-300ER · 桃園 05L 起飛 · 35,000 ft 巡航練習':departure.name+' → '+destination.name+' · '+route.map(p=>p.name).join(' → ');
       byId('message').textContent=rangeLesson?'SF-16 由臺中跑道起飛。按 M 射擊虛構地面靶，命中並依航點返場停妥才結算。':contract?'使用 SB-172，從冷艙出發，依序通過航點並停妥。基本報酬 '+contract.base+' 金幣，結算扣除耗油。':isClimb?'從跑道靜止開始，手動起飛。巡航高度與速度維持 60 秒後儲存成績。':isVoyage?'桃園及成田周邊高程可離線使用。夜航任務固定夜間開始。':'區域高程可離線使用。模擬航線供遊戲練習。';
+      if(isTactical) byId('message').textContent='虛構訓練空域 · '+tacticalScenarios[tacticalSelection].brief+' · M 發射';
     }catch(error){byId('message').textContent=error.message;}
   }
   for(const name of ['aircraft','departure','destination','waypoints','lesson','cruiseWind']) byId(name).addEventListener('change',drawPlan);
@@ -1083,6 +1091,7 @@ function initialize(){
   }
   function beginFlight(){
     byId('gateGuide').hidden=true;
+    tacticalView.start(flight);
     touchControls.reset();
     showTouchPause(false);
     cockpitView.preset=0;
@@ -1103,7 +1112,12 @@ function initialize(){
       const replacedId=restart?flight?.checkpointId:undefined;
       const wind=lesson==='crosswind'?5.144:['fog','wet'].includes(weather)?0:Number(weather);
       replay=null;replayControls.hidden=true;
-      if(lesson==='range'){
+      if(lesson==='tactical'){
+        if(approach) throw new Error('請按「開始飛行」載入戰術任務。');
+        byId('aircraft').value='sf16';
+        flight=makeTacticalFlight(airports.find(a=>a.code==='RCMQ'),selectedAircraft(),tacticalSelection,wind,
+          byId('tacticalGuided').value==='guided',byId('tacticalDifficulty').value==='advanced');
+      }else if(lesson==='range'){
         if(approach) throw new Error('靶場訓練由臺中跑道開始。');
         const airport=airports.find(a=>a.code==='RCMQ');
         const fighter=fleet.find(a=>a.id==='sf16');
@@ -1203,6 +1217,7 @@ function initialize(){
     }catch(error){byId('message').textContent=error.message;}
   }
   function menu(){
+    tacticalView.clear();
     touchControls.reset();
     saveCurrentMission(flight);
     replay=null;replayControls.hidden=true;updateReplayButton();
@@ -1226,7 +1241,10 @@ function initialize(){
     if(replay&&!['KeyC','KeyP','KeyN','Home'].includes(code)) return;
     if(replay&&code==='KeyP'){byId('replayToggle').click();return;}
     if(code==='KeyJ') toggleNavigation(flight);
-    if(code==='KeyM'&&!paused) rangeShot(flight);
+    if(code==='KeyM'&&!paused){
+      if(flight.tactical) tacticalView.command('fire');
+      else rangeShot(flight);
+    }
     if(code==='KeyV') flight.bankCommand=0;
     if(code==='KeyN') cycleCockpitView();
     if(code==='Home'&&cockpitActive()){
@@ -1281,7 +1299,7 @@ function initialize(){
   });
   addEventListener('keyup',event=>{keys.delete(event.code);keys.delete(boundCode(event.code));});
   addEventListener('blur',()=>{keys.clear();pointer.active=false;cockpitView.drag=null;});
-  const overControls=target=>target.closest('button,details,input,select,textarea,a,.systems,.right,header,#touchFlight');
+  const overControls=target=>target.closest('button,details,input,select,textarea,a,.systems,.right,header,#touchFlight,#tacticalGuide,#tacticalReport');
   addEventListener('contextmenu',event=>{
     if(cockpitActive()&&!overControls(event.target)) event.preventDefault();
   });
@@ -1608,7 +1626,8 @@ function initialize(){
           if(f.tow) stepRunwayTow(f,simTick);
           else stepTrainer(f,smoothControls(f,input,simTick));
           if(f.service) updatePassengerService(f,simTick);
-          if(f.regional) updateRegionalFlight(f);
+          if(f.tactical) stepTactical(f,simTick);
+          else if(f.regional) updateRegionalFlight(f);
           if(f.voyage) captureVoyage(f,voyageFrames,f.finished);
           accumulator-=simTick;
           if(f.finished){
@@ -1772,7 +1791,7 @@ function initialize(){
       values.forEach((value,i)=>statValues[i].textContent=live?value:'—');
       const straightAhead=cockpitView.preset!==(twoSeats(profile)?2:1)&&
         Math.abs(cockpitView.yaw)<.18&&Math.abs(cockpitView.pitch)<.16;
-      byId('benchmarkHUD').hidden=!profile.role||!cockpitActive()||!live||!straightAhead;
+      byId('benchmarkHUD').hidden=Boolean(f.tactical)||!profile.role||!cockpitActive()||!live||!straightAhead;
       if(!byId('benchmarkHUD').hidden){
         byId('hudHeading').textContent='HDG '+values[3];
         byId('hudCross').style.transform='rotate('+(-f.bank/rad)+'deg) translateY('+clamp(f.pitch/rad*2,-40,40)+'px)';
@@ -1802,7 +1821,7 @@ function initialize(){
       const target=f.regional?activeTarget(f):legacyRoute[f.waypoint];
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}
       const statusBox=byId('status');
-      statusBox.hidden=!byId('gateGuide').hidden&&!paused&&!f.towMessage;
+      statusBox.hidden=Boolean(f.tactical&&!paused)||!byId('gateGuide').hidden&&!paused&&!f.towMessage;
       statusBox.textContent=status(f,knots,target);
       if(now>=nextNavDraw){drawNav(f,target);nextNavDraw=now+100;}
     }else{
@@ -1890,6 +1909,7 @@ function initialize(){
       !flight&&['panel','night'].includes(byId('inspect').value)?82:64;
     if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}
     atmosphericSky.update(camera,dt,qualitySelect.value);
+    tacticalView.render(flight,dt,now,qualitySelect.value==='low'||touchControls.mode.value==='mobile');
     renderer.render(scene,camera);
     if(!flight&&!inspectionMode&&now%200<35){
       const canvas=renderer.domElement;
@@ -1898,6 +1918,35 @@ function initialize(){
       hangarPreview.drawImage(canvas,(canvas.width-width)/2,(canvas.height-height)/2,width,height,0,0,352,200);
     }
   }
+  let tacticalSelection='radar';
+  for(const [id,mission] of Object.entries(tacticalScenarios)){
+    const card=document.createElement('button');
+    const name=document.createElement('strong'), details=document.createElement('small'), brief=document.createElement('small');
+    name.textContent=mission.name;
+    details.textContent='SF-16 · '+mission.difficulty+' · '+mission.minutes+' 分 · '+mission.base+' 金幣';
+    brief.textContent=(id==='intercept'?'跑道起飛':'空中開始')+' · '+mission.brief;
+    card.type='button';
+    card.setAttribute('aria-pressed',String(id===tacticalSelection));
+    card.append(name,details,brief);
+    card.onclick=()=>{
+      tacticalSelection=id;
+      for(const option of byId('tacticalCards').children) option.setAttribute('aria-pressed',String(option===card));
+      drawPlan();
+    };
+    byId('tacticalCards').append(card);
+  }
+  const tacticalView=createTacticalView(scene,camera,{
+    paused:()=>paused,
+    retry:()=>start(false,true),
+    menu,
+    sound:frequency=>{if(audioEnabled) flightAudio.effect(frequency,.18);},
+    replayPlane:([x,y,z,heading,pitch,bank],inside)=>{
+      const model=models[fleet.indexOf(flight.aircraft)];
+      model.visible=!inside;
+      model.position.set(x,y,z);
+      model.rotation.set(pitch,-heading,-bank,'YXZ');
+    }
+  });
   drawPlan();showLog();updateReplayButton();activeDay=setEnvironment();
   byId('time').addEventListener('change',()=>{activeDay=setEnvironment();});
   byId('weather').addEventListener('change',()=>{activeDay=setEnvironment();});
