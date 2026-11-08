@@ -1392,12 +1392,17 @@ function initialize(){
       }
       model.userData.surfaces.forEach((part,i)=>part.rotation.x=-f.flaps*.16+input.roll*(i===0?-.22:.22));
       if(cameraMode===0){
-        camera.position.copy(pos).addScaledVector(dir,-profile.geometry[0]*5);
+        camera.position.copy(pos).addScaledVector(dir,-profile.geometry[0]*(profile.id==='b773'?2.7:5));
         camera.position.y+=profile.gearHeight*4;camera.up.set(0,1,0);
         camera.lookAt(pos.clone().addScaledVector(dir,12));
       }else{
         camera.position.copy(pos).addScaledVector(dir,profile.geometry[0]*(profile.role?.56:.30));
         camera.position.y+=profile.role?(profile.role==='fighter'?.68:profile.geometry[1]*.17+.62):profile.geometry[1]*.85;
+        if(profile.id==='b773'){
+          camera.position.addScaledVector(dir,-.86);
+          camera.position.x-=Math.cos(f.heading)*.58;
+          camera.position.z-=Math.sin(f.heading)*.58;
+        }
         const look=camera.position.clone().addScaledVector(dir,100);
         look.y+=Math.tan(f.pitch)*100;
         camera.up.set(Math.cos(f.heading)*Math.sin(f.bank),Math.cos(f.bank),Math.sin(f.heading)*Math.sin(f.bank));
@@ -1491,6 +1496,10 @@ function initialize(){
             const interior=inspection==='cabin'&&profile.role!=='fighter';
             camera.position.copy(model.position).add(new THREE.Vector3(.20,interior?.88:profile.role==='fighter'?.68:data.radius*.17+.62,interior?h*.39:-h*.56));
             camera.lookAt(p.x,model.position.y+(interior?.45:.20),interior?p.z-h*.44:p.z-h*.72);
+            if(profile.id==='b773'&&!interior){
+              camera.position.set(p.x-.72,model.position.y+data.radius*.17+.60,p.z-h*.56+1.20);
+              camera.lookAt(p.x-.38,model.position.y+data.radius*.17+.14,p.z-h*.56-1.31);
+            }
           }
         }
         ambient.intensity=inspection==='night'?.25:1.05;
