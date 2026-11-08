@@ -46,7 +46,7 @@ class CityExtractor(osmium.SimpleHandler):
                 height = 0
         if height <= 1:
             height = 4 + (way.id % 6) * 1.6 if max(width, depth) < 24 else 7 + (way.id % 9) * 1.8
-        cell = (round(y * 3400), round(x * 3150))
+        cell = (round(y * 5100), round(x * 4800))
         size = width * depth * max(5, height)
         if cell not in self.cells or size > self.cells[cell][0]:
             self.cells[cell] = (size, [round(y, 5), round(x, 5), min(width, 260), min(depth, 260),

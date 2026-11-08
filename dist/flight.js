@@ -344,7 +344,7 @@ function initialize(){
   }
   const taipeiVisuals=buildTaipeiVisuals(scene,renderedGround);
   const regionalScenery=buildRegionalScenery(scene,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
-  const vegetation=buildVegetation(scene,renderedGround,airports,taipeiData,treeCover);
+  const vegetation=buildVegetation(scene,renderedGround,airports,taipeiData,treeCover,taiwanHighways);
 
   const cloud = document.createElement('canvas');
   cloud.width=512; cloud.height=256;
@@ -1788,7 +1788,7 @@ function initialize(){
     const viewerX=flight?.x??selectedAirport('departure').x;
     const viewerZ=flight?.z??selectedAirport('departure').z;
     vegetation.update(camera.position.x,camera.position.z,qualitySelect.value);
-    regionalScenery.update(camera.position.x,camera.position.z,qualitySelect.value);
+    regionalScenery.update(camera.position.x,camera.position.z,qualitySelect.value,dt);
     taipeiVisuals.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',paused||Boolean(replay),qualitySelect.value);
     airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:byId('inspect').value==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);

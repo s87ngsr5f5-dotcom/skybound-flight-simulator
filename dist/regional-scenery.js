@@ -4,7 +4,7 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
   const tileKey=(x,z)=>x+':'+z;
   function tileAt(x,z){
     const id=tileKey(Math.floor(x/tileSize),Math.floor(z/tileSize));
-    if(!tiles.has(id)) tiles.set(id,{roads:[],buildings:[]});
+    if(!tiles.has(id)) tiles.set(id,{roads:[],buildings:[],traffic:new Set()});
     return tiles.get(id);
   }
   function inAirport(x,z,margin){
@@ -14,6 +14,10 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
       const p=runwayCoordinates(x,z,a);
       return Math.abs(p.along)<length&&Math.abs(p.cross)<Math.abs(a.apron)+margin;
     });
+  }
+  function insideTaipei(x,z){
+    const {lat,lon}=latLon(x,z);
+    return lat>=taipeiBounds[0]&&lat<=25.11&&lon>=taipeiBounds[1]&&lon<=taipeiBounds[3];
   }
   for(const [width,bridge,coords] of roadData){
     const points=[],lengths=[0],normals=[];
@@ -29,13 +33,14 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
       const length=Math.hypot(b.x-a.x,b.z-a.z)||1;
       normals.push({x:-(b.z-a.z)/length,z:(b.x-a.x)/length});
     }
+    const route={points,lengths,width,bridge,id:coords[0]*10000+coords[1]};
     for(let i=1;i<points.length;i++){
       const a=points[i-1],b=points[i],x=(a.x+b.x)/2,z=(a.z+b.z)/2;
-      const {lat,lon}=latLon(x,z);
-      const insideTaipei=lat>=taipeiBounds[0]&&lat<=25.11&&lon>=taipeiBounds[1]&&lon<=taipeiBounds[3];
-      if(insideTaipei) continue;
+      if(insideTaipei(x,z)) continue;
       const lift=distance=>bridge?Math.min(1,distance/48,(lengths.at(-1)-distance)/48)*4.8:0;
-      tileAt(x,z).roads.push({a,b,width,normalA:normals[i-1],normalB:normals[i],
+      const tile=tileAt(x,z);
+      if(lengths.at(-1)>115) tile.traffic.add(route);
+      tile.roads.push({a,b,width,normalA:normals[i-1],normalB:normals[i],
         riseA:lift(lengths[i-1]),riseB:lift(lengths[i])});
     }
   }
@@ -58,14 +63,69 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
   facadeTexture.colorSpace=THREE.SRGBColorSpace;
   const wall=new THREE.MeshStandardMaterial({color:0xffffff,map:facadeTexture,roughness:.88});
   const roof=new THREE.MeshStandardMaterial({color:0xb6b4a9,roughness:.95});
-  const buildings=new THREE.InstancedMesh(new THREE.BoxGeometry(),[wall,wall,roof,roof,wall,wall],28000);
+  const buildings=new THREE.InstancedMesh(new THREE.BoxGeometry(),[wall,wall,roof,roof,wall,wall],40000);
   buildings.name='Regional city volumes';
   buildings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   buildings.count=0;
   scene.add(buildings);
   const boxMatrix=new THREE.Object3D(),color=new THREE.Color();
   const palette=[0xa6a3a1,0xc9c2ad,0x9fa9af,0xada299,0x9dada7,0xc7c8c2,0xa3a7b0];
-  let last='';
+  const carBody=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({color:0xffffff}),180);
+  const carCabin=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({color:0x31434c}),180);
+  carBody.name='Regional highway vehicles';
+  for(const mesh of [carBody,carCabin]){
+    mesh.count=0;
+    mesh.frustumCulled=false;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(mesh);
+  }
+  const carColors=[0xd9dedf,0x354c62,0x9b3935,0xa3a59c,0xeee0b6];
+  let clock=0, trafficElapsed=0, last='';
+  function updateTraffic(x,z,dt,quality){
+    clock+=dt;
+    trafficElapsed+=dt;
+    if(trafficElapsed<.05) return;
+    trafficElapsed=0;
+    const col=Math.floor(x/tileSize),row=Math.floor(z/tileSize),routes=new Set();
+    for(let j=row-2;j<=row+2;j++) for(let i=col-2;i<=col+2;i++){
+      const tile=tiles.get(tileKey(i,j));
+      if(tile) for(const route of tile.traffic) routes.add(route);
+    }
+    let count=0;
+    const limit=quality==='low'?70:180;
+    for(const {points,lengths,width,bridge,id} of routes){
+      if(count>=limit) break;
+      const length=lengths.at(-1);
+      const cars=Math.min(8,Math.max(1,Math.floor(length/135)));
+      for(let k=0;k<cars&&count<limit;k++){
+        const speed=width===8?15:25;
+        const along=(clock*speed+length*(id%1+k/cars))%length;
+        let lo=0,hi=lengths.length-1;
+        while(hi-lo>1){
+          const mid=(lo+hi)>>1;
+          if(lengths[mid]<=along) lo=mid;else hi=mid;
+        }
+        const a=points[lo],b=points[hi],span=lengths[hi]-lengths[lo];
+        const t=(along-lengths[lo])/span, dx=(b.x-a.x)/span,dz=(b.z-a.z)/span;
+        const px=a.x+(b.x-a.x)*t+dz*width*.22,pz=a.z+(b.z-a.z)*t-dx*width*.22;
+        if((px-x)**2+(pz-z)**2>3900**2||insideTaipei(px,pz)) continue;
+        const y=ground(px,pz)+.72+(bridge?Math.min(1,along/48,(length-along)/48)*4.8:0);
+        const scale=Math.min(1,along/8,(length-along)/8);
+        boxMatrix.rotation.y=Math.atan2(dx,dz);
+        boxMatrix.position.set(px,y+.58*scale,pz);
+        boxMatrix.scale.set(1.78*scale,.89*scale,4.35*scale);
+        boxMatrix.updateMatrix();carBody.setMatrixAt(count,boxMatrix.matrix);
+        carBody.setColorAt(count,color.setHex(carColors[(Math.floor(id)+k)%carColors.length]));
+        boxMatrix.position.y=y+1.13*scale;
+        boxMatrix.scale.set(1.49*scale,.58*scale,2.18*scale);
+        boxMatrix.updateMatrix();carCabin.setMatrixAt(count++,boxMatrix.matrix);
+      }
+    }
+    boxMatrix.rotation.y=0;
+    carBody.count=carCabin.count=count;
+    carBody.instanceMatrix.needsUpdate=carCabin.instanceMatrix.needsUpdate=true;
+    if(carBody.instanceColor) carBody.instanceColor.needsUpdate=true;
+  }
   function meshGeometry(mesh,positions){
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
@@ -73,7 +133,8 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
     mesh.geometry.dispose();
     mesh.geometry=geometry;
   }
-  function update(x,z,quality){
+  function update(x,z,quality,dt){
+    updateTraffic(x,z,dt,quality);
     const col=Math.floor(x/tileSize),row=Math.floor(z/tileSize),key=tileKey(col,row)+':'+quality;
     if(last===key) return;
     last=key;
@@ -112,7 +173,10 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
           }
         }
         if(Math.abs(i-col)>reach-1||Math.abs(j-row)>reach-1) continue;
-        for(const b of tile.buildings){
+        const distance=Math.max(Math.abs(i-col),Math.abs(j-row));
+        const stride=distance<=2?1:quality==='high'?2:3;
+        for(let index=0;index<tile.buildings.length;index+=stride){
+          const b=tile.buildings[index];
           if(buildings.count>=buildings.instanceMatrix.count) break;
           const y=ground(b.x,b.z);
           if(y<.6) continue;

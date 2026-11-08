@@ -16,7 +16,7 @@ function createTreeCover(source){
     return density[row*source.columns+col]/15;
   };
 }
-function buildVegetation(scene,ground,airports,map,cover){
+function buildVegetation(scene,ground,airports,map,cover,highways){
   // Index mapped obstructions once. A tree only checks features in its own cell.
   const masks=new Map(), maskSize=120;
   const key=(x,z)=>x+':'+z;
@@ -29,21 +29,28 @@ function buildVegetation(scene,ground,airports,map,cover){
       }
     }
   }
-  function pathMask(path,radius){
+  function pathMask(path,radius,clearCanopy=false){
     const points=path.map(([lat,lon])=>geoPoint(lat,lon));
     for(let i=1;i<points.length;i++){
       const a=points[i-1],b=points[i],dx=b.x-a.x,dz=b.z-a.z;
       const lengthSquared=dx*dx+dz*dz;
       if(!lengthSquared) continue;
-      index(Math.min(a.x,b.x)-radius,Math.min(a.z,b.z)-radius,
-        Math.max(a.x,b.x)+radius,Math.max(a.z,b.z)+radius,(x,z)=>{
+      const padding=radius+(clearCanopy?40:0);
+      index(Math.min(a.x,b.x)-padding,Math.min(a.z,b.z)-padding,
+        Math.max(a.x,b.x)+padding,Math.max(a.z,b.z)+padding,(x,z,crown)=>{
+          const clearance=radius+(clearCanopy?crown:0);
           const t=Math.min(1,Math.max(0,((x-a.x)*dx+(z-a.z)*dz)/lengthSquared));
-          return (x-a.x-t*dx)**2+(z-a.z-t*dz)**2<radius**2;
+          return (x-a.x-t*dx)**2+(z-a.z-t*dz)**2<clearance**2;
         });
     }
   }
   for(const road of map.roads){
-    if(!road.tunnel) pathMask(road.p,road.kind==='motorway'?16:13);
+    if(!road.tunnel) pathMask(road.p,road.kind==='motorway'?12:9,true);
+  }
+  for(const [width,,coords] of highways){
+    const path=[];
+    for(let i=0;i<coords.length;i+=2) path.push([coords[i],coords[i+1]]);
+    pathMask(path,width/2+2,true);
   }
   for(const river of map.rivers){
     const width=river.name.includes('基隆')?120:river.name.includes('淡水')?180:
@@ -117,7 +124,7 @@ function buildVegetation(scene,ground,airports,map,cover){
       if(Math.abs(frame.along)<reach&&Math.abs(frame.cross)<Math.max(325,Math.abs(a.apron)+135)+radius) return true;
     }
     const cell=masks.get(key(Math.floor(x/maskSize),Math.floor(z/maskSize)));
-    return cell?.some(test=>test(x,z));
+    return cell?.some(test=>test(x,z,radius));
   }
   function update(x,z,quality){
     const spacing=96;
@@ -142,7 +149,7 @@ function buildVegetation(scene,ground,airports,map,cover){
           const size=hash(ix,iz,4), tall=hash(ix,iz,5)>.84;
           const height=8+size*10;
           const width=detail===2?height*(tall?.30:.47):grid*(.40+density*.23);
-          if(blocked(tx,tz,width)) continue;
+          if(blocked(tx,tz,width*(detail===2?1.25:1)+1)) continue;
           const angle=hash(ix,iz,6)*Math.PI*2;
           const grove=hash(Math.floor(tx/65),Math.floor(tz/65),8);
           color.setHSL(.225+grove*.08,.36+grove*.14,.25+size*.09+grove*.06,THREE.SRGBColorSpace);
