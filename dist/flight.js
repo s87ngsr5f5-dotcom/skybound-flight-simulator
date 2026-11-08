@@ -45,7 +45,21 @@ function initialize(){
     parent.add(mesh);
     return mesh;
   }
-  const terrainHeight=regionalHeight;
+  function terrainHeight(x,z){
+    const natural=regionalHeight(x,z);
+    for(const airport of airports){
+      const half=airport.length/2;
+      if(Math.abs(x-airport.x)>half+950||Math.abs(z-airport.z)>half+950) continue;
+      const {along,cross}=runwayCoordinates(x,z,airport);
+      // Clear a terrain-grid cell around paved surfaces so coarse triangles
+      // cannot bury a flat runway threshold or the edge of the apron.
+      const apronLimit=Math.sign(airport.apron)*cross>0?Math.abs(airport.apron)+135:airport.width/2+9;
+      const edge=Math.max(Math.abs(along)-half-355,Math.abs(cross)-apronLimit-355);
+      const blend=1-clamp(edge/185,0,1);
+      if(blend>0) return natural+(airport.elevation-natural)*blend;
+    }
+    return natural;
+  }
   const treeCover=createTreeCover(worldCoverTrees);
   const atlas = document.createElement('canvas');
   atlas.width = atlas.height = 1024;
@@ -132,59 +146,145 @@ function initialize(){
   asphalt.map=pavementTexture(false);concrete.map=pavementTexture(true);
   asphalt.color.set('#d3d7d7');concrete.color.set('#d4d6d1');
   const glass = material('#53758b'), roof = material('#a4afac');
-  const airportGroups=[];
+  const airportGroups=[],jetwayWalls=new Map();
+  const jetwayPaint=material('#b4c0c7'), jetwayGlass=material('#4e7087'), jetwayDark=material('#36464d');
+  function makeJetway(){
+    const root=new THREE.Group(), tunnel=new THREE.Group();
+    root.add(tunnel);
+    box(tunnel,jetwayPaint,3.3,.22,1,0,-.13,0);
+    box(tunnel,jetwayPaint,3.45,.21,1,0,2.48,0);
+    for(const side of [-1,1]){
+      box(tunnel,jetwayPaint,.11,.73,1,side*1.61,.36,0);
+      box(tunnel,jetwayGlass,.12,1.42,1,side*1.62,1.45,0);
+      box(tunnel,jetwayPaint,.14,.21,1,side*1.62,2.24,0);
+      for(let i=-3;i<=3;i++) box(tunnel,jetwayPaint,.15,1.62,.011,side*1.63,1.48,i/7);
+    }
+    const cabin=new THREE.Group();root.add(cabin);
+    box(cabin,jetwayPaint,3.50,2.65,2.25,0,1.21,0);
+    box(cabin,jetwayDark,2.32,2.34,.13,0,1.20,1.15);
+    box(cabin,jetwayGlass,3.52,.89,1.45,0,1.64,-.16);
+    const support=new THREE.Group();root.add(support);
+    box(support,jetwayPaint,.61,1,.63,-.84,-.5,0);
+    box(support,jetwayPaint,.61,1,.63,.84,-.5,0);
+    box(support,jetwayDark,2.39,.16,1,0,-.91,0);
+    return {root,tunnel,cabin,support};
+  }
+  function placeJetway(model,terminal,door,ground){
+    const length=terminal.distanceTo(door);
+    model.root.position.copy(terminal);
+    model.root.lookAt(door);
+    model.tunnel.scale.z=Math.max(.5,length-1.6);
+    model.tunnel.position.z=(length-1.6)/2;
+    model.cabin.position.z=length-1.2;
+    model.support.position.z=length*.72;
+    model.support.scale.y=Math.max(.5,(terminal.y+door.y)/2-ground);
+  }
+  function labelTexture(label,foreground,background){
+    const canvas=document.createElement('canvas');canvas.width=256;canvas.height=128;
+    const ink=canvas.getContext('2d');
+    if(background){ink.fillStyle=background;ink.fillRect(0,0,256,128);}
+    ink.font='900 '+(label.length<4?102:70)+'px Arial, sans-serif';
+    ink.textAlign='center';ink.textBaseline='middle';ink.fillStyle=foreground;
+    ink.fillText(label,128,68,244);
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+    return texture;
+  }
+  function airportSign(group,label,x,z,w,h,color='#651b1b'){
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({
+      map:labelTexture(label,'#ffffff',color),side:THREE.DoubleSide
+    }));
+    sign.position.set(x,h/2+.36,z);
+    sign.rotation.y=Math.PI/2;
+    group.add(sign);
+    box(group,roof,.44,.36,w,x,.18,z);
+  }
+
   const lampMaterial=new THREE.MeshBasicMaterial({color:0xd7eaff});
   for(const airport of airports){
-    const half=airport.length/2, width=airport.width, apron=airport.apron;
+    const half=airport.length/2, width=airport.width, apron=airport.apron, sideOfApron=Math.sign(apron);
+    const large=['RCTP','RJAA','RCKH'].includes(airport.code);
+    const gates=large?7:['RCSS','RCMQ'].includes(airport.code)?5:3;
+    const gatePitch=large?73:51, apronLength=gates*gatePitch+80;
+    const terminalX=apron+sideOfApron*(large?112:88);
+    const terminalWidth=large?59:40;
+    const gateWall=terminalX-sideOfApron*terminalWidth/2;
+    jetwayWalls.set(airport.code,gateWall);
     const group = new THREE.Group();
     group.position.set(airport.x,airport.elevation,airport.z);
     group.rotation.y = -airport.heading;
     scene.add(group);
     airportGroups.push({group,airport});
+    box(group,concrete,width+15,.08,airport.length+28,0,-.008,0);
     box(group,asphalt,width,.12,airport.length,0,0,0);
-    box(group,concrete,17,.10,airport.length-180,apron,0,0);
-    box(group,concrete,92,.11,220,apron,0,-65);
+    box(group,concrete,24,.10,airport.length-180,apron,0,0);
+    box(group,concrete,large?150:113,.11,apronLength,apron+sideOfApron*30,0,-65);
     const lane=material('#dbad49');
     box(group,lane,.26,.03,airport.length-190,apron,.07,0);
     for(const z of [half-135,-440,-950]){
       box(group,concrete,Math.abs(apron),.10,18,apron/2,0,z);
-      box(group,lane,Math.abs(apron)-width/2,.025,.23,apron/2+Math.sign(apron)*width/4,.07,z);
+      box(group,lane,Math.abs(apron)-width/2,.025,.42,apron/2+sideOfApron*width/4,.07,z);
+      const hold=sideOfApron*(width/2+32);
+      for(let i=0;i<4;i++){
+        if(i<2) box(group,lane,.34,.025,14,hold+i*.78*sideOfApron,.081,z);
+        else for(let m=-6;m<=6;m+=2) box(group,lane,.34,.025,1.12,hold+i*.78*sideOfApron,.081,z+m);
+      }
+      airportSign(group,airport.designator+'-'+airport.reciprocal,hold+sideOfApron*6,z-12,8,1.40);
     }
     for(const side of [-1,1]){
-      box(group,white,.6,.035,airport.length-38,side*(width/2-2),.08,0);
-      for(let i=0;i<7;i++){
-        for(const end of [-1,1]) box(group,white,1.25,.03,26,side*(2.8+i*width/19),.085,end*(half-40));
+      box(group,white,1.05,.035,airport.length-38,side*(width/2-2),.08,0);
+      for(const end of [-1,1]){
+        box(group,white,Math.min(8,width*.13),.035,48,side*width*.22,.086,end*(half-315));
+        for(const distance of [200,430,520]){
+          box(group,white,1.9,.035,21,side*width*.25,.086,end*(half-distance));
+          if(distance===200) box(group,white,1.9,.035,21,side*width*.33,.086,end*(half-distance));
+        }
+      }
+      for(let i=0;i<(width<50?6:8);i++){
+        for(const end of [-1,1]) box(group,white,1.55,.03,30,side*(2.6+i*width/21),.085,end*(half-40));
       }
       for(let z=-half+38;z<half;z+=60) box(group,lampMaterial,.31,.13,.31,side*(width/2+.45),.09,z);
     }
-    for(let z=-half+100;z<half-90;z+=65) box(group,white,.8,.035,31,0,.08,z);
-    const sign = document.createElement('canvas');
-    sign.width=128; sign.height=128;
-    const ink=sign.getContext('2d');
-    ink.font='bold 90px sans-serif'; ink.textAlign='center'; ink.fillStyle='#fff';
-    ink.fillText(airport.designator,64,97);
-    const marking=new THREE.Mesh(new THREE.PlaneGeometry(25,32),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sign),transparent:true,depthWrite:false}));
-    marking.rotation.x=-Math.PI/2;
-    marking.position.set(0,.11,half-100);
-    group.add(marking);
-    const reverseSign=sign.cloneNode();
-    const reverseInk=reverseSign.getContext('2d');
-    reverseInk.font='bold 90px sans-serif';
-    reverseInk.textAlign='center';
-    reverseInk.fillStyle='#fff';
-    reverseInk.fillText(airport.reciprocal,64,97);
-    const reverseMark=marking.clone();
-    reverseMark.material=marking.material.clone();
-    reverseMark.material.map=new THREE.CanvasTexture(reverseSign);
-    reverseMark.position.z=-half+100;
-    reverseMark.rotateZ(Math.PI);
-    group.add(reverseMark);
-    for(let i=0;i<6;i++){
-      box(group,roof,48,8,39,apron+Math.sign(apron)*53,4,i*66-515);
-      box(group,glass,48.1,2,39.1,apron+Math.sign(apron)*53,4.5,i*66-515);
+    for(let z=-half+160;z<half-155;z+=65) box(group,white,1.18,.035,34,0,.08,z);
+    for(const [direction,text] of [[1,airport.designator],[-1,airport.reciprocal]]){
+      const marking=new THREE.Mesh(new THREE.PlaneGeometry(width*.67,24),new THREE.MeshBasicMaterial({
+        map:labelTexture(text,'#ffffff'),transparent:true,depthWrite:false
+      }));
+      marking.rotation.x=-Math.PI/2;
+      if(direction<0) marking.rotateZ(Math.PI);
+      marking.position.set(0,.11,direction*(half-106));
+      group.add(marking);
+      const edge=new THREE.MeshBasicMaterial({color:direction===1?0x6dffc0:0xf66c62});
+      for(let x=-width/2;x<=width/2;x+=4) box(group,edge,.29,.15,.35,x,.105,direction*(half-10));
     }
-    box(group,roof,9,24,9,apron+Math.sign(apron)*70,12,-590);
-    box(group,glass,14,5,14,apron+Math.sign(apron)*70,26,-590);
+    const buildingLength=gates*gatePitch+25;
+    const height=large?15:10;
+    box(group,roof,terminalWidth,height,buildingLength,terminalX,height/2,-65);
+    box(group,glass,terminalWidth+.12,height*.44,buildingLength-3,terminalX,height*.55,-65);
+    box(group,roof,terminalWidth+5,.86,buildingLength+4,terminalX,height+.35,-65);
+    for(let gate=0;gate<gates;gate++){
+      const z=-65+(gate-Math.floor(gates/2))*gatePitch;
+      box(group,roof,9,.34,gatePitch*.76,gateWall-sideOfApron*4,height*.69,z);
+      for(let offset=-18;offset<=18;offset+=6) box(group,roof,.27,height*.52,.29,gateWall-sideOfApron*.18,height*.53,z+offset);
+      box(group,lane,large?29:21,.029,.33,apron+sideOfApron*26,.091,z);
+      box(group,lane,.35,.029,5,apron+sideOfApron*17,.091,z);
+      airportSign(group,'G'+String(gate+1).padStart(2,'0'),gateWall-sideOfApron*2,z+9,3.8,1.12,'#15354b');
+      if(gate!==Math.floor(gates/2)){
+        const fixed=makeJetway();
+        placeJetway(fixed,new THREE.Vector3(gateWall,4.5,z-7),new THREE.Vector3(gateWall-sideOfApron*23,3.7,z+3),0);
+        group.add(fixed.root);
+      }
+    }
+    const towerZ=-65-buildingLength/2-56;
+    const towerHeight=large?38:28;
+    box(group,roof,8,towerHeight,8,terminalX+sideOfApron*15,towerHeight/2,towerZ);
+    box(group,glass,14,6,14,terminalX+sideOfApron*15,towerHeight+3,towerZ);
+    box(group,roof,15.5,.92,15.5,terminalX+sideOfApron*15,towerHeight+6.2,towerZ);
+    const terminalLabel=new THREE.Mesh(new THREE.PlaneGeometry(22,6),new THREE.MeshBasicMaterial({
+      map:labelTexture(airport.code,'#ffffff','#15354b'),side:THREE.DoubleSide
+    }));
+    terminalLabel.rotation.y=-sideOfApron*Math.PI/2;
+    terminalLabel.position.set(gateWall-sideOfApron*.15,height*.78,-65);
+    group.add(terminalLabel);
     const byMaterial=new Map();
     for(const child of group.children){
       if(child.geometry?.type!=='BoxGeometry') continue;
@@ -230,6 +330,7 @@ function initialize(){
     return (u+v<=1?a*(1-u-v)+b*u+c*v:d*(u+v-1)+b*(1-v)+c*(1-u))-.14;
   }
   const taipeiVisuals=buildTaipeiVisuals(scene,renderedGround);
+  const regionalScenery=buildRegionalScenery(scene,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
   const vegetation=buildVegetation(scene,renderedGround,airports,taipeiData,treeCover);
 
   const cloud = document.createElement('canvas');
@@ -1267,17 +1368,7 @@ function initialize(){
     f.lessonSaved=true;
     try{localStorage.setItem('skybound.lesson.'+f.lesson,'完成');}catch{}
   }
-  const bridgeMat=material('#829098');
-  const bridgeMesh=new THREE.Group();
-  box(bridgeMesh,bridgeMat,2.65,.20,9,0,-1.18,0);
-  for(const side of [-1,1]){
-    box(bridgeMesh,bridgeMat,.11,.9,9,side*1.27,-.61,0);
-    box(bridgeMesh,bridgeMat,.10,.10,9,side*1.27,.21,0);
-  }
-  for(const z of [-2.8,2.8]){
-    box(bridgeMesh,bridgeMat,.24,4.4,.24,-.92,-3.2,z);
-    box(bridgeMesh,bridgeMat,.24,4.4,.24,.92,-3.2,z);
-  }
+  const activeJetway=makeJetway(),bridgeMesh=activeJetway.root;
   scene.add(bridgeMesh);
   bridgeMesh.visible=false;
   const bridgeQueue=new THREE.Group();
@@ -1437,20 +1528,23 @@ function initialize(){
         });
         data.passengerCabin?.update(f,dt);
         if(f.bridge){
-          const door=new THREE.Vector3(-data.radius-4.3,.35,-data.half*.58).applyQuaternion(model.quaternion);
-          bridgeMesh.position.copy(pos).add(door);
-          bridgeMesh.rotation.y=model.rotation.y+Math.PI/2;
+          const airport=f.awaitingService?f.destination:f.departure;
+          const localDoor=new THREE.Vector3(-data.radius-.18,.10,-data.half*.58);
+          const door=localDoor.applyQuaternion(model.quaternion).add(pos);
+          const gate=airportPoint(airport,65,jetwayWalls.get(airport.code));
+          placeJetway(activeJetway,new THREE.Vector3(gate.x,airport.elevation+4.5,gate.z),door,airport.elevation);
           bridgeMesh.visible=true;
           if(f.service?.door){
             const exit=f.service.mode==='exit';
             const waiting=exit?f.service.boarded:f.passengers-f.service.boarded;
             bridgeQueue.position.copy(bridgeMesh.position);
-            bridgeQueue.rotation.y=bridgeMesh.rotation.y;
+            bridgeQueue.quaternion.copy(bridgeMesh.quaternion);
             bridgeQueue.visible=waiting>0;
+            const distance=bridgeMesh.position.distanceTo(door);
             queuePeople.forEach((person,index)=>{
               person.visible=index<waiting;
-              const moving=(f.elapsed*1.6+index)%9;
-              person.position.set(index%2?.34:-.34,-1.03+Math.sin(moving*8)*.035,(exit?-1:1)*(moving-4.5));
+              const moving=(f.elapsed*1.6+index*1.7)%Math.max(1,distance-3);
+              person.position.set(index%2?.34:-.34,Math.sin(moving*8)*.035,exit?distance-2-moving:moving+1);
               person.rotation.y=exit?Math.PI:0;
             });
           }
@@ -1583,19 +1677,33 @@ function initialize(){
     for(const {group,airport} of airportGroups) group.visible=Math.hypot(px-airport.x,pz-airport.z)<24000||!flight&&selectedAirport('departure')===airport;
     if(!flight&&byId('inspect').value.startsWith('tour-')){
       models.forEach(model=>{model.visible=false;if(model.userData.cabin)model.userData.cabin.visible=false;});
-      const tours={
-        'tour-apron':[25.0652,121.5507,28,25.0646,121.5527,10],
-        'tour-river':[25.0787,121.5531,280,25.0742,121.5475,12],
-        'tour-city':[25.0558,121.5447,370,25.0662,121.5585,18],
-        'tour-woods':[25.1122,121.5770,34,25.1132,121.5777,12]
-      };
-      const t=tours[byId('inspect').value],eye=geoPoint(t[0],t[1]),target=geoPoint(t[3],t[4]);
-      camera.position.set(eye.x,terrainHeight(eye.x,eye.z)+t[2],eye.z);
-      camera.up.set(0,1,0);camera.lookAt(target.x,terrainHeight(target.x,target.z)+t[5],target.z);
+      const tour=byId('inspect').value;
+      const airport=selectedAirport('departure');
+      if(tour==='tour-terminal'||tour==='tour-runway'){
+        const apron=airport.apron, half=airport.length/2;
+        const terminal=tour==='tour-terminal';
+        const eye=terminal?airportPoint(airport,-122,apron*.62):airportPoint(airport,-half+14,0);
+        const target=terminal?airportPoint(airport,65,jetwayWalls.get(airport.code)):airportPoint(airport,-half+300,0);
+        camera.position.set(eye.x,airport.elevation+(terminal?27:21),eye.z);
+        camera.up.set(0,1,0);
+        camera.lookAt(target.x,airport.elevation+(terminal?5:0),target.z);
+      }else{
+        const tours={
+          'tour-apron':[25.0652,121.5507,28,25.0646,121.5527,10],
+          'tour-river':[25.0787,121.5531,280,25.0742,121.5475,12],
+          'tour-city':[25.0558,121.5447,370,25.0662,121.5585,18],
+          'tour-woods':[25.1122,121.5770,34,25.1132,121.5777,12]
+        };
+        const t=tours[tour],eye=geoPoint(t[0],t[1]),target=geoPoint(t[3],t[4]);
+        camera.position.set(eye.x,terrainHeight(eye.x,eye.z)+t[2],eye.z);
+        camera.up.set(0,1,0);
+        camera.lookAt(target.x,terrainHeight(target.x,target.z)+t[5],target.z);
+      }
     }
     const viewerX=flight?.x??selectedAirport('departure').x;
     const viewerZ=flight?.z??selectedAirport('departure').z;
     vegetation.update(camera.position.x,camera.position.z,qualitySelect.value);
+    regionalScenery.update(camera.position.x,camera.position.z,qualitySelect.value);
     taipeiVisuals.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',paused||Boolean(replay),qualitySelect.value);
     airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:byId('inspect').value==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);
