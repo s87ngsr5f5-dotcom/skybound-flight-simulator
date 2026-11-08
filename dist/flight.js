@@ -346,26 +346,7 @@ function initialize(){
   const regionalScenery=buildRegionalScenery(scene,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
   const vegetation=buildVegetation(scene,renderedGround,airports,taipeiData,treeCover,taiwanHighways);
 
-  const cloud = document.createElement('canvas');
-  cloud.width=512; cloud.height=256;
-  const cloudInk=cloud.getContext('2d');
-  for(let i=0;i<46;i++){
-    const x=92+random()*328, y=65+random()*117, radius=27+random()*62;
-    const gradient=cloudInk.createRadialGradient(x,y-radius*.18,radius*.08,x,y,radius);
-    gradient.addColorStop(0,'rgba(255,255,255,.45)');
-    gradient.addColorStop(.58,'rgba(241,245,250,.23)');
-    gradient.addColorStop(1,'rgba(213,228,239,0)');
-    cloudInk.fillStyle=gradient;
-    cloudInk.fillRect(x-radius,y-radius,radius*2,radius*2);
-  }
-  const cloudMap=new THREE.CanvasTexture(cloud);
-  const cloudMaterial=new THREE.SpriteMaterial({map:cloudMap,depthWrite:false,fog:false});
-  for(let i=0;i<84;i++){
-    const sprite=new THREE.Sprite(cloudMaterial);
-    sprite.position.set((random()-.5)*110000,1100+random()*3000,-25000+random()*165000);
-    sprite.scale.set(3500+random()*5800,900+random()*1400,1);
-    scene.add(sprite);
-  }
+  const atmosphericSky=createAtmosphericSky(scene);
 
   const fuselage = material('#e9eef2'), trim = material('#185378'), windowMat=material('#192b39');
   function makeAircraft(profile,index){
@@ -839,20 +820,28 @@ function initialize(){
   }
   function setEnvironment(){
     const [hours,minutes]=byId('time').value.split(':').map(Number);
-    const day=clamp(Math.sin(((hours||0)+(minutes||0)/60-6)/12*Math.PI),0,1);
-    sunlight.intensity=.05+day*2.3;
-    ambient.intensity=.16+day*1.14;
-    sunlight.position.set(Math.cos((hours-6)/12*Math.PI)*500,Math.max(20,day*800),-360);
-    scene.background.set(day>.07?'#9ccbea':'#132740');
+    const hour=(hours||0)+(minutes||0)/60;
+    const angle=(hour-6)/12*Math.PI;
+    const elevation=Math.sin(angle);
+    const day=clamp((elevation+.13)/.53,0,1);
+    const weather=byId('weather').value;
+    const wet=weather==='wet';
+    const strength=weather==='fog'?.42:wet?.62:1;
+    const warmth=clamp(1-Math.min(Math.abs(hour-6),Math.abs(hour-18))/1.45,0,1);
+    sunlight.intensity=.05+day*2.3*strength;
+    sunlight.color.set('#fff0d9').lerp(new THREE.Color('#ffad71'),warmth);
+    ambient.intensity=.16+day*1.14*(weather==='fog'?.83:1);
+    sunlight.position.set(Math.cos(angle)*760,elevation*820,-280);
+    atmosphericSky.setWeather(hour,day,weather,sunlight.position);
+    scene.background.set('#132740').lerp(new THREE.Color(weather==='fog'?'#c5ced1':wet?'#aabac5':'#b2ccdc'),day);
     scene.fog.color.copy(scene.background);
-    scene.fog.density=byId('weather').value==='fog'?.00064:.000034;
+    scene.fog.density=weather==='fog'?.00064:wet?.000065:.000034;
     lampMaterial.color.set(day>.07?0xc5d7e2:0xeffaff);
-    const wet=byId('weather').value==='wet';
     asphalt.roughness=wet?.24:.90;asphalt.metalness=wet?.27:.02;
     concrete.roughness=wet?.31:.92;concrete.metalness=wet?.19:.02;
     return day;
   }
-  let activeDay=1;
+  let activeDay=1,previewNight=false;
   let nextCheckpoint=0;
   function saveCurrentMission(f,replaces){
     if(!f||replay) return;
@@ -1754,9 +1743,11 @@ function initialize(){
             }
           }
         }
-        ambient.intensity=inspection==='night'?.25:1.05;
-        sunlight.intensity=inspection==='night'?.08:2.15;
       }
+      const night=profile.role&&inspection==='night';
+      if(night){ambient.intensity=.25;sunlight.intensity=.08;}
+      else if(previewNight) activeDay=setEnvironment();
+      previewNight=Boolean(night);
     }
     const px=flight?.x??0,pz=flight?.z??0;
     for(const {group,airport} of airportGroups) group.visible=Math.hypot(px-airport.x,pz-airport.z)<24000||!flight&&selectedAirport('departure')===airport;
@@ -1796,6 +1787,7 @@ function initialize(){
     const viewFov=cockpitActive()?clamp((panelView?53:69)+cockpitView.zoom,34,86):
       !flight&&['panel','night'].includes(byId('inspect').value)?82:64;
     if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}
+    atmosphericSky.update(camera,dt,qualitySelect.value);
     renderer.render(scene,camera);
     if(!flight&&!inspectionMode&&now%200<35){
       const canvas=renderer.domElement;
