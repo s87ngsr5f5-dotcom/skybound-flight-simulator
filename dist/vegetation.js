@@ -1,5 +1,22 @@
 'use strict';
-function buildVegetation(scene,ground,airports,map){
+function createTreeCover(source){
+  const runs=atob(source.runs);
+  const density=new Uint8Array(source.columns*source.rows);
+  let index=0;
+  for(let i=0;i<runs.length;i++){
+    const run=runs.charCodeAt(i), end=index+(run&15)+1;
+    density.fill(run>>>4,index,end);
+    index=end;
+  }
+  return (x,z)=>{
+    const {lat,lon}=latLon(x,z);
+    const col=Math.floor((lon-source.west)/source.step);
+    const row=Math.floor((source.north-lat)/source.step);
+    if(col<0||row<0||col>=source.columns||row>=source.rows) return null;
+    return density[row*source.columns+col]/15;
+  };
+}
+function buildVegetation(scene,ground,airports,map,cover){
   // Index mapped obstructions once. A tree only checks features in its own cell.
   const masks=new Map(), maskSize=120;
   const key=(x,z)=>x+':'+z;
@@ -39,9 +56,29 @@ function buildVegetation(scene,ground,airports,map){
     const x0=Math.min(...xs)-4,x1=Math.max(...xs)+4,z0=Math.min(...zs)-4,z1=Math.max(...zs)+4;
     index(x0,z0,x1,z1,(x,z)=>x>=x0&&x<=x1&&z>=z0&&z<=z1);
   }
-  const limit=10000;
+  const limit=23000;
   const bark=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,envMapIntensity:.12});
   const leaves=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.96,envMapIntensity:.15});
+  // A small shared texture breaks up the solid color of the nearest crowns.
+  const tile=document.createElement('canvas');
+  tile.width=tile.height=128;
+  const ink=tile.getContext('2d');
+  ink.fillStyle='#b5b5b5';
+  ink.fillRect(0,0,128,128);
+  for(let i=0;i<2100;i++){
+    const x=hash(i,0,20)*128,z=hash(i,0,21)*128;
+    const shade=100+Math.round(hash(i,0,22)*145);
+    ink.fillStyle='rgb('+shade+' '+shade+' '+shade+')';
+    ink.beginPath();
+    ink.ellipse(x,z,1.2+hash(i,0,23)*2.6,.6+hash(i,0,24)*1.2,hash(i,0,25)*Math.PI,0,Math.PI*2);
+    ink.fill();
+  }
+  const leafTexture=new THREE.CanvasTexture(tile);
+  leafTexture.colorSpace=THREE.SRGBColorSpace;
+  leafTexture.wrapS=leafTexture.wrapT=THREE.RepeatWrapping;
+  leafTexture.repeat.set(3,2);
+  const detailedLeaves=leaves.clone();
+  detailedLeaves.map=leafTexture;
   function batch(name,geometry,material){
     const mesh=new THREE.InstancedMesh(geometry,material,limit);
     mesh.name=name;
@@ -51,68 +88,79 @@ function buildVegetation(scene,ground,airports,map){
     return mesh;
   }
   const trunks=batch('Vegetation trunks',new THREE.CylinderGeometry(.68,1,1,7),bark);
-  const crowns=batch('Vegetation crowns',new THREE.IcosahedronGeometry(1,1),leaves);
-  const branches=batch('Vegetation crown lobes',new THREE.IcosahedronGeometry(1,0),leaves);
+  const crowns=batch('Vegetation crowns',new THREE.IcosahedronGeometry(1,1),detailedLeaves);
+  const branches=batch('Vegetation crown lobes',new THREE.IcosahedronGeometry(1,0),detailedLeaves);
   const distant=batch('Vegetation distant crowns',new THREE.IcosahedronGeometry(1,0),leaves);
   const matrix=new THREE.Object3D(), color=new THREE.Color();
-  const grid=27;
+  const up=new THREE.Vector3(0,1,0), normal=new THREE.Vector3(), yawRotation=new THREE.Quaternion();
   let last='';
   function hash(x,z,salt){
     let n=Math.imul(x,374761393)^Math.imul(z,668265263)^Math.imul(salt,1442695041);
     n=Math.imul(n^(n>>>13),1274126177);
     return ((n^(n>>>16))>>>0)/4294967296;
   }
-  function place(mesh,x,y,z,sx,sy,sz,yaw){
+  function place(mesh,x,y,z,sx,sy,sz,yaw,slopeX=0,slopeZ=0){
     if(mesh.count>=limit) return;
     matrix.position.set(x,y,z);
     matrix.scale.set(sx,sy,sz);
-    matrix.rotation.y=yaw;
+    normal.set(-slopeX,1,-slopeZ).normalize();
+    matrix.quaternion.setFromUnitVectors(up,normal).multiply(yawRotation.setFromAxisAngle(up,yaw));
     matrix.updateMatrix();
     mesh.setMatrixAt(mesh.count,matrix.matrix);
     mesh.setColorAt(mesh.count++,color);
   }
+  function blocked(x,z,radius){
+    for(const a of airports){
+      const reach=a.length/2+460+radius;
+      if(Math.abs(x-a.x)>reach||Math.abs(z-a.z)>reach) continue;
+      const frame=runwayCoordinates(x,z,a);
+      if(Math.abs(frame.along)<reach&&Math.abs(frame.cross)<Math.max(325,Math.abs(a.apron)+135)+radius) return true;
+    }
+    const cell=masks.get(key(Math.floor(x/maskSize),Math.floor(z/maskSize)));
+    return cell?.some(test=>test(x,z));
+  }
   function update(x,z,quality){
-    const spacing=grid*9;
+    const spacing=96;
     const col=Math.floor(x/spacing),row=Math.floor(z/spacing),id=key(col,row)+':'+quality;
     if(last===id) return;
     last=id;
     for(const mesh of [trunks,crowns,branches,distant]) mesh.count=0;
-    const near=quality==='low'?760:quality==='high'?1600:1200;
-    const far=quality==='low'?2900:quality==='high'?5700:4400;
+    const [near,mid,far]=quality==='low'?[215,930,2900]:quality==='high'?[450,1500,5300]:[320,1200,4200];
     const centerX=(col+.5)*spacing,centerZ=(row+.5)*spacing;
-    for(let iz=Math.floor((centerZ-far)/grid);iz*grid<centerZ+far;iz++){
-      for(let ix=Math.floor((centerX-far)/grid);ix*grid<centerX+far;ix++){
-        const distance=(ix*grid-centerX)**2+(iz*grid-centerZ)**2;
-        if(distance>far**2) continue;
-        const close=distance<near**2;
-        if(!close&&(ix%3||iz%3)) continue;
-        const tx=(ix+.12+.76*hash(ix,iz,1))*grid,tz=(iz+.12+.76*hash(ix,iz,2))*grid;
-        const elevation=ground(tx,tz);
-        if(elevation<1.5||elevation>3200) continue;
-        if(hash(ix,iz,3)>(elevation<18?.27:elevation<80?.55:.82)) continue;
-        if(airports.some(a=>{
-          const reach=a.length/2+460;
-          if(Math.abs(tx-a.x)>reach||Math.abs(tz-a.z)>reach) return false;
-          const frame=runwayCoordinates(tx,tz,a);
-          return Math.abs(frame.along)<reach&&Math.abs(frame.cross)<Math.max(325,Math.abs(a.apron)+135);
-        })) continue;
-        const cell=masks.get(key(Math.floor(tx/maskSize),Math.floor(tz/maskSize)));
-        if(cell?.some(test=>test(tx,tz))) continue;
-
-        const size=hash(ix,iz,4),tall=hash(ix,iz,5)>.72;
-        const height=5.5+size*9, width=height*(tall?.24:.37);
-        const angle=hash(ix,iz,6)*Math.PI*2;
-        color.setHSL(.235+hash(ix,iz,7)*.085,.40,.29+size*.12,THREE.SRGBColorSpace);
-        if(close){
-          place(crowns,tx,elevation+height*.68,tz,width,height*(tall?.39:.31),width*.9,angle);
-          color.multiplyScalar(.83);
-          const dx=Math.cos(angle)*width*.52,dz=Math.sin(angle)*width*.52;
-          place(branches,tx+dx,elevation+height*.60,tz+dz,width*.68,height*.22,width*.68,angle);
-          place(branches,tx-dx,elevation+height*.76,tz-dz,width*.64,height*.23,width*.64,angle);
-          color.setHSL(.08,.34,.27+size*.09,THREE.SRGBColorSpace);
-          place(trunks,tx,elevation+height*.22-.2,tz,.16+size*.20,height*.46,.16+size*.20,angle);
-        }else{
-          place(distant,tx,elevation+height*.64,tz,width,height*.35,width*.88,angle);
+    for(const [grid,inner,outer,detail] of [[10,0,near,2],[23,near,mid,1],[54,mid,far,0]]){
+      for(let iz=Math.floor((centerZ-outer)/grid);iz*grid<centerZ+outer;iz++){
+        for(let ix=Math.floor((centerX-outer)/grid);ix*grid<centerX+outer;ix++){
+          const tx=(ix+.12+.76*hash(ix,iz,1))*grid,tz=(iz+.12+.76*hash(ix,iz,2))*grid;
+          const distance=(tx-centerX)**2+(tz-centerZ)**2;
+          if(distance<inner**2||distance>outer**2) continue;
+          const elevation=ground(tx,tz);
+          if(elevation<1.5||elevation>3500) continue;
+          const measured=cover(tx,tz);
+          const fallback=elevation<40?.04:elevation<120?.24:.78;
+          const density=measured??fallback;
+          if(hash(ix,iz,3)>density) continue;
+          const size=hash(ix,iz,4), tall=hash(ix,iz,5)>.84;
+          const height=8+size*10;
+          const width=detail===2?height*(tall?.30:.47):grid*(.40+density*.23);
+          if(blocked(tx,tz,width)) continue;
+          const angle=hash(ix,iz,6)*Math.PI*2;
+          const grove=hash(Math.floor(tx/65),Math.floor(tz/65),8);
+          color.setHSL(.225+grove*.08,.36+grove*.14,.25+size*.09+grove*.06,THREE.SRGBColorSpace);
+          if(detail===2){
+            place(crowns,tx,elevation+height*.69,tz,width,height*(tall?.42:.34),width*.88,angle);
+            color.multiplyScalar(.83);
+            const dx=Math.cos(angle)*width*.53,dz=Math.sin(angle)*width*.53;
+            place(branches,tx+dx,elevation+height*.59,tz+dz,width*.69,height*.24,width*.69,angle);
+            place(branches,tx-dx,elevation+height*.79,tz-dz,width*.64,height*.23,width*.64,angle);
+            color.setHSL(.08,.34,.27+size*.09,THREE.SRGBColorSpace);
+            place(trunks,tx,elevation+height*.23-.35,tz,.19+size*.23,height*.48,.19+size*.23,angle);
+          }else{
+            // A wider crown stands in for a group of trees beyond the near view.
+            const probe=grid*.30;
+            const slopeX=(ground(tx+probe,tz)-elevation)/probe;
+            const slopeZ=(ground(tx,tz+probe)-elevation)/probe;
+            place(distant,tx,elevation+height*.39,tz,width,height*.49,width*.92,angle,slopeX,slopeZ);
+          }
         }
       }
     }

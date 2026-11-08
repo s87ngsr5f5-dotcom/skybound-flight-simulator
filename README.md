@@ -48,3 +48,10 @@
 ## 自有客機維修
 
 機庫工坊可買入 737 MAX 8、767-300ER、777-300ER 與 SA-380。執飛定期載客後，自有客機按飛行時間和接地情況累積磨耗。機況低於 60% 時，需要先維修才能接下一趟定期航班。工坊會顯示費用，維修後恢復至 100%。有未完成航班時須先完成或結束該航班。租機的地面處置仍按航班結算，自有客機則在工坊支付修復費。
+
+
+## 臺灣森林
+
+臺灣本島以 ESA WorldCover 2021 v200 的樹木覆蓋分類（class 10）決定林地分布。來源為 N24E120、N21E120 兩個圖磚，將原始 10 公尺分類彙整為約 125–140 公尺的覆蓋比例。林地邊界來自衛星資料，樹種、單株位置和大小由遊戲生成。資料範圍外使用地形推估。重新生成資料可使用 `tools/build-forest-cover.py`，輸入官方 GeoTIFF 所在資料夾和輸出路徑。
+
+© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. Adapted by SKYBOUND GLOBAL. [ESA WorldCover 2021 v200](https://doi.org/10.5281/zenodo.7254221), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

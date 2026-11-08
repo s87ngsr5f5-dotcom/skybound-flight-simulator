@@ -46,6 +46,7 @@ function initialize(){
     return mesh;
   }
   const terrainHeight=regionalHeight;
+  const treeCover=createTreeCover(worldCoverTrees);
   const atlas = document.createElement('canvas');
   atlas.width = atlas.height = 1024;
   const paint = atlas.getContext('2d');
@@ -85,7 +86,9 @@ function initialize(){
         for(let i=0;i<pos.count;i++){
           const height=terrainHeight(px+pos.getX(i),pz+pos.getZ(i));
           pos.setY(i,height-.14);
+          const forest=height>=1.5&&height<=3500?(treeCover(px+pos.getX(i),pz+pos.getZ(i))||0):0;
           if(height<.7) rgb.push(.17,.42,.83);
+          else if(forest>.08) rgb.push(.76-.44*forest,.90-.45*forest,.76-.47*forest);
           else if(height>1000) rgb.push(.71,.77,.72);
           else{
             const worldX=px+pos.getX(i),worldZ=pz+pos.getZ(i);
@@ -227,7 +230,7 @@ function initialize(){
     return (u+v<=1?a*(1-u-v)+b*u+c*v:d*(u+v-1)+b*(1-v)+c*(1-u))-.14;
   }
   const taipeiVisuals=buildTaipeiVisuals(scene,renderedGround);
-  const vegetation=buildVegetation(scene,renderedGround,airports,taipeiData);
+  const vegetation=buildVegetation(scene,renderedGround,airports,taipeiData,treeCover);
 
   const cloud = document.createElement('canvas');
   cloud.width=512; cloud.height=256;
