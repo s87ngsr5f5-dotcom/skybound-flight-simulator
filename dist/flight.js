@@ -855,9 +855,30 @@ function initialize(){
     nextCheckpoint=performance.now()+15000;
   }
   addEventListener('pagehide',()=>saveCurrentMission(flight));
+  function callRunwayTow(f){
+    if(!paused&&!replay&&requestRunwayTow(f)){f.towMessage='';return;}
+    if(!f.tow) f.towMessage='請在出發機場停住、收油，並關門收空橋；載客航班須完成登機及加油。';
+  }
   function addPassengerSystems(f,entries){
     const service=f.service;
     const atGate=()=>!f.finished&&groundServiceAllowed(f)&&!service.pushing&&(!service.pushed||f.awaitingService);
+    const fuel=()=>{if(atGate()&&!f.awaitingService) service.pumping=f.fuel<service.targetFuel&&!service.pumping;};
+    const bridge=()=>{if(atGate()&&!service.door) f.bridge=!f.bridge;};
+    const door=()=>{if(atGate()) setPassengerDoor(f,!service.door);};
+    const aisle=()=>{f.cabinView=f.cabinView==='aisle'?false:'aisle';changeView();};
+    byId('gateStep').onclick=()=>{
+      if(!f.parkingBrake&&f.ground&&Math.hypot(f.vx,f.vz)<.8){f.parkingBrake=true;return;}
+      if(f.ground&&f.parkingBrake&&Math.hypot(f.vx,f.vz)<.8&&f.engines.some(Boolean)){
+        f.engines.forEach((running,index)=>{if(running) startEngine(f,index);});
+        return;
+      }
+      const complete=f.awaitingService?service.delivered===f.passengers:service.boarded===f.passengers;
+      if(!f.awaitingService&&complete&&!f.bridge&&f.fuel>=service.targetFuel){callRunwayTow(f);return;}
+      if(f.bridge&&(service.door||!complete)) door();
+      else bridge();
+    };
+    byId('gateFuel').onclick=fuel;
+    byId('gateView').onclick=aisle;
     entries.push(
       ['客艙廣播',()=>false,()=>{
         const message=f.awaitingService?'已抵達，請依序下機。':f.ground?'歡迎登機，請就座並繫好安全帶。':'請繫好安全帶。';
@@ -869,21 +890,10 @@ function initialize(){
           audio.voice=voice;speechSynthesis.speak(audio);
         }
       }],
-      ['加油',()=>Boolean(service.pumping),()=>{
-        if(atGate()&&!f.awaitingService) service.pumping=f.fuel<service.targetFuel&&!service.pumping;
-      }],
-      ['連接空橋',()=>f.bridge,()=>{if(atGate()&&!service.door) f.bridge=!f.bridge;}],
-      ['客艙門',()=>service.door,()=>{
-        if(atGate()&&f.bridge){
-          service.door=!service.door;
-          service.bridgeElapsed=0;
-          service.progress=0;
-          const end=jetwayEndpoints(f,models[fleet.indexOf(f.aircraft)]);
-          service.bridgeDelay=service.door?end.terminal.distanceTo(end.door)/2.6:0;
-          service.mode=service.door?(f.awaitingService?'exit':'board'):null;
-        }
-      }],
-      ['客艙走道',()=>f.cabinView==='aisle',()=>{f.cabinView=f.cabinView==='aisle'?false:'aisle';changeView();}],
+      ['加油',()=>Boolean(service.pumping),fuel],
+      ['連接空橋',()=>f.bridge,bridge],
+      ['客艙門',()=>service.door,door],
+      ['客艙走道',()=>f.cabinView==='aisle',aisle],
       ['乘客窗景',()=>f.cabinView==='window',()=>{f.cabinView=f.cabinView==='window'?false:'window';changeView();}],
       ['客艙照明',()=>service.cabinLights,()=>{service.cabinLights=!service.cabinLights;}],
       ['安全帶燈',()=>service.seatBelts,()=>{service.seatBelts=!service.seatBelts;}]
@@ -930,6 +940,7 @@ function initialize(){
   }
   function drawPassengerStatus(f){
     const service=f.service;
+    drawGateGuide(f);
     const output=byId('passengerStatus');
     byId('passengerAlternate').disabled=f.ground||f.finished||service.diverted||!reachableAlternate(f,airports.find(a=>a.code==='RCMQ'));
     byId('passengerGoAround').disabled=f.ground||f.finished||f.phase!=='approach';
@@ -947,6 +958,40 @@ function initialize(){
       (f.airborne&&f.fuel<service.brief.reserve?' · 低油量，請檢查備降':'')+
       (service.door&&service.mode&&(service.bridgeElapsed||0)<(service.bridgeDelay||0)?' · 旅客正在通過空橋':'')+
       (service.announcement?' · 廣播：'+service.announcement:'');
+  }
+  function drawGateGuide(f){
+    const service=f.service;
+    const guide=byId('gateGuide');
+    guide.hidden=f.finished||!f.ground||service.pushing>0||Boolean(f.tow)||service.pushed&&!f.awaitingService;
+    if(guide.hidden) return;
+    const arriving=f.awaitingService;
+    const complete=arriving?service.delivered===f.passengers:service.boarded===f.passengers;
+    const available=groundServiceAllowed(f);
+    const count=arriving?service.delivered:service.boarded;
+    const activity=arriving?'下機':'登機';
+    let prompt, next;
+    if(!f.parkingBrake){prompt='停妥後拉上停機煞車。';next='停機煞車';}
+    else if(f.engines.some(Boolean)){prompt='請關閉引擎，才能使用空橋。';next='關閉引擎';}
+    else if(!available){prompt='請在機位停妥後開始地勤作業。';}
+    else if(!f.bridge&&!complete){prompt='接上空橋，準備'+activity+'。';next='接上空橋';}
+    else if(!service.door&&!complete){prompt='開門後，旅客會自動'+activity+'。';next='開艙門';}
+    else if(!complete){prompt='旅客正在'+activity+'，請保持艙門開啟。';}
+    else if(service.door){prompt=activity+'完成，可以關門。';next='關艙門';}
+    else if(f.bridge){prompt='艙門已關閉，可以收回空橋。';next='收回空橋';}
+    else if(arriving) prompt='地勤作業完成。';
+    else if(f.fuel<service.targetFuel) prompt='登機完成，請完成加油。';
+    else {prompt='登機與加油完成，可以呼叫拖車。';next='拖車牽引至跑道';}
+    const message=activity+' '+count+'/'+f.passengers+' 人 · '+prompt;
+    const caption=byId('gateCaption');
+    if(caption.textContent!==message) caption.textContent=message;
+    const step=byId('gateStep'), fuel=byId('gateFuel');
+    step.hidden=!next;
+    if(next&&step.textContent!==next) step.textContent=next;
+    step.disabled=Math.hypot(f.vx,f.vz)>=.8;
+    fuel.hidden=arriving;
+    fuel.disabled=!available||f.fuel>=service.targetFuel;
+    const fuelLabel=service.pumping?'停止加油':f.fuel>=service.targetFuel?'加油完成':'開始加油';
+    if(fuel.textContent!==fuelLabel) fuel.textContent=fuelLabel;
   }
   function jetwayEndpoints(f,model){
     const airport=f.awaitingService?f.destination:f.departure;
@@ -983,10 +1028,7 @@ function initialize(){
     entries.push(['自動導航 J',()=>Boolean(f.hold?.nav),()=>toggleNavigation(f)]);
     if(f.range) entries.push(['射擊訓練靶 M',()=>f.range.hit,()=>{if(!paused&&!replay) rangeShot(f);}]);
     if(f.aircraft.role==='fighter') entries.push(['加力待命',()=>f.boost,()=>{if(f.engines[0]) f.boost=!f.boost;}]);
-    entries.push(['拖車牽引至跑道',()=>Boolean(f.tow),()=>{
-      if(!paused&&!replay&&requestRunwayTow(f)){f.towMessage='';return;}
-      if(!f.tow) f.towMessage='請在出發機場停住、收油，並關門收空橋；載客航班須完成登機及加油。';
-    }]);
+    entries.push(['拖車牽引至跑道',()=>Boolean(f.tow),()=>callRunwayTow(f)]);
     if(f.service) addPassengerSystems(f,entries);
     if(f.aircraft.role==='passenger'&&!f.service) entries.push(['連接空橋',()=>f.bridge,()=>{
       if(f.awaitingService&&groundServiceAllowed(f)) f.bridge=!f.bridge;
@@ -1040,6 +1082,7 @@ function initialize(){
     }));
   }
   function beginFlight(){
+    byId('gateGuide').hidden=true;
     touchControls.reset();
     showTouchPause(false);
     cockpitView.preset=0;
@@ -1450,6 +1493,38 @@ function initialize(){
   const activeJetway=makeJetway(),bridgeMesh=activeJetway.root;
   scene.add(bridgeMesh);
   bridgeMesh.visible=false;
+  // Two local ground decals avoid a second full scenery render for shadows.
+  function groundShadow(paint){
+    const image=document.createElement('canvas');
+    image.width=image.height=128;
+    const ink=image.getContext('2d');
+    ink.fillStyle='#16202c';
+    ink.filter='blur(3px)';
+    paint(ink);
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({
+      map:new THREE.CanvasTexture(image),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2
+    }));
+    mesh.visible=false;
+    scene.add(mesh);
+    return mesh;
+  }
+  const aircraftShadow=groundShadow(ink=>{
+    ink.beginPath();ink.ellipse(64,64,7,56,0,0,Math.PI*2);ink.fill();
+    ink.beginPath();
+    for(const [x,y] of [[64,48],[120,79],[119,86],[64,70],[9,86],[8,79]]) ink.lineTo(x,y);
+    ink.fill();
+    ink.fillRect(43,101,42,7);
+  });
+  const jetwayShadow=groundShadow(ink=>ink.fillRect(28,6,72,116));
+  function placeGroundShadow(mesh,x,z,y,heading,width,length,height){
+    const light=sunlight.position;
+    const projection=height/Math.max(230,light.y);
+    mesh.position.set(x-light.x*projection,y+.16,z-light.z*projection);
+    mesh.rotation.set(-Math.PI/2,0,-heading);
+    mesh.scale.set(width,length,1);
+    mesh.material.opacity=(.25+.28*clamp(sunlight.intensity/2.3,0,1))*activeDay;
+    mesh.visible=mesh.material.opacity>.02;
+  }
   const bridgeQueue=new THREE.Group();
   const skin=new THREE.MeshStandardMaterial({color:0xc99c78});
   const queuePeople=Array.from({length:9},(_,i)=>{
@@ -1509,6 +1584,7 @@ function initialize(){
     rangeMarker.visible=Boolean(flight?.range&&!flight.range.hit);
     if(rangeMarker.visible) rangeMarker.position.set(flight.range.x,flight.range.y+12,flight.range.z);
     bridgeMesh.visible=false;
+    aircraftShadow.visible=jetwayShadow.visible=false;
     bridgeQueue.visible=tug.visible=tanker.visible=false;
     cargoLoader.visible=false;
     serviceLamp.intensity=0;
@@ -1563,6 +1639,11 @@ function initialize(){
       taxiLamp.target.position.copy(pos).addScaledVector(dir,62);
       taxiLamp.target.position.y=f.y-5;
       model.position.copy(pos);model.rotation.set(f.pitch,-f.heading,-f.bank,'YXZ');
+      const airport=f.landed?f.destination:f.departure;
+      if(f.ground&&airport&&Math.hypot(f.x-airport.x,f.z-airport.z)<airport.length*.5+450){
+        placeGroundShadow(aircraftShadow,f.x,f.z,airport.elevation,f.heading,
+          profile.geometry[2]*2.22,profile.geometry[0]*2.24,profile.gearHeight*.8);
+      }
       if(f.ground){
         if(f.tow||f.service?.pushing){
           tug.position.copy(pos).addScaledVector(dir,profile.geometry[0]+2.5);
@@ -1617,6 +1698,9 @@ function initialize(){
           const {terminal,door,airport}=jetwayEndpoints(f,model);
           placeJetway(activeJetway,terminal,door,airport.elevation);
           bridgeMesh.visible=true;
+          placeGroundShadow(jetwayShadow,(terminal.x+door.x)/2,(terminal.z+door.z)/2,
+            airport.elevation,Math.atan2(door.x-terminal.x,terminal.z-door.z),4.2,
+            Math.hypot(door.x-terminal.x,door.z-terminal.z)*1.1,3.8);
           if(f.service?.door){
             const exit=f.service.mode==='exit';
             const waiting=exit?f.service.boarded:f.passengers-f.service.boarded;
@@ -1625,9 +1709,10 @@ function initialize(){
             bridgeQueue.visible=waiting>0;
             const distance=bridgeMesh.position.distanceTo(door);
             queuePeople.forEach((person,index)=>{
-              const travel=(f.service.bridgeElapsed||0)*2.6-index*1.65;
+              const seconds=Math.min(f.service.bridgeDelay??passengerBridgeSeconds,passengerBridgeSeconds)||passengerBridgeSeconds;
+              const travel=(f.service.bridgeElapsed||0)/seconds-index/queuePeople.length;
               person.visible=index<waiting&&travel>=0;
-              const moving=Math.max(0,travel)%Math.max(1,distance-.5);
+              const moving=(travel%1)*Math.max(0,distance-.5);
               person.position.set(index%2?.34:-.34,Math.sin(moving*8)*.035,exit?distance-.25-moving:moving+.25);
               person.rotation.y=exit?Math.PI:0;
             });
@@ -1716,7 +1801,9 @@ function initialize(){
       if(!f.regional&&!f.ground&&f.waypoint<4&&Math.hypot(legacyRoute[f.waypoint].x-f.x,legacyRoute[f.waypoint].z-f.z)<420) f.waypoint++;
       const target=f.regional?activeTarget(f):legacyRoute[f.waypoint];
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}
-      byId('status').textContent=status(f,knots,target);
+      const statusBox=byId('status');
+      statusBox.hidden=!byId('gateGuide').hidden&&!paused&&!f.towMessage;
+      statusBox.textContent=status(f,knots,target);
       if(now>=nextNavDraw){drawNav(f,target);nextNavDraw=now+100;}
     }else{
       taxiLamp.intensity=0;

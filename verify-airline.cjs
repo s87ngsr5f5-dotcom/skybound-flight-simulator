@@ -26,7 +26,10 @@ f.battery=true;
 assert.equal(readCareer().money,6000);
 assert(!startEngine(f,0));
 const emptyMass=flightMass(f);
-f.bridge=true;f.service.door=true;f.service.mode='board';f.service.pumping=true;
+f.bridge=true;setPassengerDoor(f,true);f.service.pumping=true;
+f.service.bridgeDelay=60; // Checkpoints from earlier versions stored a distance-based delay.
+for(let i=0;i<120*5;i++) updatePassengerService(f,simTick);
+assert(f.service.boarded>0,'Passengers should start boarding within five simulated seconds');
 for(let i=0;i<120*150;i++) updatePassengerService(f,simTick);
 assert.equal(f.service.boarded,aircraft.passengers);
 assert.equal(f.fuel,f.fuelStart);

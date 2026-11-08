@@ -171,6 +171,16 @@ function stepRunwayTow(f,dt){
   f.pitch=f.bank=f.pitchRate=f.bankRate=f.yawRate=f.vy=f.vs=0;
   f.speed=Math.hypot(f.vx,f.vz);
 }
+const passengerBridgeSeconds=4;
+function setPassengerDoor(f,open){
+  if(!groundServiceAllowed(f)||!f.bridge||f.finished) return;
+  const service=f.service;
+  service.door=open;
+  service.bridgeElapsed=0;
+  service.progress=0;
+  service.bridgeDelay=open?passengerBridgeSeconds:0;
+  service.mode=open?(f.awaitingService?'exit':'board'):null;
+}
 function updatePassengerService(f,dt){
   const service=f.service;
   if(!service||f.finished) return;
@@ -181,7 +191,7 @@ function updatePassengerService(f,dt){
   if(service.mode&&service.door&&f.bridge&&groundServiceAllowed(f)){
     const previous=service.bridgeElapsed||0;
     service.bridgeElapsed=previous+dt;
-    const delay=service.bridgeDelay||0;
+    const delay=Math.min(service.bridgeDelay??passengerBridgeSeconds,passengerBridgeSeconds);
     service.progress+=6*(Math.max(0,service.bridgeElapsed-delay)-Math.max(0,previous-delay));
     const count=Math.floor(service.progress);
     if(count){
