@@ -206,7 +206,6 @@ function initialize(){
   }
   const buildingGeo = new THREE.BoxGeometry();
   const blocks = new THREE.InstancedMesh(buildingGeo,material('#ffffff'),2100);
-  const trees = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),material('#ffffff'),2600);
   const dummy = new THREE.Object3D();
   for(let i=0;i<blocks.count;i++){
     const a=airports[0], side=i%2===0 ? -1 : 1;
@@ -221,18 +220,6 @@ function initialize(){
     blocks.setMatrixAt(i,dummy.matrix);
     blocks.setColorAt(i,new THREE.Color().setHSL(.11+random()*.52,.09,.36+random()*.39));
   }
-  for(let i=0;i<trees.count;i++){
-    const a=airports[0], x=a.x+(random()-.3)*15000, z=a.z+(random()-.5)*19500;
-    const height=2+random()*8;
-    const {along,cross}=localRunway(x,z);
-    const hidden=(Math.abs(along)<1670 && Math.abs(cross)<375) || terrainHeight(x,z)<60;
-    dummy.position.set(x,hidden ? -50 : terrainHeight(x,z)+height,z);
-    dummy.scale.set(height*.65,height,height*.65);
-    dummy.updateMatrix();
-    trees.setMatrixAt(i,dummy.matrix);
-    trees.setColorAt(i,new THREE.Color().setHSL(.23+random()*.07,.28+random()*.24,.18+random()*.17));
-  }
-  scene.add(trees);
   function renderedGround(x,z){
     const step=240,cx=Math.floor(x/step)*step,cz=Math.floor(z/step)*step;
     const u=(x-cx)/step,v=(z-cz)/step;
@@ -240,6 +227,7 @@ function initialize(){
     return (u+v<=1?a*(1-u-v)+b*u+c*v:d*(u+v-1)+b*(1-v)+c*(1-u))-.14;
   }
   const taipeiVisuals=buildTaipeiVisuals(scene,renderedGround);
+  const vegetation=buildVegetation(scene,renderedGround,airports,taipeiData);
 
   const cloud = document.createElement('canvas');
   cloud.width=512; cloud.height=256;
@@ -1510,7 +1498,8 @@ function initialize(){
       const tours={
         'tour-apron':[25.0652,121.5507,28,25.0646,121.5527,10],
         'tour-river':[25.0787,121.5531,280,25.0742,121.5475,12],
-        'tour-city':[25.0558,121.5447,370,25.0662,121.5585,18]
+        'tour-city':[25.0558,121.5447,370,25.0662,121.5585,18],
+        'tour-woods':[25.1122,121.5770,34,25.1132,121.5777,12]
       };
       const t=tours[byId('inspect').value],eye=geoPoint(t[0],t[1]),target=geoPoint(t[3],t[4]);
       camera.position.set(eye.x,terrainHeight(eye.x,eye.z)+t[2],eye.z);
@@ -1518,6 +1507,7 @@ function initialize(){
     }
     const viewerX=flight?.x??selectedAirport('departure').x;
     const viewerZ=flight?.z??selectedAirport('departure').z;
+    vegetation.update(camera.position.x,camera.position.z,qualitySelect.value);
     taipeiVisuals.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',paused||Boolean(replay),qualitySelect.value);
     airlinerDetail.update(flight?.aircraft.id==='sa380'?flight:null,now,flight?activeDay:byId('inspect').value==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);
