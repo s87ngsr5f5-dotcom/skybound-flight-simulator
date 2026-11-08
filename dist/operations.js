@@ -343,7 +343,7 @@ function updateRegionalFlight(f,save=recordFlight){
         }
         f.finished=true;
         const completedRoute=f.waypoint===f.route.length-1;
-        const contractReady=completedRoute&&(f.contract?.kind!=='cargo'||f.contract.cargoAtTakeoff>0);
+        const contractReady=completedRoute&&(!f.range||f.range.hit)&&(f.contract?.kind!=='cargo'||f.contract.cargoAtTakeoff>0);
         const result=f.contract?(contractReady?'任務完成':'航段或貨運條件未完成'):f.mission?'任務完成':'已落地並停妥';
         if(f.contract) f.contract.result=result;
         f.recorded=save(f,result);
@@ -368,11 +368,36 @@ function updateRegionalFlight(f,save=recordFlight){
   const target=f.taxi[f.taxiIndex];
   if(Math.hypot(f.x-target.x,f.z-target.z)<16){ f.taxiIndex++; if(f.taxiIndex===f.taxi.length) f.phase="takeoff"; }
 }
+function navigationControls(f,target){
+  const dx=target.x-f.x,dz=target.z-f.z;
+  const desired=Math.atan2(dx,-dz);
+  const track=Math.atan2(f.vx,-f.vz);
+  const heading=desired+limit(wrapAngle(desired-track)*.55,-.22,.22);
+  const tas=Math.max(24,flightSpeeds(f).tas);
+  const q=.5*1.225*Math.exp(-Math.max(0,f.y)/8500)*tas**2;
+  const desiredVS=limit((f.hold.altitude-f.y)*.095,-6,6);
+  const lift=flightMass(f)*(9.80665+limit((desiredVS-f.vy)*1.2,-4,4))/(q*f.aircraft.wingArea*Math.max(.72,Math.cos(f.bank)));
+  const attitude=Math.atan2(f.vy,tas)+(lift-.27-f.aircraft.flapLift[f.flaps])/5.05-.036;
+  return {roll:limit(wrapAngle(heading-f.heading)*2.4-f.bank*.32,-.65,.65),
+    pitch:limit((attitude-.015-f.trim-f.flaps*.008)/.24,-.66,.70)};
+}
+function rangeShot(f){
+  const range=f.range;
+  if(!range||f.finished||f.ground||range.hit||!range.rounds) return false;
+  range.rounds--;
+  const dx=range.x-f.x,dz=range.z-f.z;
+  const distance=Math.hypot(dx,dz);
+  const yaw=Math.abs(wrapAngle(Math.atan2(dx,-dz)-f.heading));
+  const pitch=Math.abs(Math.atan2(range.y-f.y,distance)-f.pitch);
+  range.hit=distance>250&&distance<2600&&yaw<.105&&pitch<.12;
+  range.message=range.hit?'命中訓練靶 · 返回機場':range.rounds?'未命中 · 調整機鼻後再射擊':'彈藥用盡 · 可按 R 重試';
+  return range.hit;
+}
 function activeTarget(f){
   if(f.phase==='arrival') return f.arrivalTaxi[f.taxiIndex];
   if(f.phase==='taxi'||f.phase==='cold') return f.taxi[f.taxiIndex];
   return f.route[f.waypoint];
 }
-if(typeof module!=='undefined') Object.assign(globalThis,{makeRegionalFlight,startEngine,updateRegionalFlight,activeTarget,readFlightLog,makeCruiseTrial,makeClimbLesson,climbReady,makeRegionalContract,attachContract,makePassengerFlight,updatePassengerService,savePassenger,readCareer,recordFlight,passengerBrief});
+if(typeof module!=='undefined') Object.assign(globalThis,{makeRegionalFlight,startEngine,updateRegionalFlight,activeTarget,readFlightLog,makeCruiseTrial,makeClimbLesson,climbReady,navigationControls,rangeShot,makeRegionalContract,attachContract,makePassengerFlight,updatePassengerService,savePassenger,readCareer,recordFlight,passengerBrief});
 
 

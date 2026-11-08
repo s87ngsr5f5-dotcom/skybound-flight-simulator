@@ -151,8 +151,10 @@ function stepTrainer(f, input, dt=simTick){
     if(f.fuel===0) f.fuelFlow=0;
     if(f.fuel===0) running=0;
   }
+  const fastJet=f.boost&&aircraft.role==='fighter'&&!f.gear&&!f.flaps;
+  const inletSpeed=fastJet?(aircraft.id==='sf16'?520:460):255+cruiseBlend*115;
   const available=aircraft.thrust?
-    (aircraft.thrust+(f.boost&&f.power>.89?aircraft.boostThrust||0:0))*Math.pow(rho/1.225,.75)/(1+Math.pow(speed/(255+cruiseBlend*115),2)):
+    (aircraft.thrust+(f.boost&&f.power>.89?aircraft.boostThrust||0:0))*Math.pow(rho/1.225,.75)/(1+Math.pow(speed/inletSpeed,2)):
     Math.min(2700*aircraft.power/119000,aircraft.power*.78/Math.max(18,forwardSpeed));
   const thrust=f.power*running*(f.propLow?.82:1)*available;
   const left=engines.slice(0,engines.length/2).filter(Boolean).length;
