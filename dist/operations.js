@@ -12,7 +12,7 @@ function readCareer(){
   }catch{return {money:0,active:null,receipts:{}};}
 }
 function readMoney(){return readCareer().money;}
-const hangarPrices={sa380:420000,b773:290000};
+const hangarPrices={sa380:420000,b773:290000,b38m:155000,b763er:215000};
 const liveryPrice=6000;
 function purchaseHangar(aircraft,item){
   const career=readCareer();
@@ -24,6 +24,24 @@ function purchaseHangar(aircraft,item){
   if(career.money<price) return false;
   career.money-=price;
   inventory[aircraft.id]=true;
+  try{localStorage.setItem(careerKey,JSON.stringify(career));return true;}catch{return false;}
+}
+const minimumDispatchCondition=60;
+function hangarCondition(career,id){
+  return career.condition?.[id]??100;
+}
+function maintenanceQuote(career,aircraft){
+  const id=aircraft.id;
+  const condition=hangarCondition(career,id);
+  const cost=(100-condition)*Math.round((hangarPrices[id]||0)/1000);
+  return {condition,cost,owned:Boolean(career.owned?.[id]),busy:career.active?.aircraft?.id===id};
+}
+function serviceHangar(aircraft){
+  const career=readCareer();
+  const quote=maintenanceQuote(career,aircraft);
+  if(!quote.owned||quote.busy||!quote.cost||career.money<quote.cost) return false;
+  career.money-=quote.cost;
+  (career.condition??={})[aircraft.id]=100;
   try{localStorage.setItem(careerKey,JSON.stringify(career));return true;}catch{return false;}
 }
 function savePassenger(f){
@@ -80,9 +98,14 @@ function makePassengerFlight(departure,destination,aircraft,wind,fuel,weather,ti
     throw new Error('請選擇足夠的航程及備用燃油，並符合本航班的加油上限。');
   }
   const f=makeRegionalFlight(departure,destination,aircraft,'cold',wind,brief.route);
-  const rent=hangarPrices[aircraft.id]&&!readCareer().owned?.[aircraft.id]?4500:0;
+  const career=readCareer();
+  const owned=Boolean(career.owned?.[aircraft.id]);
+  if(owned&&hangarCondition(career,aircraft.id)<minimumDispatchCondition){
+    throw new Error('自有客機機況低於 '+minimumDispatchCondition+'%，請先在機庫維修。');
+  }
+  const rent=hangarPrices[aircraft.id]&&!owned?4500:0;
   return Object.assign(f,{mission:'passenger',lesson:'airline',fuel:0,fuelStart:fuel,passengers:brief.passengers,
-    service:{id:crypto.randomUUID(),rent,targetFuel:fuel,referencePayload:brief.capacity+brief.passengers*95,
+    service:{id:crypto.randomUUID(),rent,owned,targetFuel:fuel,referencePayload:brief.capacity+brief.passengers*95,
       boarded:0,delivered:0,door:false,pushed:false,pushing:0,progress:0,
       mode:null,seatBelts:true,cabinLights:true,comfort:100,weather,time,brief}});
 }
@@ -137,9 +160,18 @@ function settlePassenger(f,result){
   const fuel=Math.round(Math.max(0,f.fuelStart-f.fuel)*.8);
   const handling=service?1200:0;
   const rent=service?.rent??0;
-  const maintenance=service?(success?(service.landingPenalty||0)*110:3500):0;
+  const owned=service?.owned??Boolean(service&&!rent&&career.owned?.[f.aircraft.id]);
+  const maintenance=service&&!owned?(success?(service.landingPenalty||0)*110:3500):0;
   const net=base+punctual-fuel-handling-maintenance-rent;
   const receipt={base,punctual,fuel,handling,maintenance,rent,net,comfort:Math.round(service?.comfort??100)};
+  if(owned&&(f.airborne||f.touchdown||success)){
+    const airborneWear=2+Math.min(8,Math.floor(f.elapsed/3600));
+    const impactWear=f.ended&&!success&&f.touchdown?12:Math.ceil((service.landingPenalty||0)/4);
+    const oldCondition=hangarCondition(career,f.aircraft.id);
+    const condition=Math.max(0,oldCondition-airborneWear-impactWear);
+    (career.condition??={})[f.aircraft.id]=condition;
+    Object.assign(receipt,{condition,wear:oldCondition-condition});
+  }
   career.money+=net;
   if(id){
     career.receipts[id]=receipt;

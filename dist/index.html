@@ -36,7 +36,7 @@ body.cockpit-active[data-panel=analog] .stat b{border:2px solid #68818d;border-r
 <label>油門增加／減少按鍵（KeyboardEvent.code）<input id="throttleKeys" value="KeyW,KeyS"></label><div id="bindings" class="actions" aria-label="飛行按鍵綁定"></div>
 </details>
 <label id="cruiseWeather" hidden>巡航風況<select id="cruiseWind"><option value="0">無風</option><option value="60">60 kt 順風</option><option value="-60">60 kt 逆風</option></select></label><section id="airlinePlan" hidden><p id="passengerBrief"></p><label>航班<select id="airlineRoute"><option value="RCKH">桃園 → 高雄</option><option value="RCQC">松山 → 澎湖</option><option value="RCBS">松山 → 金門</option><option value="RJAA">桃園 → 成田</option></select></label><label>計畫加油量（kg）<input id="airlineFuel" type="number" step="100"></label><p id="fuelPreview"></p></section>
-<details id="hangarShop"><summary>機庫工坊</summary><p id="shopInfo"></p>
+<details id="hangarShop"><summary>機庫工坊</summary><p id="shopInfo"></p><p id="maintenanceInfo" hidden></p><button id="servicePlane" type="button" hidden>維修客機</button>
 <label class="check"><input id="liveryPreview" type="checkbox"> 預覽海灣青塗裝</label>
 <div class="actions"><button id="buyLivery" type="button">購買塗裝</button><button id="buyPlane" type="button">購買飛機</button></div>
 <p id="shopMessage" aria-live="polite"></p></details>

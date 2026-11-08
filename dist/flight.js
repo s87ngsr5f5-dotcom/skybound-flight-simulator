@@ -480,6 +480,13 @@ function initialize(){
     byId('buyPlane').disabled=!hangarPrices[aircraft.id]||Boolean(owned);
     byId('shopInfo').textContent='海灣青塗裝 '+(hangarLiveries[aircraft.id]?'已購買':liveryPrice.toLocaleString()+' 金幣')+
       (hangarPrices[aircraft.id]?' · '+(owned?'已擁有':'買機 '+hangarPrices[aircraft.id].toLocaleString()+' 金幣 · 未購買時每個載客航班租金 4,500'):'');
+    const quote=maintenanceQuote(career,aircraft);
+    const maintenance=byId('servicePlane');
+    maintenance.hidden=byId('maintenanceInfo').hidden=!quote.owned;
+    maintenance.disabled=quote.busy||!quote.cost||career.money<quote.cost;
+    maintenance.textContent='維修至 100% · '+quote.cost.toLocaleString()+' 金幣';
+    byId('maintenanceInfo').textContent='機況 '+quote.condition+'%'+(quote.busy?' · 航班進行中':
+      quote.condition<minimumDispatchCondition?' · 需維修後才能接定期航班':' · 可執飛定期航班');
   }
   for(const [id,item] of [['buyLivery','livery'],['buyPlane','plane']]){
     byId(id).onclick=()=>{
@@ -488,6 +495,11 @@ function initialize(){
       updateAirlinePlan();
     };
   }
+  byId('servicePlane').onclick=()=>{
+    const ok=serviceHangar(selectedAircraft());
+    byId('shopMessage').textContent=ok?'維修完成，機況已恢復至 100%':'目前無法維修';
+    updateAirlinePlan();
+  };
   function updateAirlinePlan(){
     updateHangar();
     const active=byId('lesson').value==='airline';
@@ -507,6 +519,13 @@ function initialize(){
     const [from,to]=airlineRoute();
     if(!compatibleAirline(aircraft,from,to)){
       byId('passengerBrief').textContent='請選擇適合此跑道和機位的客機。離島航線建議 A220-300。';
+      byId('fuelPreview').textContent='';
+      field.disabled=true;
+      return;
+    }
+    const quote=maintenanceQuote(career,aircraft);
+    if(quote.owned&&quote.condition<minimumDispatchCondition){
+      byId('passengerBrief').textContent='自有客機機況 '+quote.condition+'%，請先在機庫工坊維修。';
       byId('fuelPreview').textContent='';
       field.disabled=true;
       return;
@@ -779,7 +798,7 @@ function initialize(){
       const r=f.receipt;
       output.textContent='基本 '+r.base+' · 準點獎金 '+r.punctual+' · 燃油費 '+r.fuel+
         ' · 地勤 '+r.handling+' · 維修 '+r.maintenance+' · 租賃 '+(r.rent||0)+' · 淨額 '+r.net+' 金幣 · 滿意度 '+r.comfort+
-        '%'+(service.roughPhase?' · 不平穩階段 '+service.roughPhase:'')+(service.landingPenalty?' · 接地扣分 '+service.landingPenalty:'');
+        '%'+(r.condition!==undefined?' · 機況 '+r.condition+'%（磨耗 '+r.wear+'）':'')+(service.roughPhase?' · 不平穩階段 '+service.roughPhase:'')+(service.landingPenalty?' · 接地扣分 '+service.landingPenalty:'');
       return;
     }
     output.textContent='登機 '+service.boarded+'/'+f.passengers+' · 空位 '+(f.passengers-service.boarded)+
