@@ -74,7 +74,7 @@ if(ownPlane){
   const worn=readCareer();
   worn.condition[aircraft.id]=59;
   localStorage.setItem(careerKey,JSON.stringify(worn));
-  assert.throws(()=>makePassengerFlight(from,to,aircraft,0,brief.estimated+brief.reserve,'0','13:00'),/60%/);
+  assert.throws(()=>makePassengerFlight(from,to,aircraft,0,0,'0','13:00'),/60%/);
   assert(serviceHangar(aircraft));
   assert(makePassengerFlight(from,to,aircraft,0,brief.estimated+brief.reserve,'0','13:00').service.owned);
 }

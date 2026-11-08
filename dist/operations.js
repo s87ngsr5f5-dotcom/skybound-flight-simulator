@@ -93,16 +93,16 @@ function passengerBrief(aircraft,departure,destination){
     schedule:Math.ceil((enrouteHours+.53)*60),base:passengers*180,route};
 }
 function makePassengerFlight(departure,destination,aircraft,wind,fuel,weather,time){
-  const brief=passengerBrief(aircraft,departure,destination);
-  if(!Number.isFinite(fuel)||fuel<brief.estimated+brief.reserve||fuel>brief.capacity){
-    throw new Error('請選擇足夠的航程及備用燃油，並符合本航班的加油上限。');
-  }
-  const f=makeRegionalFlight(departure,destination,aircraft,'cold',wind,brief.route);
   const career=readCareer();
   const owned=Boolean(career.owned?.[aircraft.id]);
   if(owned&&hangarCondition(career,aircraft.id)<minimumDispatchCondition){
     throw new Error('自有客機機況低於 '+minimumDispatchCondition+'%，請先在機庫維修。');
   }
+  const brief=passengerBrief(aircraft,departure,destination);
+  if(!Number.isFinite(fuel)||fuel<brief.estimated+brief.reserve||fuel>brief.capacity){
+    throw new Error('請選擇足夠的航程及備用燃油，並符合本航班的加油上限。');
+  }
+  const f=makeRegionalFlight(departure,destination,aircraft,'cold',wind,brief.route);
   const rent=hangarPrices[aircraft.id]&&!owned?4500:0;
   return Object.assign(f,{mission:'passenger',lesson:'airline',fuel:0,fuelStart:fuel,passengers:brief.passengers,
     service:{id:crypto.randomUUID(),rent,owned,targetFuel:fuel,referencePayload:brief.capacity+brief.passengers*95,
