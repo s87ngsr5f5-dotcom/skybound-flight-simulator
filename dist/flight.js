@@ -81,17 +81,32 @@ function initialize(){
   const terrainMaterial=new THREE.MeshStandardMaterial({map:landTexture,roughness:1,vertexColors:true});
   const terrainChunks=new Map();
   const span=11520;
-  let previousChunk='';
+  let previousChunk='',terrainQueue=[];
   function updateTerrain(x,z){
-    const cx=Math.floor(x/span), cz=Math.floor(z/span), id=cx+':'+cz;
-    if(id===previousChunk) return;
-    previousChunk=id;
-    const visible=new Set();
-    for(let row=cz-3;row<=cz+3;row++){
-      for(let col=cx-3;col<=cx+3;col++){
-        const key=col+':'+row;
-        visible.add(key);
-        if(terrainChunks.has(key)) continue;
+    const cx=Math.floor(x/span),cz=Math.floor(z/span),id=cx+':'+cz;
+    if(id!==previousChunk){
+      previousChunk=id;
+      const visible=new Set();
+      terrainQueue=[];
+      for(let row=cz-3;row<=cz+3;row++){
+        for(let col=cx-3;col<=cx+3;col++){
+          const key=col+':'+row;
+          visible.add(key);
+          if(!terrainChunks.has(key)) terrainQueue.push({col,row,key,distance:(cx-col)**2+(cz-row)**2});
+        }
+      }
+      terrainQueue.sort((a,b)=>a.distance-b.distance);
+      for(const [key,patch] of terrainChunks){
+        if(visible.has(key)) continue;
+        scene.remove(patch);
+        patch.geometry.dispose();
+        terrainChunks.delete(key);
+      }
+    }
+    // Build the nearest patches first without generating a whole region in one frame.
+    const deadline=performance.now()+3;
+    for(let count=0;terrainQueue.length&&(count===0||count<3&&performance.now()<deadline);count++){
+      const {col,row,key}=terrainQueue.shift();
         const mesh=new THREE.PlaneGeometry(span,span,48,48);
         mesh.rotateX(-Math.PI/2);
         const px=(col+.5)*span,pz=(row+.5)*span;
@@ -116,13 +131,6 @@ function initialize(){
         patch.position.set(px,0,pz);
         terrainChunks.set(key,patch);
         scene.add(patch);
-      }
-    }
-    for(const [key,patch] of terrainChunks){
-      if(visible.has(key)) continue;
-      scene.remove(patch);
-      patch.geometry.dispose();
-      terrainChunks.delete(key);
     }
   }
   landTexture.repeat.set(9,9);
@@ -439,6 +447,7 @@ function initialize(){
 
   let inspectionMode=false;
   let flight=null, cameraMode=0, last=performance.now(), accumulator=0, paused=false;
+  let nextNavDraw=0;
   let savedControls={};
   try{savedControls=JSON.parse(localStorage.getItem('skybound.controls.v2')||'{}')||{};}catch{}
   let settings=upgradeControls(savedControls);
@@ -1044,7 +1053,7 @@ function initialize(){
     cockpitView.preset=0;
     resetLook();
     if(flight.regional) showSystems(flight);
-    activeDay=setEnvironment();paused=false;accumulator=0;keys.clear();trail.length=0;previousTouchdown=null;
+    activeDay=setEnvironment();paused=false;accumulator=0;nextNavDraw=0;keys.clear();trail.length=0;previousTouchdown=null;
     byId('plan').hidden=byId('edition').hidden=true;
     byId('hud').hidden=byId('menu').hidden=false;
     changeView();
@@ -1319,7 +1328,8 @@ function initialize(){
     else if(Math.abs(roll)>.04) f.bankCommand=roll;
     else roll=f.bankCommand||0;
     if(f.hold){
-      if(Math.abs(roll)+Math.abs(pitch)+Math.abs(manual.rudder)+Math.abs(throttle)>.15) f.hold=null;
+      const manualThrottle=throttle;
+      if(Math.abs(roll)+Math.abs(pitch)+Math.abs(manual.rudder)+(!f.hold.climb?Math.abs(throttle):0)>.15) f.hold=null;
       else {
         if(f.hold.nav) ({roll,pitch}=navigationControls(f,activeTarget(f)));
         else{
@@ -1327,6 +1337,7 @@ function initialize(){
           const desiredVS=clamp((f.hold.altitude-f.y)*.14,-5,5);
           pitch=clamp(.36+(desiredVS-f.vy)*.11,-.7,.85);
           if(f.hold.mach) ({pitch,throttle}=f.hold.climb?climbCruiseControls(f):cruiseControls(f));
+          if(f.hold.climb&&manualThrottle) throttle=manualThrottle;
         }
       }
     }
@@ -1383,7 +1394,7 @@ function initialize(){
       }
       if(f.ground) return knots<f.aircraft.rotation?'桃園 05L · 增加油門，達到 '+f.aircraft.rotation+' IAS kt 再抬頭':'抬頭離地 · 正爬升後收起落架';
       if(f.stall) return '失速 · 放低機鼻';
-      if(f.hold?.climb||f.climbLesson.stable>0) return '目標 35,000 ft · Mach 0.84 · 穩定 '+Math.floor(f.climbLesson.stable)+'/60 秒 · 剩油 '+Math.round(f.fuel)+' kg';
+      if(f.hold?.climb||f.climbLesson.stable>0) return '自動油門 · 目標 35,000 ft · Mach 0.84 · 穩定 '+Math.floor(f.climbLesson.stable)+'/60 秒 · 剩油 '+Math.round(f.fuel)+' kg';
       if(f.gear||f.flaps||f.spoilers) return '保持正爬升 · 收起落架、襟翼及擾流板';
       return climbReady(f)?'接通「爬升／巡航 35,000 ft」':'保持正爬升 · 離地約 500 呎且至少 164 IAS kt 後接通爬升';
     }
@@ -1510,7 +1521,10 @@ function initialize(){
       }else{
         const fast=f.voyage&&f.phase==='cruise'&&f.y>650&&f.waypoint<4?Number(byId('voyageRate').value):1;
         if(!paused&&!f.finished&&!document.hidden) accumulator+=frameSeconds*fast;
-        while(accumulator+1e-10>=simTick){
+        // Catch up gradually after a long frame so fast-forward cannot stall rendering.
+        const simDeadline=performance.now()+5;
+        for(let ticks=0;!paused&&!document.hidden&&accumulator+1e-10>=simTick&&
+            (ticks<12||performance.now()<simDeadline);ticks++){
           if(f.tow) stepRunwayTow(f,simTick);
           else stepTrainer(f,smoothControls(f,input,simTick));
           if(f.service) updatePassengerService(f,simTick);
@@ -1523,6 +1537,7 @@ function initialize(){
             accumulator=0;break;
           }
         }
+        accumulator=Math.min(accumulator,fast);
       }
       if(f.checkpointId&&!replay&&!f.finished&&!paused&&now>=nextCheckpoint) saveCurrentMission(f);
       if(f.service){
@@ -1677,7 +1692,7 @@ function initialize(){
       if(f.regional){
         for(const b of switches.children) b.update();
         byId('instrumentType').textContent=live?
-          f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+(f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+(f.hold?.climb?(f.hold.levelOff?' · 巡航保持':' · 爬升至 35,000 ft'):(f.hold?.nav?' · 自動導航接通':f.hold?' · 保持接通':'')):'航電未供電';
+          f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+(f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+(f.hold?.climb?(f.hold.levelOff?' · 自動油門／巡航保持':' · 自動油門／爬升至 35,000 ft'):(f.hold?.nav?' · 自動導航接通':f.hold?' · 保持接通':'')):'航電未供電';
         if(profile.role&&live){
           const guide=approachGuidance(f);
           byId('instrumentType').textContent+=' · VAPP '+profile.approach+(f.boost&&f.power>.89?' · 加力':'');
@@ -1698,7 +1713,7 @@ function initialize(){
       const target=f.regional?activeTarget(f):legacyRoute[f.waypoint];
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}
       byId('status').textContent=status(f,knots,target);
-      drawNav(f,target);
+      if(now>=nextNavDraw){drawNav(f,target);nextNavDraw=now+100;}
     }else{
       taxiLamp.intensity=0;
       const airport=selectedAirport('departure');
