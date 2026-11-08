@@ -60,3 +60,6 @@
 ## 客機模型精修
 
 雙發客機採用貼合機身的駕駛艙玻璃、圓角舷窗、艙門接縫、分層引擎短艙及起落架支柱。777-300ER 加入後掠翼尖、六輪主起落架和帶飛行數據的雙發座艙。原創遊戲模型參考 [波音 777 設計特點](https://www.boeing.com/commercial/777/design-highlights) 和 [777 機場規劃資料](https://www.boeing.com/resources/boeingdotcom/commercial/airports/acaps/777-200LR-300ER-F_Rev_G.pdf)。
+
+
+飛行中按 C 進入駕駛艙，按 N 切換左座、右座和儀表近看。單座機和教練機提供正前方與儀表近看。在場景上按住滑鼠右鍵拖曳環視，滾輪調整視野，按 Home 回到預設方向與倍率。鏡頭會隨飛機姿態轉動，環視不會改變飛行操控。

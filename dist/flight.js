@@ -373,7 +373,22 @@ function initialize(){
   };
   const legacyRoute=[worldRunway(2400,0),worldRunway(2700,2100),worldRunway(-3600,2100),worldRunway(-4000,0),worldRunway(-900,0)];
   const keys=new Set(), pointer={x:0,y:0,active:false};
-  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV']);
+  const cockpitView={preset:0,yaw:0,pitch:0,zoom:0,drag:null};
+  const cockpitEye=new THREE.Vector3(), cockpitAim=new THREE.Vector3();
+  const cockpitOrientation=new THREE.Quaternion(), lookRotation=new THREE.Quaternion();
+  const cockpitAngles=new THREE.Euler(0,0,0,'YXZ');
+  const cockpitActive=()=>Boolean(flight&&cameraMode===1&&!flight.cabinView);
+  const twoSeats=profile=>['passenger','cargo'].includes(profile?.role);
+  function resetLook(){
+    Object.assign(cockpitView,{yaw:0,pitch:0,zoom:0,drag:null});
+  }
+  function cycleCockpitView(){
+    if(!cockpitActive()) return;
+    cockpitView.preset=(cockpitView.preset+1)%(twoSeats(flight.aircraft)?3:2);
+    resetLook();
+    changeView();
+  }
+  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home']);
   const radar=byId('radar').getContext('2d');
   const planMap=byId('planMap').getContext('2d');
   const hangarPreview=byId('hangarPreview').getContext('2d');
@@ -582,7 +597,14 @@ function initialize(){
     voyageFrames=saved.voyage?frames:[];
     flight=saved;
     beginFlight();
-    cameraMode=options.camera;
+    cameraMode=options.camera===1?1:0;
+    const savedView=options.cockpitView;
+    if(savedView){
+      cockpitView.preset=clamp(Math.trunc(savedView.preset)||0,0,twoSeats(aircraft)?2:1);
+      cockpitView.yaw=clamp(Number(savedView.yaw)||0,-100*rad,100*rad);
+      cockpitView.pitch=clamp(Number(savedView.pitch)||0,-58*rad,48*rad);
+      cockpitView.zoom=clamp(Number(savedView.zoom)||0,-14,22);
+    }
     changeView();
     paused=true;
     nextCheckpoint=performance.now()+15000;
@@ -673,14 +695,21 @@ function initialize(){
     }catch{}
   }
   function changeView(){
-    const cockpit=Boolean(flight&&cameraMode===1&&!flight.cabinView);
+    const cockpit=cockpitActive();
     byId('cockpit').hidden=byId('struts').hidden=!cockpit||Boolean(flight?.aircraft.role);
     byId('systems').hidden=!flight?.regional;
     byId('reticle').hidden=!cockpit||Boolean(flight?.aircraft.role);
     byId('benchmarkHUD').hidden=!cockpit||!flight?.aircraft.role;
     document.body.classList.toggle('cockpit-active',cockpit);
+    document.body.classList.toggle('cockpit-panel-view',
+      cockpit&&cockpitView.preset===(twoSeats(flight.aircraft)?2:1));
     document.body.dataset.panel=flight?.aircraft?.glass?'glass':'analog';
     byId('view').textContent=cockpit?'追蹤視角 C':'駕駛艙 C';
+    byId('cockpitViews').hidden=!cockpit;
+    if(cockpit){
+      const views=twoSeats(flight.aircraft)?['左座','右座','儀表近看']:['正前方','儀表近看'];
+      byId('cockpitPreset').textContent=views[cockpitView.preset]+' · N';
+    }
   }
   function setEnvironment(){
     const [hours,minutes]=byId('time').value.split(':').map(Number);
@@ -704,7 +733,8 @@ function initialize(){
     if(f.service){savePassenger(f);return;}
     if(!f.checkpointId||f.finished) return;
     const options={lesson:byId('lesson').value,weather:byId('weather').value,time:byId('time').value,
-      rate:byId('voyageRate').value,guided:byId('voyageGuided').checked,cruiseWind:byId('cruiseWind').value,camera:cameraMode};
+      rate:byId('voyageRate').value,guided:byId('voyageGuided').checked,cruiseWind:byId('cruiseWind').value,camera:cameraMode,
+      cockpitView:{preset:cockpitView.preset,yaw:cockpitView.yaw,pitch:cockpitView.pitch,zoom:cockpitView.zoom}};
     f.checkpointFailed=!writeMissionCheckpoint(f,options,f.voyage?voyageFrames:[],replaces);
     nextCheckpoint=performance.now()+15000;
   }
@@ -880,6 +910,8 @@ function initialize(){
     }));
   }
   function beginFlight(){
+    cockpitView.preset=0;
+    resetLook();
     if(flight.regional) showSystems(flight);
     activeDay=setEnvironment();paused=false;accumulator=0;keys.clear();trail.length=0;previousTouchdown=null;
     byId('plan').hidden=byId('edition').hidden=true;
@@ -976,11 +1008,11 @@ function initialize(){
           flight.engines.fill(true);
         }
       }
+      beginFlight();
       if(savesMission){
         flight.checkpointId=crypto.randomUUID();
         saveCurrentMission(flight,restart?checkpoint?.flight.checkpointId:undefined);
       }
-      beginFlight();
     }catch(error){byId('message').textContent=error.message;}
   }
   function menu(){
@@ -992,9 +1024,15 @@ function initialize(){
     showLog();drawPlan();changeView();
   }
   function action(code){
-    if(replay&&!['KeyC','KeyP'].includes(code)) return;
+    if(replay&&!['KeyC','KeyP','KeyN','Home'].includes(code)) return;
     if(replay&&code==='KeyP'){byId('replayToggle').click();return;}
     if(code==='KeyV') flight.bankCommand=0;
+    if(code==='KeyN') cycleCockpitView();
+    if(code==='Home'&&cockpitActive()){
+      cockpitView.preset=0;
+      resetLook();
+      changeView();
+    }
     if(code==='KeyC'){if(flight.cabinView) flight.cabinView=false;else cameraMode=1-cameraMode;changeView();}
     if(code==='KeyP') paused=!paused;
     if(code==='KeyF') flight.flaps=(flight.flaps+1)%3;
@@ -1041,18 +1079,44 @@ function initialize(){
     if(!event.repeat) action(code);
   });
   addEventListener('keyup',event=>{keys.delete(event.code);keys.delete(boundCode(event.code));});
-  addEventListener('blur',()=>{keys.clear();pointer.active=false;});
+  addEventListener('blur',()=>{keys.clear();pointer.active=false;cockpitView.drag=null;});
+  const overControls=target=>target.closest('button,details,input,select,textarea,a,.systems,.right,header');
+  addEventListener('contextmenu',event=>{
+    if(cockpitActive()&&!overControls(event.target)) event.preventDefault();
+  });
+  addEventListener('wheel',event=>{
+    if(!cockpitActive()||overControls(event.target)) return;
+    event.preventDefault();
+    cockpitView.zoom=clamp(cockpitView.zoom+Math.sign(event.deltaY)*4,-14,22);
+  },{passive:false});
   addEventListener('pointerdown',event=>{
-    if(!flight||!settings.mouse||event.target.closest('button,details,input,select,textarea,.systems')) return;
+    if(!flight||overControls(event.target)) return;
+    if(event.button===2&&cockpitActive()){
+      event.preventDefault();
+      pointer.active=false;
+      cockpitView.drag={id:event.pointerId,x:event.clientX,y:event.clientY};
+      return;
+    }
+    if(event.button!==0||!settings.mouse||cockpitView.drag) return;
     pointer.active=true;pointer.x=0;pointer.y=0;pointer.left=event.clientX;pointer.top=event.clientY;
   });
   addEventListener('pointermove',event=>{
+    const drag=cockpitView.drag;
+    if(drag?.id===event.pointerId){
+      cockpitView.yaw=clamp(cockpitView.yaw-(event.clientX-drag.x)*.004,-100*rad,100*rad);
+      cockpitView.pitch=clamp(cockpitView.pitch-(event.clientY-drag.y)*.004,-58*rad,48*rad);
+      drag.x=event.clientX;
+      drag.y=event.clientY;
+      return;
+    }
     if(!pointer.active) return;
     pointer.x=clamp((event.clientX-pointer.left)/130,-1,1);
     pointer.y=clamp((pointer.top-event.clientY)/130,-1,1);
   });
+  addEventListener('pointercancel',()=>{pointer.active=false;cockpitView.drag=null;});
   addEventListener('pointerup',event=>{
-    pointer.active=false;
+    if(event.pointerId===cockpitView.drag?.id&&event.button===2) cockpitView.drag=null;
+    if(event.button===0) pointer.active=false;
     if(event.target instanceof HTMLInputElement&&event.target.type==='range'&&event.target.closest('#quickControls')) event.target.blur();
   });
   byId('viewScene').onclick=()=>{
@@ -1062,6 +1126,8 @@ function initialize(){
     inspectionMode=false;byId('plan').hidden=false;byId('exitInspection').hidden=true;
   };
   byId('view').onclick=()=>{if(flight) action('KeyC');};
+  byId('cockpitPreset').onclick=cycleCockpitView;
+  byId('resetLook').onclick=()=>action('Home');
   byId('fly').onclick=()=>{byId('fly').blur();start(false);};
   byId('approach').onclick=()=>{byId('approach').blur();start(true);};
   byId('menu').onclick=menu;
@@ -1396,17 +1462,22 @@ function initialize(){
         camera.position.y+=profile.gearHeight*4;camera.up.set(0,1,0);
         camera.lookAt(pos.clone().addScaledVector(dir,12));
       }else{
-        camera.position.copy(pos).addScaledVector(dir,profile.geometry[0]*(profile.role?.56:.30));
-        camera.position.y+=profile.role?(profile.role==='fighter'?.68:profile.geometry[1]*.17+.62):profile.geometry[1]*.85;
-        if(profile.id==='b773'){
-          camera.position.addScaledVector(dir,-.86);
-          camera.position.x-=Math.cos(f.heading)*.58;
-          camera.position.z-=Math.sin(f.heading)*.58;
-        }
-        const look=camera.position.clone().addScaledVector(dir,100);
-        look.y+=Math.tan(f.pitch)*100;
-        camera.up.set(Math.cos(f.heading)*Math.sin(f.bank),Math.cos(f.bank),Math.sin(f.heading)*Math.sin(f.bank));
-        camera.lookAt(look);
+        const airliner=twoSeats(profile);
+        const panel=cockpitView.preset===(airliner?2:1);
+        const half=profile.geometry[0],radius=profile.geometry[1];
+        const seat=airliner?(cockpitView.preset===1?.70:-.70):0;
+        const height=profile.role?(airliner?radius*.17+.64:.68):radius*.85;
+        const setback=airliner?(profile.id==='b773'?.86:.64):0;
+        cockpitEye.set(panel&&airliner?-.28:seat,height-(panel?.08:0),
+          -half*(profile.role?.56:.30)+setback+(panel?.26:0));
+        camera.position.copy(cockpitEye.applyQuaternion(model.quaternion).add(pos));
+        cockpitAngles.set(cockpitView.pitch-(panel?(airliner?.24:.31):0),cockpitView.yaw,0);
+        lookRotation.setFromEuler(cockpitAngles);
+        cockpitOrientation.copy(model.quaternion).multiply(lookRotation);
+        cockpitAim.set(0,1,0).applyQuaternion(cockpitOrientation);
+        camera.up.copy(cockpitAim);
+        cockpitAim.set(0,0,-1).applyQuaternion(cockpitOrientation).add(camera.position);
+        camera.lookAt(cockpitAim);
       }
       if((f.voyage||profile.sideCargo)&&cameraMode===0&&cargoLoader.visible){
         const door=new THREE.Vector3(f.sideDoor?-model.userData.radius:0,2,
@@ -1431,8 +1502,10 @@ function initialize(){
       const knots=Math.round(speeds.ias*knotsPerMps), live=!f.regional||f.battery;
       const values=[knots,Math.round(f.y*3.28084),Math.round(f.vs*196.85),String(Math.round(((f.heading/rad)%360+360)%360)%360).padStart(3,'0')+'°',Math.round(f.power*100)+'%',f.flaps+' / '+Math.round(f.trim/rad)+'°',Math.round(speeds.gs*knotsPerMps),Math.round(speeds.tas*knotsPerMps),speeds.mach.toFixed(2)];
       values.forEach((value,i)=>statValues[i].textContent=live?value:'—');
-      byId('benchmarkHUD').hidden=!profile.role||cameraMode!==1||!live||Boolean(f.cabinView);
-      if(profile.role&&cameraMode===1&&live&&!f.cabinView){
+      const straightAhead=cockpitView.preset!==(twoSeats(profile)?2:1)&&
+        Math.abs(cockpitView.yaw)<.18&&Math.abs(cockpitView.pitch)<.16;
+      byId('benchmarkHUD').hidden=!profile.role||!cockpitActive()||!live||!straightAhead;
+      if(!byId('benchmarkHUD').hidden){
         byId('hudHeading').textContent='HDG '+values[3];
         byId('hudCross').style.transform='rotate('+(-f.bank/rad)+'deg) translateY('+clamp(f.pitch/rad*2,-40,40)+'px)';
         byId('hudNumbers').textContent=knots+' IAS kt　 '+values[1]+' FT　 VAPP '+profile.approach;
@@ -1526,7 +1599,9 @@ function initialize(){
     taipeiVisuals.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',paused||Boolean(replay),qualitySelect.value);
     airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:byId('inspect').value==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);
-    const viewFov=!flight&&['panel','night'].includes(byId('inspect').value)?82:64;
+    const panelView=cockpitActive()&&cockpitView.preset===(twoSeats(profile)?2:1);
+    const viewFov=cockpitActive()?clamp((panelView?53:69)+cockpitView.zoom,34,86):
+      !flight&&['panel','night'].includes(byId('inspect').value)?82:64;
     if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}
     renderer.render(scene,camera);
     if(!flight&&!inspectionMode&&now%200<35){
