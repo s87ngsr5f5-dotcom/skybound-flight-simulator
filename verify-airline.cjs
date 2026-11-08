@@ -31,8 +31,18 @@ for(let i=0;i<120*150;i++) updatePassengerService(f,simTick);
 assert.equal(f.service.boarded,aircraft.passengers);
 assert.equal(f.fuel,f.fuelStart);
 assert(flightMass(f)>emptyMass+10000);
-f.service.door=false;f.bridge=false;f.service.mode=null;f.service.pushing=18;
-for(let i=0;i<120*12;i++) updatePassengerService(f,simTick);
+f.service.door=false;f.bridge=false;f.service.mode=null;
+if(process.argv.includes('--tow')){
+  assert(requestRunwayTow(f));
+  for(let i=0;i<120*420&&f.tow;i++) stepRunwayTow(f,simTick);
+  const runway=runwayCoordinates(f.x,f.z,from);
+  assert(!f.tow&&f.parkingBrake&&f.start==='runway');
+  assert(Math.abs(runway.cross)<.05&&Math.abs(runway.along+from.length/2-183)<.05);
+  assert.equal(f.heading,from.heading);
+}else{
+  f.service.pushing=18;
+  for(let i=0;i<120*12;i++) updatePassengerService(f,simTick);
+}
 assert(f.service.pushed);
 savePassenger(f);
 const originalId=f.service.id;

@@ -147,7 +147,8 @@ function initialize(){
   asphalt.color.set('#d3d7d7');concrete.color.set('#d4d6d1');
   const glass = material('#53758b'), roof = material('#a4afac');
   const airportGroups=[],jetwayWalls=new Map();
-  const jetwayPaint=material('#b4c0c7'), jetwayGlass=material('#4e7087'), jetwayDark=material('#36464d');
+  const jetwayPaint=material('#b4c0c7'), jetwayDark=material('#36464d');
+  const jetwayGlass=new THREE.MeshStandardMaterial({color:0x527f99,roughness:.25,transparent:true,opacity:.37,depthWrite:false});
   function makeJetway(){
     const root=new THREE.Group(), tunnel=new THREE.Group();
     root.add(tunnel);
@@ -160,9 +161,13 @@ function initialize(){
       for(let i=-3;i<=3;i++) box(tunnel,jetwayPaint,.15,1.62,.011,side*1.63,1.48,i/7);
     }
     const cabin=new THREE.Group();root.add(cabin);
-    box(cabin,jetwayPaint,3.50,2.65,2.25,0,1.21,0);
-    box(cabin,jetwayDark,2.32,2.34,.13,0,1.20,1.15);
-    box(cabin,jetwayGlass,3.52,.89,1.45,0,1.64,-.16);
+    box(cabin,jetwayPaint,3.50,.23,2.25,0,-.12,0);
+    box(cabin,jetwayPaint,3.50,.22,2.25,0,2.45,0);
+    for(const side of [-1,1]){
+      box(cabin,jetwayGlass,.13,1.65,2.25,side*1.69,1.36,0);
+      box(cabin,jetwayPaint,.15,.56,2.25,side*1.69,.28,0);
+      box(cabin,jetwayDark,.34,2.38,.15,side*1.36,1.18,1.15);
+    }
     const support=new THREE.Group();root.add(support);
     box(support,jetwayPaint,.61,1,.63,-.84,-.5,0);
     box(support,jetwayPaint,.61,1,.63,.84,-.5,0);
@@ -872,12 +877,11 @@ function initialize(){
       ['客艙門',()=>service.door,()=>{
         if(atGate()&&f.bridge){
           service.door=!service.door;
+          service.bridgeElapsed=0;
+          service.progress=0;
+          const end=jetwayEndpoints(f,models[fleet.indexOf(f.aircraft)]);
+          service.bridgeDelay=service.door?end.terminal.distanceTo(end.door)/2.6:0;
           service.mode=service.door?(f.awaitingService?'exit':'board'):null;
-        }
-      }],
-      ['推離機位',()=>Boolean(service.pushing||service.pushed),()=>{
-        if(atGate()&&!service.pushed&&!f.bridge&&!service.door&&service.boarded===f.passengers&&f.fuel>=service.targetFuel){
-          service.pushing=18;
         }
       }],
       ['客艙走道',()=>f.cabinView==='aisle',()=>{f.cabinView=f.cabinView==='aisle'?false:'aisle';changeView();}],
@@ -942,7 +946,16 @@ function initialize(){
       ' kg · '+(f.fuelFlow||0).toFixed(2)+' kg/s · 重量 '+Math.round(flightMass(f)).toLocaleString()+
       ' kg · '+(service.seatBelts?'請繫安全帶':'安全帶燈已關閉')+
       (f.airborne&&f.fuel<service.brief.reserve?' · 低油量，請檢查備降':'')+
+      (service.door&&service.mode&&(service.bridgeElapsed||0)<(service.bridgeDelay||0)?' · 旅客正在通過空橋':'')+
       (service.announcement?' · 廣播：'+service.announcement:'');
+  }
+  function jetwayEndpoints(f,model){
+    const airport=f.awaitingService?f.destination:f.departure;
+    const {radius,half}=model.userData;
+    const door=new THREE.Vector3(-radius*.94-.12,-.72,-half*.58);
+    door.applyQuaternion(model.quaternion).add(model.position);
+    const gate=airportPoint(airport,65,jetwayWalls.get(airport.code));
+    return {terminal:new THREE.Vector3(gate.x,airport.elevation+4.5,gate.z),door,airport};
   }
   function showSystems(f){
     switches.replaceChildren();special.replaceChildren();
@@ -971,6 +984,10 @@ function initialize(){
     entries.push(['自動導航 J',()=>Boolean(f.hold?.nav),()=>toggleNavigation(f)]);
     if(f.range) entries.push(['射擊訓練靶 M',()=>f.range.hit,()=>{if(!paused&&!replay) rangeShot(f);}]);
     if(f.aircraft.role==='fighter') entries.push(['加力待命',()=>f.boost,()=>{if(f.engines[0]) f.boost=!f.boost;}]);
+    entries.push(['拖車牽引至跑道',()=>Boolean(f.tow),()=>{
+      if(!paused&&!replay&&requestRunwayTow(f)){f.towMessage='';return;}
+      if(!f.tow) f.towMessage='請在出發機場停住、收油，並關門收空橋；載客航班須完成登機及加油。';
+    }]);
     if(f.service) addPassengerSystems(f,entries);
     if(f.aircraft.role==='passenger'&&!f.service) entries.push(['連接空橋',()=>f.bridge,()=>{
       if(f.awaitingService&&groundServiceAllowed(f)) f.bridge=!f.bridge;
@@ -1172,7 +1189,7 @@ function initialize(){
     if(code==='KeyF') flight.flaps=(flight.flaps+1)%3;
     if(code==='KeyR'&&!flight.service) start(flight.approach,true);
     if(!flight.regional) return;
-    if(code==='KeyB') flight.parkingBrake=!flight.parkingBrake;
+    if(code==='KeyB'&&!flight.tow) flight.parkingBrake=!flight.parkingBrake;
     if(code==='KeyI') startEngine(flight,0);
     if(code==='KeyL'&&flight.battery) flight.lights=!flight.lights;
     if(code==='KeyG'&&flight.aircraft.retract&&!flight.ground&&flight.battery) flight.gear=!flight.gear;
@@ -1342,6 +1359,9 @@ function initialize(){
   function status(f,knots,target){
     if(replay) return '貨運回放 · '+Math.floor(replay.time/60)+' 分鐘 · '+f.phase;
     if(paused) return '已暫停 · P 繼續';
+    if(f.tow) return '拖車牽引中 · 對正跑道後自動停住';
+    if(f.ground&&f.towMessage) return f.towMessage;
+    if(f.ground&&f.start==='runway'&&f.parkingBrake&&f.taxiIndex>=f.taxi.length) return '已對正跑道 · 啟動引擎後按 B 鬆開煞車';
     if(f.checkpointFailed&&!f.finished) return '任務存檔未更新 · 請檢查瀏覽器儲存空間或其他分頁';
     if(f.contract&&f.finished){
       const receipt=f.receipt;
@@ -1385,7 +1405,7 @@ function initialize(){
       const service=f.service;
       if(f.awaitingService) return service.delivered===f.passengers?'下機完成 · 關艙門並收回空橋':'關閉引擎 · 接空橋、開艙門讓旅客下機';
       if(!service.pushed) return service.pushing?'地勤推離中':service.boarded===f.passengers&&f.fuel>=service.targetFuel?
-        '關艙門、收空橋，再按推離機位':'停妥後接空橋並開艙門，同時加油';
+        '關艙門、收空橋，再按「拖車牽引至跑道」':'停妥後接空橋並開艙門，同時加油';
     }
     if(f.awaitingService) return f.mission==='cargo'?'關閉引擎 · 開貨門卸貨，卸完關門':'關閉引擎 · 連接空橋';
     if(f.phase==='cold'){
@@ -1491,7 +1511,8 @@ function initialize(){
         const fast=f.voyage&&f.phase==='cruise'&&f.y>650&&f.waypoint<4?Number(byId('voyageRate').value):1;
         if(!paused&&!f.finished&&!document.hidden) accumulator+=frameSeconds*fast;
         while(accumulator+1e-10>=simTick){
-          stepTrainer(f,smoothControls(f,input,simTick));
+          if(f.tow) stepRunwayTow(f,simTick);
+          else stepTrainer(f,smoothControls(f,input,simTick));
           if(f.service) updatePassengerService(f,simTick);
           if(f.regional) updateRegionalFlight(f);
           if(f.voyage) captureVoyage(f,voyageFrames,f.finished);
@@ -1523,13 +1544,13 @@ function initialize(){
       taxiLamp.target.position.copy(pos).addScaledVector(dir,62);
       taxiLamp.target.position.y=f.y-5;
       model.position.copy(pos);model.rotation.set(f.pitch,-f.heading,-f.bank,'YXZ');
-      if(f.ground&&f.service){
-        if(f.service.pushing){
-          tug.position.copy(pos).addScaledVector(dir,profile.geometry[0]*.76+2);
+      if(f.ground){
+        if(f.tow||f.service?.pushing){
+          tug.position.copy(pos).addScaledVector(dir,profile.geometry[0]+2.5);
           tug.position.y=terrainHeight(tug.position.x,tug.position.z);
           tug.rotation.y=-f.heading;tug.visible=true;
         }
-        if(f.service.pumping){
+        if(f.service?.pumping){
           const side=new THREE.Vector3(Math.cos(f.heading),0,Math.sin(f.heading));
           tanker.position.copy(pos).addScaledVector(side,profile.geometry[1]+4);
           tanker.position.y=terrainHeight(tanker.position.x,tanker.position.z);
@@ -1574,11 +1595,8 @@ function initialize(){
         });
         data.passengerCabin?.update(f,dt);
         if(f.bridge){
-          const airport=f.awaitingService?f.destination:f.departure;
-          const localDoor=new THREE.Vector3(-data.radius-.18,.10,-data.half*.58);
-          const door=localDoor.applyQuaternion(model.quaternion).add(pos);
-          const gate=airportPoint(airport,65,jetwayWalls.get(airport.code));
-          placeJetway(activeJetway,new THREE.Vector3(gate.x,airport.elevation+4.5,gate.z),door,airport.elevation);
+          const {terminal,door,airport}=jetwayEndpoints(f,model);
+          placeJetway(activeJetway,terminal,door,airport.elevation);
           bridgeMesh.visible=true;
           if(f.service?.door){
             const exit=f.service.mode==='exit';
@@ -1588,9 +1606,10 @@ function initialize(){
             bridgeQueue.visible=waiting>0;
             const distance=bridgeMesh.position.distanceTo(door);
             queuePeople.forEach((person,index)=>{
-              person.visible=index<waiting;
-              const moving=(f.elapsed*1.6+index*1.7)%Math.max(1,distance-3);
-              person.position.set(index%2?.34:-.34,Math.sin(moving*8)*.035,exit?distance-2-moving:moving+1);
+              const travel=(f.service.bridgeElapsed||0)*2.6-index*1.65;
+              person.visible=index<waiting&&travel>=0;
+              const moving=Math.max(0,travel)%Math.max(1,distance-.5);
+              person.position.set(index%2?.34:-.34,Math.sin(moving*8)*.035,exit?distance-.25-moving:moving+.25);
               person.rotation.y=exit?Math.PI:0;
             });
           }

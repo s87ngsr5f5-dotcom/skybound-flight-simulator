@@ -121,6 +121,56 @@ function makePassengerFlight(departure,destination,aircraft,wind,fuel,weather,ti
       boarded:0,delivered:0,door:false,pushed:false,pushing:0,progress:0,
       mode:null,seatBelts:true,cabinLights:true,comfort:100,weather,time,brief}});
 }
+function requestRunwayTow(f){
+  if(!f.regional||!f.ground||f.airborne||f.finished||f.tow||f.power>.08||
+      Math.hypot(f.vx,f.vz)>1.2||f.bridge||f.service?.door||f.service?.pumping||
+      f.noseDoor||f.sideDoor) return false;
+  if(f.service&&(f.service.boarded!==f.passengers||f.fuel<f.service.targetFuel)) return false;
+  const airport=f.departure;
+  const frame=runwayCoordinates(f.x,f.z,airport);
+  const threshold=-airport.length/2+135;
+  if(Math.abs(frame.along)>airport.length/2+450||Math.abs(frame.cross)>750) return false;
+  const pavedAlong=limit(frame.along,-airport.length/2+100,airport.length/2-100);
+  f.tow={index:0,points:[
+    airportPoint(airport,pavedAlong,airport.apron),
+    airportPoint(airport,threshold,airport.apron),
+    airportPoint(airport,threshold,0),
+    airportPoint(airport,threshold+48,0)
+  ]};
+  f.parkingBrake=true;
+  f.phase='taxi';
+  f.hold=null;
+  return true;
+}
+function stepRunwayTow(f,dt){
+  const tow=f.tow,airport=f.departure;
+  f.parkingBrake=true;
+  const target=tow.points[tow.index];
+  const dx=target.x-f.x,dz=target.z-f.z;
+  const distance=Math.hypot(dx,dz);
+  const speed=Math.min(12,Math.max(2,distance*.75));
+  f.elapsed+=dt;
+  if(distance>.025){
+    const heading=Math.atan2(dx,-dz);
+    const turn=wrapAngle(heading-f.heading);
+    f.heading=wrapAngle(f.heading+limit(turn,-.95*dt,.95*dt));
+    const step=Math.abs(turn)<.10?Math.min(distance,speed*dt):0;
+    f.vx=dx/distance*step/dt;f.vz=dz/distance*step/dt;
+    f.x+=f.vx*dt;f.z+=f.vz*dt;
+  }else{
+    f.x=target.x;f.z=target.z;f.vx=f.vz=0;
+    tow.index++;
+    if(tow.index===tow.points.length){
+      f.tow=null;f.heading=airport.heading;
+      f.taxiIndex=f.taxi.length;
+      f.start='runway';f.phase='takeoff';
+      if(f.service){f.service.pushed=true;f.service.pushing=0;}
+    }
+  }
+  f.y=airport.elevation+f.aircraft.gearHeight;
+  f.pitch=f.bank=f.pitchRate=f.bankRate=f.yawRate=f.vy=f.vs=0;
+  f.speed=Math.hypot(f.vx,f.vz);
+}
 function updatePassengerService(f,dt){
   const service=f.service;
   if(!service||f.finished) return;
@@ -129,7 +179,10 @@ function updatePassengerService(f,dt){
     if(f.fuel>=service.targetFuel) service.pumping=false;
   }
   if(service.mode&&service.door&&f.bridge&&groundServiceAllowed(f)){
-    service.progress+=dt*6;
+    const previous=service.bridgeElapsed||0;
+    service.bridgeElapsed=previous+dt;
+    const delay=service.bridgeDelay||0;
+    service.progress+=6*(Math.max(0,service.bridgeElapsed-delay)-Math.max(0,previous-delay));
     const count=Math.floor(service.progress);
     if(count){
       service.progress-=count;
@@ -327,7 +380,7 @@ function startEngine(f,index){
   return true;
 }
 function updateRegionalFlight(f,save=recordFlight){
-  if(f.finished) return;
+  if(f.finished||f.tow) return;
   if(f.climbLesson){updateClimbLesson(f,save);return;}
   if(f.ended){
     f.finished=true;
@@ -407,6 +460,7 @@ function rangeShot(f){
   return range.hit;
 }
 function activeTarget(f){
+  if(f.tow) return {...f.tow.points[f.tow.index],name:'拖車牽引至跑道'};
   if(f.phase==='arrival') return f.arrivalTaxi[f.taxiIndex];
   if(f.phase==='taxi'||f.phase==='cold') return f.taxi[f.taxiIndex];
   return f.route[f.waypoint];
