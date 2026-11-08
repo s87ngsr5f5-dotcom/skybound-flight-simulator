@@ -307,14 +307,17 @@ function initialize(){
     return group;
   }
   const models=fleet.map((m,i)=>m.role?buildBenchmarkAirframe(m,scene):makeAircraft(m,i));
-  const airlinerDetail=refineAirliner(models[fleet.findIndex(m=>m.id==='sa380')]);
+  const airlinerDetails={
+    sa380:refineAirliner(models[fleet.findIndex(m=>m.id==='sa380')]),
+    b773:refineAirliner(models[fleet.findIndex(m=>m.id==='b773')],{twin:true})
+  };
   const raycaster=new THREE.Raycaster();
   addEventListener('click',event=>{
     if(event.target.closest('button,input,select,textarea,details,a'))return;
-    if(!flight||flight.aircraft.id!=='sa380'||cameraMode!==1||replay)return;
+    if(!flight||!airlinerDetails[flight.aircraft.id]||cameraMode!==1||flight.cabinView||replay)return;
     const mouse=new THREE.Vector2(event.clientX/innerWidth*2-1,1-event.clientY/innerHeight*2);
     raycaster.setFromCamera(mouse,camera);
-    const hit=raycaster.intersectObjects(airlinerDetail.switches)[0];
+    const hit=raycaster.intersectObjects(airlinerDetails[flight.aircraft.id].switches)[0];
     if(!hit)return;
     const label=hit.object.userData.action;
     for(const button of byId('switches').children)if(button.textContent===label){button.click();break;}
@@ -1458,7 +1461,7 @@ function initialize(){
       taxiLamp.intensity=0;
       const airport=selectedAirport('departure');
       model.userData.passengerCabin?.update(null,dt);
-      const p=profile.role?airportPoint(airport,230,-520):parkingPoint(airport);
+      const p=profile.role?airportPoint(airport,230,0):parkingPoint(airport);
       updateTerrain(airport.x,airport.z);
       model.userData.gear.scale.y=1;model.userData.gear.visible=true;
       model.position.set(p.x,airport.elevation+profile.gearHeight,p.z);
@@ -1472,7 +1475,7 @@ function initialize(){
         const h=data.half;
         const station={nose:[0,3,-2.9],side:[2.8,3,0],tail:[0,3,2.9],belly:[.3,-9,2.6]}[inspection];
         if(inspection==='orbit'){
-          camera.position.set(p.x-h*2,model.position.y+h*.62,p.z+h*1.8);
+          camera.position.set(p.x-h*1.62,model.position.y+h*.64,p.z+h*1.42);
           camera.lookAt(model.position);
         }else{
           model.rotation.set(0,0,0);
@@ -1512,7 +1515,7 @@ function initialize(){
     const viewerZ=flight?.z??selectedAirport('departure').z;
     vegetation.update(camera.position.x,camera.position.z,qualitySelect.value);
     taipeiVisuals.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',paused||Boolean(replay),qualitySelect.value);
-    airlinerDetail.update(flight?.aircraft.id==='sa380'?flight:null,now,flight?activeDay:byId('inspect').value==='night'?0:1);
+    airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:byId('inspect').value==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);
     const viewFov=!flight&&['panel','night'].includes(byId('inspect').value)?82:64;
     if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}

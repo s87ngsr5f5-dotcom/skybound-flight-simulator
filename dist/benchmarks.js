@@ -32,7 +32,7 @@ const benchmarkFleet=[
   {id:'b773',name:'Boeing 777-300ER',type:'雙發廣體客機',role:'passenger',
     mass:260000,wingArea:436.8,inertia:[28500000,54000000,73000000],cgOffset:.07,gearHeight:4.1,stallAngle:.28,
     rotation:149,approach:151,geometry:[36.93,3.10,32.4,-.95,2,10.5],thrust:965000,jet:true,
-    passengers:360,missionFuel:45000,nacelleRadius:1.69,cruiseMach:.84,maxMach:.89,cleanDrag:.022,fuelIdle:.32,fuelPower:2.6},
+    passengers:360,missionFuel:45000,nacelleRadius:1.88,mainAxles:3,rakedTip:true,cruiseMach:.84,maxMach:.89,cleanDrag:.022,fuelIdle:.32,fuelPower:2.6},
   {id:'b763f',name:'Boeing 767-300F',type:'雙發側門貨機',role:'cargo',
     mass:139000,wingArea:283.3,inertia:[12500000,27000000,33700000],cgOffset:.075,gearHeight:3.5,stallAngle:.29,
     rotation:142,approach:152,geometry:[27.47,2.515,23.785,-.76,2,9.1],thrust:560000,jet:true,

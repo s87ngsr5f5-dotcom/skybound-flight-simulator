@@ -55,3 +55,8 @@
 臺灣本島以 ESA WorldCover 2021 v200 的樹木覆蓋分類（class 10）決定林地分布。來源為 N24E120、N21E120 兩個圖磚，將原始 10 公尺分類彙整為約 125–140 公尺的覆蓋比例。林地邊界來自衛星資料，樹種、單株位置和大小由遊戲生成。資料範圍外使用地形推估。重新生成資料可使用 `tools/build-forest-cover.py`，輸入官方 GeoTIFF 所在資料夾和輸出路徑。
 
 © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. Adapted by SKYBOUND GLOBAL. [ESA WorldCover 2021 v200](https://doi.org/10.5281/zenodo.7254221), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+
+## 客機模型精修
+
+雙發客機採用貼合機身的駕駛艙玻璃、圓角舷窗、艙門接縫、分層引擎短艙及起落架支柱。777-300ER 加入後掠翼尖、六輪主起落架和帶飛行數據的雙發座艙。原創遊戲模型參考 [波音 777 設計特點](https://www.boeing.com/commercial/777/design-highlights) 和 [777 機場規劃資料](https://www.boeing.com/resources/boeingdotcom/commercial/airports/acaps/777-200LR-300ER-F_Rev_G.pdf)。

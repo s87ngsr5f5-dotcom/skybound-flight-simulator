@@ -3,8 +3,9 @@ function buildBenchmarkAirframe(profile,scene){
   const group=new THREE.Group(), gear=new THREE.Group(), cabin=new THREE.Group();
   const [half,radius,span,wingY,engineCount,sweep]=profile.geometry;
   const fighter=profile.role==='fighter', freight=profile.role==='cargo';
+  const detailed=profile.role==='passenger'&&engineCount===2;
   const color=fighter?0x778798:freight?0xd9e2e4:0xf2f5f7;
-  const surface=new THREE.MeshStandardMaterial({color,roughness:.57,metalness:fighter?.19:.08});
+  const surface=new THREE.MeshStandardMaterial({color,roughness:detailed?.39:.57,metalness:fighter?.19:.08});
   const stockColor=profile.trimColor??(freight?0x173d5d:0x146a80);
   const paint=new THREE.MeshStandardMaterial({color:stockColor,roughness:.48});
   const rubber=new THREE.MeshStandardMaterial({color:0x151a1e,roughness:.94});
@@ -83,22 +84,103 @@ function buildBenchmarkAirframe(profile,scene){
         block(sideDoor,paint,.14,2.38,3.25,-.06,-1.29,0);
       }
     }
-    const windshield=mesh(group,new THREE.SphereGeometry(1,28,16),glazing,0,radius*(freight?1.04:.75),-half*.79);
-    windshield.scale.set(radius*.68,radius*.17,half*.062);
-    for(const side of [-1,1]){
-      if(!freight){
-        const glassBank=new THREE.InstancedMesh(new THREE.BoxGeometry(.12,.27,.48),glazing,engineCount===4?110:55);
-        const transform=new THREE.Object3D();
-        for(let i=0;i<glassBank.count;i++){
-          const y=i<55?radius*.22:radius*.63;
-          transform.position.set(side*(radius*(i<55?.98:.86)),y,-half*.64+(i%55)*half*.0225);
-          transform.updateMatrix();glassBank.setMatrixAt(i,transform.matrix);
-        }
-        group.add(glassBank);
+    if(detailed){
+      function skinPoint(z,angle,offset){
+        const next=body.findIndex(station=>station[0]>=z);
+        const a=body[Math.max(0,next-1)],b=body[Math.max(1,next)];
+        const t=Math.max(0,Math.min(1,(z-a[0])/(b[0]-a[0])));
+        const r=a[1]+(b[1]-a[1])*t*t*(3-2*t)+offset;
+        return [r*Math.sin(angle),r*1.18*Math.cos(angle),z];
       }
-      for(const z of [-half*.57,-half*.16,half*.25,half*.55]){
-        block(group,metal,.045,1.7,1.06,side*radius*.97,radius*.26,z);
-        block(group,surface,.058,1.53,.91,side*radius*.981,radius*.26,z);
+      function skinPanel(corners,mat,offset){
+        const vertices=[], indices=[];
+        const steps=6;
+        for(let i=0;i<=steps;i++){
+          const t=i/steps;
+          for(let j=0;j<=steps;j++){
+            const u=j/steps;
+            const lo=corners[0].map((n,k)=>n+(corners[1][k]-n)*u);
+            const hi=corners[3].map((n,k)=>n+(corners[2][k]-n)*u);
+            vertices.push(...skinPoint(lo[0]+(hi[0]-lo[0])*t,lo[1]+(hi[1]-lo[1])*t,offset));
+            if(i&&j){
+              const a=i*(steps+1)+j,b=a-steps-1;
+              indices.push(a,b,a-1,b,b-1,a-1);
+            }
+          }
+        }
+        const geometry=new THREE.BufferGeometry();
+        geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        mesh(group,geometry,mat);
+      }
+      const windowFrame=new THREE.MeshStandardMaterial({color:0x35434b,roughness:.41,side:THREE.DoubleSide});
+      const windshield=glazing.clone();windshield.side=THREE.DoubleSide;
+      const seam=new THREE.LineBasicMaterial({color:0x8c989d,transparent:true,opacity:.82});
+      const doorZ=[-.65,-.29,.34,.58].map(v=>v*half);
+      const windowShape=new THREE.Shape();
+      windowShape.moveTo(-.12,-.14);windowShape.lineTo(.12,-.14);
+      windowShape.quadraticCurveTo(.20,-.14,.20,-.05);windowShape.lineTo(.20,.05);
+      windowShape.quadraticCurveTo(.20,.14,.12,.14);windowShape.lineTo(-.12,.14);
+      windowShape.quadraticCurveTo(-.20,.14,-.20,.05);windowShape.lineTo(-.20,-.05);
+      windowShape.quadraticCurveTo(-.20,-.14,-.12,-.14);
+      const windowGeo=new THREE.ShapeGeometry(windowShape,4);
+      const windowPositions=[];
+      for(let z=-half*.63;z<half*.65;z+=.83){
+        if(doorZ.every(door=>Math.abs(z-door)>.72)) windowPositions.push(z);
+      }
+      for(const side of [-1,1]){
+        for(const [left,right] of [[.08,.44],[.49,.80],[.85,1.12]]){
+          const z0=-half*.909+(left-.08)*half*.078;
+          const z1=z0+half*.049;
+          const outline=[[z0,left*side],[z1,(left-.055)*side],[z1+half*.008,right*side],[z0+half*.014,right*side]];
+          skinPanel(outline,windowFrame,.032);
+          const center=outline.reduce((mean,p)=>[mean[0]+p[0]/4,mean[1]+p[1]/4],[0,0]);
+          skinPanel(outline.map(p=>p.map((value,k)=>center[k]+(value-center[k])*.86)),windshield,.053);
+        }
+        const windows=new THREE.InstancedMesh(windowGeo,windshield,windowPositions.length);
+        const transform=new THREE.Object3D();
+        for(const [index,z] of windowPositions.entries()){
+          transform.position.set(...skinPoint(z,side*1.38,.03));
+          transform.rotation.y=side*Math.PI/2;
+          transform.updateMatrix();
+          windows.setMatrixAt(index,transform.matrix);
+        }
+        group.add(windows);
+        for(const z of doorZ){
+          const corners=[[-.48,1.19],[.48,1.19],[.48,1.19+1.72/(radius*1.18)],[-.48,1.19+1.72/(radius*1.18)],[-.48,1.19]];
+          const points=[];
+          for(let edge=1;edge<corners.length;edge++){
+            for(let i=0;i<8;i++){
+              const t=i/8,a=corners[edge-1],b=corners[edge];
+              points.push(new THREE.Vector3(...skinPoint(z+a[0]+(b[0]-a[0])*t,side*(a[1]+(b[1]-a[1])*t),.055)));
+            }
+          }
+          points.push(points[0].clone());
+          group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),seam));
+        }
+      }
+      const radome=[];
+      for(let i=0;i<=48;i++) radome.push(new THREE.Vector3(...skinPoint(-half*.928,i*Math.PI/24,.024)));
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(radome),seam));
+    }else{
+      const windshield=mesh(group,new THREE.SphereGeometry(1,28,16),glazing,0,radius*(freight?1.04:.75),-half*.79);
+      windshield.scale.set(radius*.68,radius*.17,half*.062);
+      for(const side of [-1,1]){
+        if(!freight){
+          const glassBank=new THREE.InstancedMesh(new THREE.BoxGeometry(.12,.27,.48),glazing,engineCount===4?110:55);
+          const transform=new THREE.Object3D();
+          for(let i=0;i<glassBank.count;i++){
+            const y=i<55?radius*.22:radius*.63;
+            transform.position.set(side*(radius*(i<55?.98:.86)),y,-half*.64+(i%55)*half*.0225);
+            transform.updateMatrix();glassBank.setMatrixAt(i,transform.matrix);
+          }
+          group.add(glassBank);
+        }
+        for(const z of [-half*.57,-half*.16,half*.25,half*.55]){
+          block(group,metal,.045,1.7,1.06,side*radius*.97,radius*.26,z);
+          block(group,surface,.058,1.53,.91,side*radius*.981,radius*.26,z);
+        }
       }
     }
   }
@@ -117,7 +199,8 @@ function buildBenchmarkAirframe(profile,scene){
     const tip=root+sweep;
     const wingVertices=[],wingIndices=[],sections=12,slices=24;
     for(let k=0;k<=sections;k++){
-      const v=k/sections,c=chord*(1-.78*v),lead=root+sweep*v;
+      const v=k/sections,rake=profile.rakedTip?Math.max(0,(v-.88)/.12):0;
+      const c=chord*(1-.78*v)*(1-rake*.86),lead=root+sweep*v+rake*2.2;
       for(let j=0;j<=slices;j++){
         const angle=j/slices*Math.PI*2,t=(1-Math.cos(angle))/2;
         const thick=5*.10*c*(.2969*Math.sqrt(t)-.126*t-.3516*t*t+.2843*t*t*t-.1036*t*t*t*t);
@@ -131,7 +214,7 @@ function buildBenchmarkAirframe(profile,scene){
     }
     const wingGeo=new THREE.BufferGeometry();wingGeo.setAttribute('position',new THREE.Float32BufferAttribute(wingVertices,3));wingGeo.setIndex(wingIndices);wingGeo.computeVertexNormals();
     const wingMat=surface.clone();wingMat.side=THREE.DoubleSide;mesh(group,wingGeo,wingMat);
-    if(!profile.noWinglet){
+    if(!profile.noWinglet&&!profile.rakedTip){
       const tipFence=block(group,paint,.11,fighter?.28:1.2,.73,side*span,wingY+.42,tip+.3);
       tipFence.rotation.z=-side*.17;
       if(profile.splitWinglet){
@@ -149,12 +232,13 @@ function buildBenchmarkAirframe(profile,scene){
     block(flap,metal,span*.32,.14,chord*.17,0,0,chord*.085);
     group.add(flap);flaps.push(flap);
     const lamp=mesh(group,new THREE.SphereGeometry(fighter?.085:.19,12,8),
-      new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,wingY+.16,tip);
+      new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,wingY+.62,tip+(profile.rakedTip?2.2:0));
     lamps.push(lamp);
     if(!fighter&&engineCount>=2){
       for(const factor of engineCount===4?[.33,.65]:[.38]){
         const engine=new THREE.Group();
         const size=profile.nacelleRadius??(freight?1.43:1.78);
+        const length=profile.rakedTip?1.35:1;
         hull(engine,[[-2.8,size*.89],[-2.52,size],[.82,size*.94],[1.8,size*.71]],surface);
         const fan=mesh(engine,new THREE.CircleGeometry(size*.82,32),dark,0,0,-2.68);
         fan.rotation.y=Math.PI;
@@ -166,7 +250,14 @@ function buildBenchmarkAirframe(profile,scene){
           const blade=block(fanGroup,metal,size*.07,size*.70,.08,Math.sin(v*Math.PI/10)*size*.48,Math.cos(v*Math.PI/10)*size*.48,-2.71);
           blade.rotation.z=-v*Math.PI/10-.42;
         }
-        block(engine,metal,size*.40,1.48,2.3,0,1.06,.14);
+        if(detailed){
+          hull(engine,[[-2.73,size*.91],[-2.55,size*.84],[-2.20,size*.82]],metal);
+          hull(engine,[[1.15,size*.72],[1.78,size*.66],[2.18,size*.49],[2.36,size*.43]],metal);
+          mesh(engine,new THREE.ConeGeometry(size*.25,.92,28),metal,0,0,2.22).rotation.x=Math.PI/2;
+          const pylon=block(engine,surface,size*.47,1.42,2.7,0,1.18,.18);
+          pylon.rotation.x=.14;
+        }else block(engine,metal,size*.40,1.48,2.3,0,1.06,.14);
+        engine.scale.z=length;
         engine.position.set(side*span*factor,wingY-size*.55-.40,root+sweep*factor-1.5);
         group.add(engine);
       }
@@ -185,6 +276,15 @@ function buildBenchmarkAirframe(profile,scene){
   for(const [x,z,axles] of bogies){
     const size=fighter?.32:.58;
     block(gear,metal,.23,profile.gearHeight*.69,.30,x,-profile.gearHeight*.43,z);
+    if(detailed){
+      mesh(gear,new THREE.CylinderGeometry(.21,.26,profile.gearHeight*.52,12),metal,x,-profile.gearHeight*.35,z);
+      mesh(gear,new THREE.CylinderGeometry(.145,.145,profile.gearHeight*.27,12),metal,x,-profile.gearHeight*.65,z);
+      block(gear,metal,.28,.20,axles>1?(axles-1)*1.12+.58:.72,x,-profile.gearHeight+size,z);
+      const brace=block(gear,metal,.11,profile.gearHeight*.54,.13,x+.33,-profile.gearHeight*.32,z+.21);
+      brace.rotation.z=.28;
+      const door=block(gear,surface,.09,profile.gearHeight*.39,.91,x+(x<0?-.41:.41),-profile.gearHeight*.29,z);
+      door.rotation.z=x<0?-.13:.13;
+    }
     for(let a=0;a<axles;a++){
       for(const offset of fighter?[0]:[-.29,.29]){
         const wheel=mesh(gear,new THREE.CylinderGeometry(size,size,fighter?.21:.34,20),rubber,x+offset,-profile.gearHeight+size,z+(a-(axles-1)/2)*1.12);
