@@ -34,7 +34,7 @@ function maintenanceQuote(career,aircraft){
   const id=aircraft.id;
   const condition=hangarCondition(career,id);
   const cost=(100-condition)*Math.round((hangarPrices[id]||0)/1000);
-  return {condition,cost,owned:Boolean(career.owned?.[id]),busy:career.active?.aircraft?.id===id};
+  return {condition,cost,owned:Boolean(career.owned?.[id]),busy:passengerCheckpoints(career).some(f=>f.aircraft.id===id)};
 }
 function serviceHangar(aircraft){
   const career=readCareer();
@@ -44,35 +44,47 @@ function serviceHangar(aircraft){
   (career.condition??={})[aircraft.id]=100;
   try{localStorage.setItem(careerKey,JSON.stringify(career));return true;}catch{return false;}
 }
+function passengerCheckpoints(career=readCareer()){
+  const saves={...career.passengerSaves};
+  if(career.active?.service?.id) saves[career.active.service.id]=career.active;
+  return Object.values(saves).filter(f=>!f.finished&&!career.receipts[f.service.id]);
+}
 function savePassenger(f){
   const career=readCareer();
   if(f.finished||career.receipts[f.service.id]) return;
+  career.passengerSaves=Object.fromEntries(passengerCheckpoints(career).map(saved=>[saved.service.id,saved]));
+  career.passengerSaves[f.service.id]=f;
   career.active=f;
   try{localStorage.setItem(careerKey,JSON.stringify(career));}catch{}
 }
 const missionSaveKey='skybound.missionCheckpoint.v1';
-function readMissionCheckpoint(){
+function missionCheckpoints(){
   try{
-    const saved=JSON.parse(localStorage.getItem(missionSaveKey)||'null');
-    if(!saved?.flight?.checkpointId||saved.flight.finished||!saved.options||!Array.isArray(saved.frames)) return null;
-    if(saved.flight.contract&&readCareer().receipts[saved.flight.contract.id]) return null;
-    return saved;
-  }catch{return null;}
+    const stored=JSON.parse(localStorage.getItem(missionSaveKey)||'null');
+    const saves=stored?.flight?[stored]:Array.isArray(stored)?stored:[];
+    const receipts=readCareer().receipts;
+    return saves.filter(saved=>saved?.flight?.checkpointId&&!saved.flight.finished&&saved.options&&Array.isArray(saved.frames)&&
+      !(saved.flight.contract&&receipts[saved.flight.contract.id]));
+  }catch{return [];}
+}
+function readMissionCheckpoint(id){
+  const saves=missionCheckpoints();
+  return (id?saves.find(saved=>saved.flight.checkpointId===id):saves[0])??null;
 }
 function writeMissionCheckpoint(f,options,frames=[],replaces){
   if(f.finished||!f.checkpointId||f.contract&&readCareer().receipts[f.contract.id]) return false;
-  const current=readMissionCheckpoint();
-  if(current&&![f.checkpointId,replaces].includes(current.flight.checkpointId)) return false;
+  const saves=missionCheckpoints().filter(saved=>![f.checkpointId,replaces].includes(saved.flight.checkpointId));
   try{
-    localStorage.setItem(missionSaveKey,JSON.stringify({flight:f,options,frames}));
+    localStorage.setItem(missionSaveKey,JSON.stringify([{flight:f,options,frames},...saves]));
     return true;
   }catch{return false;}
 }
 function clearMissionCheckpoint(id){
   try{
-    const current=JSON.parse(localStorage.getItem(missionSaveKey)||'null');
-    if(current?.flight?.checkpointId!==id) return false;
-    localStorage.removeItem(missionSaveKey);
+    const saves=missionCheckpoints();
+    const remaining=saves.filter(saved=>saved.flight.checkpointId!==id);
+    if(remaining.length) localStorage.setItem(missionSaveKey,JSON.stringify(remaining));
+    else localStorage.removeItem(missionSaveKey);
     return true;
   }catch{return false;}
 }
@@ -175,7 +187,8 @@ function settlePassenger(f,result){
   career.money+=net;
   if(id){
     career.receipts[id]=receipt;
-    if(career.active?.service.id===id) career.active=null;
+    if(career.passengerSaves) delete career.passengerSaves[id];
+    if(career.active?.service.id===id) career.active=passengerCheckpoints(career).at(-1)??null;
   }
   try{localStorage.setItem(careerKey,JSON.stringify(career));return receipt;}catch{return null;}
 }

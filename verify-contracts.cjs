@@ -22,9 +22,11 @@ for(const kind of ['sightseeing','ferry']){
       assert(f.airborne);
       assert(writeMissionCheckpoint(f,options));
       const competing={...f,checkpointId:crypto.randomUUID()};
-      assert(!writeMissionCheckpoint(competing,options));
-      assert(!clearMissionCheckpoint(competing.checkpointId));
-      const saved=readMissionCheckpoint();
+      assert(writeMissionCheckpoint(competing,options));
+      assert.equal(missionCheckpoints().length,2);
+      const saved=readMissionCheckpoint(f.checkpointId);
+      assert(clearMissionCheckpoint(competing.checkpointId));
+      assert.equal(missionCheckpoints().length,1);
       assert.deepEqual(saved.options,options);
       assert.deepEqual(saved.flight,f);
       f=saved.flight;

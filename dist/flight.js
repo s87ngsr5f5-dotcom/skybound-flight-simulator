@@ -616,13 +616,19 @@ function initialize(){
     byId('airlinePlan').hidden=!active;
     const career=readCareer();
     byId('wallet').textContent='遊戲金幣 '+career.money.toLocaleString()+' · 存在目前瀏覽器';
-    byId('resumeAirline').hidden=!career.active;
-    const checkpoint=readMissionCheckpoint();
-    byId('resumeMission').hidden=byId('discardMission').hidden=!checkpoint;
-    if(checkpoint){
-      const f=checkpoint.flight;
-      byId('resumeMission').textContent='繼續任務 · '+f.aircraft.name+' · '+f.departure.code+' → '+f.destination.code;
+    const passengers=passengerCheckpoints(career);
+    const missions=missionCheckpoints();
+    function fillSaved(select,flights,id){
+      const previous=select.value;
+      select.replaceChildren(...flights.map(f=>new Option(
+        f.aircraft.name+' · '+f.departure.code+' → '+f.destination.code+' · '+Math.floor(f.elapsed/60)+' 分',id(f))));
+      if([...select.options].some(option=>option.value===previous)) select.value=previous;
+      select.hidden=flights.length===0;
     }
+    fillSaved(byId('savedAirline'),passengers,f=>f.service.id);
+    fillSaved(byId('savedMission'),missions.map(checkpoint=>checkpoint.flight),f=>f.checkpointId);
+    byId('resumeAirline').hidden=!passengers.length;
+    byId('resumeMission').hidden=byId('discardMission').hidden=!missions.length;
     if(!active) return;
     const aircraft=selectedAircraft();
     const field=byId('airlineFuel');
@@ -666,7 +672,7 @@ function initialize(){
     byId('fly').focus();
   };
   byId('resumeAirline').onclick=()=>{
-    const saved=readCareer().active;
+    const saved=passengerCheckpoints().find(f=>f.service.id===byId('savedAirline').value);
     if(!saved) return;
     const aircraft=fleet.find(a=>a.id===saved.aircraft.id);
     if(!aircraft){byId('message').textContent='此存檔的機型目前無法載入。';return;}
@@ -677,7 +683,7 @@ function initialize(){
     beginFlight();
   };
   byId('resumeMission').onclick=()=>{
-    const checkpoint=readMissionCheckpoint();
+    const checkpoint=readMissionCheckpoint(byId('savedMission').value);
     if(!checkpoint) return;
     const {flight:saved,options,frames}=checkpoint;
     const aircraft=fleet.find(a=>a.id===saved.aircraft.id);
@@ -711,7 +717,7 @@ function initialize(){
     nextCheckpoint=performance.now()+15000;
   };
   byId('discardMission').onclick=()=>{
-    const checkpoint=readMissionCheckpoint();
+    const checkpoint=readMissionCheckpoint(byId('savedMission').value);
     if(!checkpoint||!confirm('刪除尚未完成的任務進度與其未完成的回放？')) return;
     if(clearMissionCheckpoint(checkpoint.flight.checkpointId)) drawPlan();
   };
@@ -1033,10 +1039,7 @@ function initialize(){
       const weather=byId('weather').value;
       const savesMission=Boolean(regionalContracts[lesson]||lesson==='climbLesson'||lesson==='naritaCargo'||
         (lesson==='benchmark'&&['fighter','cargo'].includes(selectedAircraft().role)||lesson==='range'));
-      const checkpoint=readMissionCheckpoint();
-      if(savesMission&&checkpoint&&!(restart&&checkpoint.flight.checkpointId===flight?.checkpointId)){
-        throw new Error('已有任務存檔，請先繼續或刪除該存檔。');
-      }
+      const replacedId=restart?flight?.checkpointId:undefined;
       const wind=lesson==='crosswind'?5.144:['fog','wet'].includes(weather)?0:Number(weather);
       replay=null;replayControls.hidden=true;
       if(lesson==='range'){
@@ -1056,7 +1059,6 @@ function initialize(){
         byId('aircraft').value=flight.aircraft.id;
       }else if(lesson==='airline'){
         if(approach) throw new Error('載客任務請從機位開始。');
-        if(readCareer().active) throw new Error('已有未完成的載客任務。請選擇繼續載客任務。');
         const profile=selectedAircraft();
         const [from,to]=airlineRoute();
         if(!compatibleAirline(profile,from,to)) throw new Error('此機型不適用所選機位或跑道。');
@@ -1135,7 +1137,7 @@ function initialize(){
       beginFlight();
       if(savesMission){
         flight.checkpointId=crypto.randomUUID();
-        saveCurrentMission(flight,restart?checkpoint?.flight.checkpointId:undefined);
+        saveCurrentMission(flight,replacedId);
       }
     }catch(error){byId('message').textContent=error.message;}
   }
