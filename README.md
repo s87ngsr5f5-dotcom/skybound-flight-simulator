@@ -2,14 +2,16 @@
 
 目前同步版本為 0.11。共有 11 架可選機型，六架 SB 系列已移出機庫。既有訓練與區域任務改用 A220。手機版提供觸控提示、逐步地勤、跳過拖車、快速操控與引擎聲浪。自動導航可進場、接地並在跑道煞停。777 可用「試飛 777 高速巡航」進入約 670 kt TAS 的遊戲速度，也可選寫實巡航。引擎可在非零油門時啟動。「極致」畫質有高解析、陰影和完整城市地景；多雲時可飛到雲上，夜間有月亮、星星和城市窗燈。
 
-- [正式遊玩網址](https://skybound-global.alondragallard.chatgpt.site/)
-- [iPhone 手機相容版](https://skybound-global.alondragallard.chatgpt.site/iphone.html)
-- [GitHub Pages 鏡像](https://s87ngsr5f5-dotcom.github.io/skybound-global/)
+- [正式遊玩網址](https://s87ngsr5f5-dotcom.github.io/skybound-global/)
+- [iPhone 手機相容版](https://s87ngsr5f5-dotcom.github.io/skybound-global/iphone.html)
+- [ChatGPT Sites 既有遊玩入口](https://skybound-global.alondragallard.chatgpt.site/)
+- [共編與發布流程](CONTRIBUTING.md)
+- [給 Gemini 的交接提示詞](PASTE-INTO-GEMINI.txt)
 - [飛機建模基準](AIRCRAFT-QUALITY.md)
 
 本機預覽使用 `python -m http.server 8765 --directory dist`，再開啟 `http://127.0.0.1:8765/` 或 `http://127.0.0.1:8765/iphone.html`。不需要 npm 建置。
 
-GitHub Pages 的部署只更新鏡像。正式網址由既有 ChatGPT Sites 專案管理，發布時要在有該 Site 編輯權限的環境接續原專案。兩個網域的瀏覽器存檔各自獨立。
+共同開發請從 `main` 開分支、提交 Pull Request。GitHub Actions 會測試飛行功能，合併到 `main` 後更新原本的 GitHub Pages 正式網址。ChatGPT Sites 為另一個發布入口，兩個網域的瀏覽器存檔各自獨立。
 
 機模和地景來源見 [模型授權](dist/models/SOURCES.txt)、[地景來源](dist/VISUALS.txt)及 [Three.js 授權](dist/THREE-LICENSE.txt)。飛行物理及機型細節為遊戲近似，地景重點在臺灣區域與成田周邊。
 
