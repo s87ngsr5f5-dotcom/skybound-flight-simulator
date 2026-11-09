@@ -1304,7 +1304,7 @@ function initialize(){
     showLog();drawPlan();changeView();
   }
   function toggleNavigation(f){
-    if(f.hold?.nav){f.hold=null;return;}
+    if(f.hold?.nav){stopNavigation(f);return;}
     if(f.regional&&!f.ground&&f.battery&&!f.finished&&!f.tactical&&!f.climbLesson&&!f.cruiseTrial){
       f.navMessage='';
       f.hold={nav:true,altitude:f.y};
@@ -1488,7 +1488,7 @@ function initialize(){
     let {roll,pitch}=manual;
     let assistedBrake=false,assistedRudder;
     let throttle=clamp((axis(up,down)+Number(Boolean(buttons[5]?.pressed))-Number(Boolean(buttons[4]?.pressed)))*.48+touch.throttle,-.48,.48);
-    if(f.hold?.nav&&(!f.battery||(f.ground&&!f.landed)||f.ended)) f.hold=null;
+    if(f.hold?.nav&&(!f.battery||(f.ground&&!f.landed)||f.ended)) stopNavigation(f);
     if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
       f.hold=null;
     }
@@ -1497,7 +1497,7 @@ function initialize(){
     else roll=f.bankCommand||0;
     if(f.hold){
       const manualThrottle=throttle;
-      if(Math.abs(roll)+Math.abs(pitch)+Math.abs(manual.rudder)+(!f.hold.climb?Math.abs(throttle):0)>.15) f.hold=null;
+      if(Math.abs(roll)+Math.abs(pitch)+Math.abs(manual.rudder)+(!f.hold.climb?Math.abs(throttle):0)>.15) stopNavigation(f);
       else {
         if(f.hold.nav) ({roll,pitch,throttle,brake:assistedBrake,rudder:assistedRudder}=navigationControls(f,activeTarget(f)));
         else{
@@ -1575,7 +1575,7 @@ function initialize(){
     if(f.ended) return '落地失敗'+retry;
     if(f.hold?.nav){
       const phase={route:'沿航線飛行',descent:'自動下降至進場定位點',final:'對正跑道並自動降落',rollout:'接地後自動煞停'}[f.hold.stage]||'準備接入航線';
-      return '自動導航 · '+phase;
+      return '自動導航 · '+phase+' · 油門 '+Math.round(f.power*100)+'%';
     }
     if(f.navMessage&&!f.ground) return f.navMessage;
     if(f.aircraft.maxMach&&flightSpeeds(f).mach>f.aircraft.maxMach) return '超速 · 請降低油門';

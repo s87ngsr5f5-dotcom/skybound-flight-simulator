@@ -463,36 +463,44 @@ function updateRegionalFlight(f,save=recordFlight){
   const target=f.taxi[f.taxiIndex];
   if(Math.hypot(f.x-target.x,f.z-target.z)<16){ f.taxiIndex++; if(f.taxiIndex===f.taxi.length) f.phase="takeoff"; }
 }
+function stopNavigation(f){
+  if(f.hold?.speedBrake) f.spoilers=false;
+  f.hold=null;
+}
 function navigationControls(f,target){
   const hold=f.hold, runway=f.destination;
   if(f.landed){
     hold.stage='rollout';
-    if(Math.hypot(f.vx,f.vz)<.8){f.parkingBrake=true;f.hold=null;}
+    if(Math.hypot(f.vx,f.vz)<.8){f.parkingBrake=true;stopNavigation(f);}
     return {roll:0,pitch:-.25,throttle:-.8,brake:true,
       rudder:limit(wrapAngle(runway.heading-f.heading)*2,-.4,.4)};
   }
   const frame=runwayCoordinates(f.x,f.z,runway);
   const distance=-frame.along-runway.length/2;
-  const approach=f.waypoint>=f.route.length-2;
-  if(approach&&!hold.finalDistance){
-    hold.finalDistance=limit((f.y-runway.elevation)/.046,12500,65000);
-  }
-  const finalDistance=hold.finalDistance??12500;
+  const approachLeg=f.waypoint>=f.route.length-2;
+  const finalDistance=hold.finalDistance??limit((hold.altitude-runway.elevation)/.046,12500,65000);
   const intercept=airportPoint(runway,-runway.length/2-finalDistance,0);
   const remaining=Math.hypot(f.x-intercept.x,f.z-intercept.z);
   const speeds=flightSpeeds(f);
+  const ias=speeds.ias*knotsPerMps;
+  hold.cruiseIAS??=limit(ias,f.aircraft.approach+65,320);
   const capture=distance>150&&distance<finalDistance+2500&&Math.abs(frame.cross)<850&&
     Math.abs(wrapAngle(runway.heading-f.heading))<.70;
-  if(approach&&capture) hold.stage='final';
-  else if(hold.stage!=='final') hold.stage=approach?'descent':'route';
+  const descentRange=Math.max(38000,(hold.altitude-runway.elevation)/.0524-finalDistance+28000);
+  if(approachLeg&&capture) hold.stage='final';
+  else if(hold.stage!=='final'&&hold.stage!=='descent'){
+    hold.stage=approachLeg&&remaining<descentRange?'descent':'route';
+  }
   const final=hold.stage==='final';
+  const approach=final||hold.stage==='descent';
+  if(approach) hold.finalDistance=finalDistance;
   if(final&&distance<200&&(Math.abs(frame.cross)>runway.width*.42||
-      f.y-runway.elevation-f.aircraft.gearHeight>42||speeds.ias*knotsPerMps>f.aircraft.approach+30)){
-    f.hold=null;
+      f.y-runway.elevation-f.aircraft.gearHeight>42||ias>f.aircraft.approach+30)){
+    stopNavigation(f);
     f.navMessage='進場未穩定 · 自動導航已退出，請加油門重飛';
     return {roll:0,pitch:.35,throttle:.7};
   }
-  if(approach){
+  if(approachLeg){
     if(remaining<4600) hold.interceptPassed=true;
     target=final?airportPoint(runway,frame.along+1800,0):
       hold.interceptPassed?airportPoint(runway,-runway.length/2-5200,0):intercept;
@@ -507,32 +515,56 @@ function navigationControls(f,target){
   const tas=Math.max(24,speeds.tas);
   const q=.5*1.225*Math.exp(-Math.max(0,f.y)/8500)*tas**2;
   let altitude=hold.altitude, feedForward=0;
-  let targetIAS=f.aircraft.approach+65;
+  let targetIAS=hold.cruiseIAS;
+  let terrainClearance=0;
+  if(!final){
+    const bearing=Math.atan2(dx,-dz);
+    const directionX=Math.sin(bearing),directionZ=-Math.cos(bearing);
+    const horizon=Math.min(15000,Math.hypot(dx,dz));
+    for(const fraction of [.12,.35,.62,1]){
+      const lookAhead=horizon*fraction;
+      terrainClearance=Math.max(terrainClearance,regionalHeight(f.x+directionX*lookAhead,f.z+directionZ*lookAhead)+300);
+    }
+    altitude=Math.max(altitude,terrainClearance);
+  }
   if(approach){
     const alongDistance=final?Math.max(0,distance+350):hold.interceptPassed?
       Math.max(5200,distance):finalDistance+remaining;
     const glide=runway.elevation+f.aircraft.gearHeight+alongDistance*.0524;
-    const lookAhead=Math.min(1400,Math.hypot(dx,dz));
-    const bearing=Math.atan2(dx,-dz);
-    const terrain=regionalHeight(f.x+Math.sin(bearing)*lookAhead,f.z-Math.cos(bearing)*lookAhead);
-    altitude=final?glide:Math.max(glide,terrain+220);
-    feedForward=-Math.min(6,speeds.gs*.0524);
-    targetIAS=final?f.aircraft.approach+5:f.aircraft.approach+Math.min(55,19+remaining/500);
+    altitude=final?glide:Math.max(Math.min(hold.altitude,glide),terrainClearance);
+    if(final||glide<altitude+1&&altitude<hold.altitude) feedForward=-Math.min(final?6:12,speeds.gs*.0524);
+    targetIAS=final?f.aircraft.approach+5:Math.min(hold.cruiseIAS,f.aircraft.approach+19+remaining/500);
     if(final){
       f.gear=true;
-      if(speeds.ias*knotsPerMps<f.aircraft.approach+31) f.flaps=2;
-      else if(speeds.ias*knotsPerMps<f.aircraft.approach+49) f.flaps=1;
+      if(ias<f.aircraft.approach+31) f.flaps=2;
+      else if(ias<f.aircraft.approach+49) f.flaps=1;
     }
   }
   const height=f.y-runway.elevation-f.aircraft.gearHeight;
+  if(hold.speedBrake&&(!approach||height<140||ias<targetIAS+12)){
+    f.spoilers=false;
+    hold.speedBrake=false;
+  }else if(approach&&f.aircraft.jet&&!f.spoilers&&height>220&&ias>targetIAS+26){
+    f.spoilers=true;
+    hold.speedBrake=true;
+  }
   const flare=final&&distance<0&&height<12;
-  const desiredVS=flare?-.75:limit(feedForward+(altitude-f.y)*(final?.29:.095),-8,6);
+  const desiredVS=flare?-.75:limit(feedForward+(altitude-f.y)*(final?.29:.095),final?-8:-13,6);
   const lift=flightMass(f)*(9.80665+limit((desiredVS-f.vy)*1.2,-4,4))/(q*f.aircraft.wingArea*Math.max(.72,Math.cos(f.bank)));
   const attitude=Math.atan2(f.vy,tas)+(lift-.27-f.aircraft.flapLift[f.flaps])/5.05-.036;
-  const power=flare?0:limit(.29+f.flaps*.065+(approach?-.06:0)+(targetIAS-speeds.ias*knotsPerMps)*.016,0,1);
+  // Keep usable thrust until the flare. Speed corrections should not put
+  // the throttle at zero during normal cruise, descent or final approach.
+  const minimumPower=approach?.12:.18;
+  const power=flare?0:limit(.29+f.flaps*.065+(approach?-.06:0)+(targetIAS-ias)*.016,minimumPower,1);
+  let throttle=limit((power-f.power)*2.6,-.8,.8);
+  if(!approach&&f.y>7000&&f.aircraft.cruiseMach){
+    hold.cruiseMach??=limit(speeds.mach,f.aircraft.cruiseMach-.03,f.aircraft.cruiseMach);
+    throttle=limit((hold.cruiseMach-speeds.mach)*8,-.30,.65);
+    throttle=Math.max(throttle,(minimumPower-f.power)*2.6);
+  }
   return {roll:limit(wrapAngle(heading-f.heading)*(final?3:2.4)-f.bank*.45,final?-.31:-.65,final?.31:.65),
     pitch:limit((attitude-.015-f.trim-f.flaps*.008)/.24,-.80,.82),
-    throttle:limit((power-f.power)*2.6,-.8,.8)};
+    throttle};
 }
 function rangeShot(f){
   const range=f.range;
