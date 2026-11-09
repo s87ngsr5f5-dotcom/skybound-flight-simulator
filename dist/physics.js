@@ -37,7 +37,7 @@ function flightSpeeds(f){
   return {tas,ias,mach,gs:Math.hypot(f.vx,f.vz)};
 }
 function cruiseMachTarget(f){
-  return f.fastCruise&&f.aircraft.id==='b773'?1.05:f.aircraft.cruiseMach;
+  return f.fastCruise&&f.aircraft.id==='b773'?1.165:f.aircraft.cruiseMach;
 }
 function cruiseControls(f){
   const air=atmosphere(f.y,f.temperatureOffset);
@@ -157,9 +157,9 @@ function stepTrainer(f, input, dt=simTick){
     if(f.fuel===0) running=0;
   }
   const fastJet=f.boost&&aircraft.role==='fighter'&&!f.gear&&!f.flaps;
-  const inletSpeed=fastCruise?510:fastJet?(aircraft.id==='sf16'?520:460):255+cruiseBlend*115;
+  const inletSpeed=fastCruise?560:fastJet?(aircraft.id==='sf16'?520:460):255+cruiseBlend*115;
   const available=aircraft.thrust?
-    (aircraft.thrust+(f.boost&&f.power>.89?aircraft.boostThrust||0:0))*Math.pow(rho/1.225,.75)/(1+Math.pow(speed/inletSpeed,2)):
+    (aircraft.thrust*(fastCruise?1.18:1)+(f.boost&&f.power>.89?aircraft.boostThrust||0:0))*Math.pow(rho/1.225,.75)/(1+Math.pow(speed/inletSpeed,2)):
     Math.min(2700*aircraft.power/119000,aircraft.power*.78/Math.max(18,forwardSpeed));
   const thrust=f.power*running*(f.propLow?.82:1)*available;
   const left=engines.slice(0,engines.length/2).filter(Boolean).length;

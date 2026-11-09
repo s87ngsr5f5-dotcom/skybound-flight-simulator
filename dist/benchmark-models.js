@@ -26,13 +26,13 @@ function buildBenchmarkAirframe(profile,scene){
     // Smooth radius transitions without changing the station dimensions.
     for(let i=0;i<stations.length-1;i++){
       const a=stations[i],b=stations[i+1];
-      for(let j=0;j<5;j++){
-        const t=j/5,e=t*t*(3-2*t);
+      for(let j=0;j<8;j++){
+        const t=j/8,e=t*t*(3-2*t);
         profile.push(new THREE.Vector2(a[1]+(b[1]-a[1])*e,a[0]+(b[0]-a[0])*t));
       }
     }
     profile.push(new THREE.Vector2(stations.at(-1)[1],stations.at(-1)[0]));
-    const geo=new THREE.LatheGeometry(profile,48);
+    const geo=new THREE.LatheGeometry(profile,80);
     geo.rotateX(Math.PI/2);geo.scale(1,vertical,1);
     return mesh(parent,geo,material);
   }
@@ -197,7 +197,7 @@ function buildBenchmarkAirframe(profile,scene){
     const chord=fighter?(profile.sideIntakes?2.85:4.4):half*.51;
     const root=-half*(fighter?.29:.24);
     const tip=root+sweep;
-    const wingVertices=[],wingIndices=[],sections=12,slices=24;
+    const wingVertices=[],wingIndices=[],sections=20,slices=32;
     for(let k=0;k<=sections;k++){
       const v=k/sections,rake=profile.rakedTip?Math.max(0,(v-.88)/.12):0;
       const c=chord*(1-.78*v)*(1-rake*.86),lead=root+sweep*v+rake*2.2;
@@ -243,7 +243,7 @@ function buildBenchmarkAirframe(profile,scene){
         const fan=mesh(engine,new THREE.CircleGeometry(size*.82,32),dark,0,0,-2.68);
         fan.rotation.y=Math.PI;
         const fanGroup=new THREE.Group();engine.add(fanGroup);fans.push(fanGroup);
-        const lip=mesh(engine,new THREE.TorusGeometry(size*.91,size*.065,10,40),metal,0,0,-2.72);
+        const lip=mesh(engine,new THREE.TorusGeometry(size*.91,size*.065,16,64),metal,0,0,-2.72);
         const spinner=mesh(fanGroup,new THREE.ConeGeometry(size*.22,size*.52,24),metal,0,0,-2.70);spinner.rotation.x=-Math.PI/2;
         const exhaust=mesh(engine,new THREE.CircleGeometry(size*.60,32),dark,0,0,1.81);
         for(let v=0;v<20;v++){
@@ -287,7 +287,7 @@ function buildBenchmarkAirframe(profile,scene){
     }
     for(let a=0;a<axles;a++){
       for(const offset of fighter?[0]:[-.29,.29]){
-        const wheel=mesh(gear,new THREE.CylinderGeometry(size,size,fighter?.21:.34,20),rubber,x+offset,-profile.gearHeight+size,z+(a-(axles-1)/2)*1.12);
+        const wheel=mesh(gear,new THREE.CylinderGeometry(size,size,fighter?.21:.34,40),rubber,x+offset,-profile.gearHeight+size,z+(a-(axles-1)/2)*1.12);
         wheel.rotation.z=Math.PI/2;wheels.push(wheel);
         for(const sign of [-1,1]){
           const hub=mesh(wheel,new THREE.CylinderGeometry(size*.52,size*.52,.025,16),metal,0,sign*(fighter?.115:.18),0);

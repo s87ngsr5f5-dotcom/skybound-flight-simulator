@@ -28,7 +28,14 @@ function initialize(){
   scene.add(ambient);
   const sunlight = new THREE.DirectionalLight(0xffead0,2.1);
   sunlight.position.set(-500,800,-360);
-  scene.add(sunlight);
+  const sunDirection=sunlight.position.clone();
+  scene.add(sunlight,sunlight.target);
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  sunlight.castShadow=true;
+  sunlight.shadow.mapSize.set(2048,2048);
+  Object.assign(sunlight.shadow.camera,{left:-460,right:460,top:460,bottom:-460,near:1,far:1800});
+  sunlight.shadow.camera.updateProjectionMatrix();
+  sunlight.shadow.normalBias=.18;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure=.97;
   const sky=document.createElement('canvas');sky.width=512;sky.height=256;
@@ -77,7 +84,7 @@ function initialize(){
   landTexture.colorSpace = THREE.SRGBColorSpace;
   landTexture.wrapS = landTexture.wrapT = THREE.RepeatWrapping;
   landTexture.repeat.set(18,45);
-  landTexture.anisotropy = Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  landTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const terrainMaterial=new THREE.MeshStandardMaterial({map:landTexture,roughness:1,vertexColors:true});
   const terrainChunks=new Map();
   const span=11520;
@@ -128,6 +135,7 @@ function initialize(){
         mesh.setAttribute('color',new THREE.Float32BufferAttribute(rgb,3));
         mesh.computeVertexNormals();
         const patch=new THREE.Mesh(mesh,terrainMaterial);
+        patch.receiveShadow=true;
         patch.position.set(px,0,pz);
         terrainChunks.set(key,patch);
         scene.add(patch);
@@ -149,7 +157,7 @@ function initialize(){
     ctx.fillStyle='#20282c16';for(let i=0;i<16;i++)ctx.fillRect(170+random()*160,random()*512,2,25+random()*70);
     const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
     texture.repeat.set(concreteSurface?3:2,concreteSurface?3:30);
-    texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return texture;
+    texture.anisotropy=renderer.capabilities.getMaxAnisotropy();return texture;
   }
   asphalt.map=pavementTexture(false);concrete.map=pavementTexture(true);
   asphalt.color.set('#d3d7d7');concrete.color.set('#d4d6d1');
@@ -319,23 +327,47 @@ function initialize(){
       group.add(instances);
     }
 
+    group.traverse(object=>{
+      if(object.isMesh&&object.material?.isMeshStandardMaterial){
+        object.receiveShadow=true;
+        object.castShadow=true;
+      }
+    });
   }
   const buildingGeo = new THREE.BoxGeometry();
-  const blocks = new THREE.InstancedMesh(buildingGeo,material('#ffffff'),2100);
-  const dummy = new THREE.Object3D();
-  for(let i=0;i<blocks.count;i++){
-    const a=airports[0], side=i%2===0 ? -1 : 1;
-    const x=a.x+side*(450+random()*5200), z=a.z+(random()-.5)*9500;
-    const width=12+random()*47, height=5+random()*26;
-    const {along,cross}=localRunway(x,z);
-    const nearRunway=Math.abs(along)<1660 && Math.abs(cross)<375;
-    dummy.position.set(x,nearRunway ? -80 : terrainHeight(x,z)+height/2,z);
-    if(terrainHeight(x,z)<.5) dummy.position.y=-80;
-    dummy.scale.set(width,height,width*(.5+random()));
-    dummy.updateMatrix();
-    blocks.setMatrixAt(i,dummy.matrix);
-    blocks.setColorAt(i,new THREE.Color().setHSL(.11+random()*.52,.09,.36+random()*.39));
+  const windows=document.createElement('canvas');
+  windows.width=windows.height=64;
+  const windowInk=windows.getContext('2d');
+  windowInk.fillStyle='#000';windowInk.fillRect(0,0,64,64);
+  for(let row=0;row<5;row++) for(let col=0;col<5;col++){
+    if((row*3+col*7)%5<2) continue;
+    windowInk.fillStyle=(row+col)%3===0?'#ebbf77':'#858b90';
+    windowInk.fillRect(3+col*12,3+row*12,6,5);
   }
+  const cityWindows=new THREE.CanvasTexture(windows);
+  cityWindows.colorSpace=THREE.SRGBColorSpace;
+  const cityWall=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.87,emissive:0xffdb9d,emissiveMap:cityWindows,emissiveIntensity:0});
+  const cityRoof=material('#777e82');
+  const blocks=new THREE.InstancedMesh(buildingGeo,[cityWall,cityWall,cityRoof,cityRoof,cityWall,cityWall],cityLiteVolumes.length);
+  blocks.name='Lightweight airport cities';
+  const dummy = new THREE.Object3D();
+  const cityTones=[0xa6a3a1,0xc9c2ad,0x9fa9af,0xada299,0x9dada7,0xc7c8c2,0xa3a7b0];
+  blocks.count=0;
+  for(const [lat,lon,width,depth,height,tone] of cityLiteVolumes){
+    const {x,z}=geoPoint(lat,lon),ground=renderedGround(x,z);
+    if(ground<.5||airports.some(a=>{
+      const reach=a.length/2+Math.max(width,depth)+220;
+      if(Math.abs(a.x-x)>reach||Math.abs(a.z-z)>reach) return false;
+      const {along,cross}=runwayCoordinates(x,z,a);
+      return Math.abs(along)<reach&&Math.abs(cross)<Math.abs(a.apron)+240;
+    })) continue;
+    dummy.position.set(x,ground+height/2,z);
+    dummy.scale.set(width,height,depth);
+    dummy.updateMatrix();
+    blocks.setMatrixAt(blocks.count,dummy.matrix);
+    blocks.setColorAt(blocks.count++,new THREE.Color(cityTones[tone]??cityTones[0]));
+  }
+  scene.add(blocks);
   function renderedGround(x,z){
     const step=240,cx=Math.floor(x/step)*step,cz=Math.floor(z/step)*step;
     const u=(x-cx)/step,v=(z-cz)/step;
@@ -348,12 +380,12 @@ function initialize(){
   scene.add(sceneryLayers);
   let detailedScenery, loadingScenery=false;
   function syncSceneryMode(){
-    const desktop=touchControls.mode.value==='desktop';
-    sceneryLayers.visible=desktop;
-    if(!desktop||loadingScenery) return;
+    const detailed=touchControls.mode.value==='desktop'||byId('quality').value==='ultra';
+    sceneryLayers.visible=detailed;
+    if(!detailed||loadingScenery) return;
     loadingScenery=true;
-    const assets=['taipei-data.js','taipei-visuals.js','forest-cover.js?v=1',
-      'vegetation.js?v=3','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=2'];
+    const assets=['taipei-data.js','taipei-visuals.js?v=ultra11','forest-cover.js?v=1',
+      'vegetation.js?v=ultra11','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=ultra11'];
     Promise.all(assets.map(src=>new Promise((resolve,reject)=>{
       const script=document.createElement('script');
       script.src=src;
@@ -439,6 +471,7 @@ function initialize(){
   function aircraftModel(profile){
     if(models.has(profile.id)) return models.get(profile.id);
     const model=profile.role?buildBenchmarkAirframe(profile,scene):makeAircraft(profile,fleet.indexOf(profile));
+    model.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
     if(profile.id==='sa380'||profile.id==='b773'){
       airlinerDetails[profile.id]=refineAirliner(model,{twin:profile.id==='b773'});
     }
@@ -896,13 +929,13 @@ function initialize(){
     const day=clamp((elevation+.13)/.53,0,1);
     const weather=byId('weather').value;
     const wet=weather==='wet';
-    const strength=weather==='fog'?.42:wet?.62:1;
+    const strength=weather==='fog'?.42:wet?.62:weather==='clouds'?.85:1;
     const warmth=clamp(1-Math.min(Math.abs(hour-6),Math.abs(hour-18))/1.45,0,1);
     sunlight.intensity=.05+day*2.3*strength;
     sunlight.color.set('#fff0d9').lerp(new THREE.Color('#ffad71'),warmth);
     ambient.intensity=.16+day*1.14*(weather==='fog'?.83:1);
-    sunlight.position.set(Math.cos(angle)*760,elevation*820,-280);
-    atmosphericSky.setWeather(hour,day,weather,sunlight.position);
+    sunDirection.set(Math.cos(angle)*760,elevation*820,-280);
+    atmosphericSky.setWeather(hour,day,weather,sunDirection);
     scene.background.set('#132740').lerp(new THREE.Color(weather==='fog'?'#c5ced1':wet?'#aabac5':'#b2ccdc'),day);
     scene.fog.color.copy(scene.background);
     scene.fog.density=weather==='fog'?.00064:wet?.000065:.000034;
@@ -1098,7 +1131,7 @@ function initialize(){
     }
     if(f.aircraft.jet){
       entries.push(['擾流板',()=>f.spoilers,()=>f.spoilers=!f.spoilers]);
-      if(f.aircraft.id==='b773') entries.push(['高速遊戲 · 600 kt TAS',()=>Boolean(f.fastCruise),()=>{
+      if(f.aircraft.id==='b773') entries.push(['高速遊戲 · 670 kt TAS',()=>Boolean(f.fastCruise),()=>{
         f.fastCruise=!f.fastCruise;
         if(f.hold?.mach) f.hold.mach=cruiseMachTarget(f);
       }]);
@@ -1194,7 +1227,7 @@ function initialize(){
       const savesMission=Boolean(regionalContracts[lesson]||lesson==='climbLesson'||lesson==='naritaCargo'||
         (lesson==='benchmark'&&['fighter','cargo'].includes(selectedAircraft().role)||lesson==='range'));
       const replacedId=restart?flight?.checkpointId:undefined;
-      const wind=lesson==='crosswind'?5.144:['fog','wet'].includes(weather)?0:Number(weather);
+      const wind=lesson==='crosswind'?5.144:['fog','wet','clouds'].includes(weather)?0:Number(weather);
       replay=null;replayControls.hidden=true;
       if(lesson==='tactical'){
         if(approach) throw new Error('請按「開始飛行」載入戰術任務。');
@@ -1472,10 +1505,27 @@ function initialize(){
   try{savedQuality=localStorage.getItem('skybound-quality');}catch{}
   qualitySelect.value=savedQuality||defaultQuality;
   if(!qualitySelect.value)qualitySelect.value=defaultQuality;
-  qualitySelect.onchange=()=>{try{localStorage.setItem('skybound-quality',qualitySelect.value);}catch{}resize();};
+  const flightQuality=byId('flightQuality');
+  flightQuality.replaceChildren(...Array.from(qualitySelect.options,option=>option.cloneNode(true)));
+  flightQuality.value=qualitySelect.value;
+  qualitySelect.onchange=()=>{
+    flightQuality.value=qualitySelect.value;
+    try{localStorage.setItem('skybound-quality',qualitySelect.value);}catch{}
+    resize();
+    syncSceneryMode();
+  };
+  flightQuality.onchange=()=>{
+    qualitySelect.value=flightQuality.value;
+    qualitySelect.onchange();
+  };
   function resize(){
-    const scale={low:.6,balanced:1,high:1.75}[qualitySelect.value]||.85;
-    renderer.setPixelRatio(Math.min(devicePixelRatio,scale,touchControls.mode.value==='mobile'?1:Infinity));
+    const ultra=qualitySelect.value==='ultra';
+    const scale={low:.6,balanced:1,high:1.75}[qualitySelect.value]||1;
+    const mobile=touchControls.mode.value==='mobile';
+    const ratio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(innerWidth*innerHeight))):
+      Math.min(devicePixelRatio,scale,mobile?1:Infinity);
+    renderer.setPixelRatio(ratio);
+    renderer.shadowMap.enabled=ultra;
     renderer.setSize(innerWidth,innerHeight);
     camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
   }
@@ -1592,13 +1642,13 @@ function initialize(){
       return '自動導航 · '+phase+' · 油門 '+Math.round(f.power*100)+'%';
     }
     if(f.navMessage&&!f.ground) return f.navMessage;
-    const machLimit=f.fastCruise&&f.y>5000&&!f.gear&&!f.flaps?1.10:f.aircraft.maxMach;
+    const machLimit=f.fastCruise&&f.y>5000&&!f.gear&&!f.flaps?1.22:f.aircraft.maxMach;
     if(machLimit&&flightSpeeds(f).mach>machLimit) return '超速 · 請降低油門';
     if(f.range&&!f.range.hit&&!f.ground){
       const d=Math.hypot(f.range.x-f.x,f.range.z-f.z);
       return (f.range.message||'對準橘色地面靶，距離 250–2600 m '+(mobile?'點「訓練射擊」':'按 M'))+' · '+Math.round(d)+' m · '+f.range.rounds+' 發';
     }
-    if(f.cruiseTrial) return (f.fastCruise?'777 高速遊戲 · 600 kt TAS':'777 寫實巡航')+' · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
+    if(f.cruiseTrial) return (f.fastCruise?'777 高速遊戲 · 670 kt TAS':'777 寫實巡航')+' · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
     if(!f.regional){
       if(f.landed) return '已接地 · 收油並煞車'+retry;
       if(f.ground) return knots>=51?(mobile?'向上拖搖桿拉升':'按 ↑ 拉升'):(mobile?'長按油門 ＋':'按住 W')+' 加速至約 51 KTS';
@@ -1714,7 +1764,7 @@ function initialize(){
   });
   const jetwayShadow=groundShadow(ink=>ink.fillRect(28,6,72,116));
   function placeGroundShadow(mesh,x,z,y,heading,width,length,height){
-    const light=sunlight.position;
+    const light=sunDirection;
     const projection=height/Math.max(230,light.y);
     mesh.position.set(x-light.x*projection,y+.16,z-light.z*projection);
     mesh.rotation.set(-Math.PI/2,0,-heading);
@@ -1774,7 +1824,7 @@ function initialize(){
     const profile=flight?.aircraft||selectedAircraft();
     const model=aircraftModel(profile);
     const livery=hangarLiveries[profile.id]||!flight&&byId('liveryPreview').checked;
-    updateDownloadedAircraft(model,profile,flight,livery);
+    updateDownloadedAircraft(model,profile,flight,livery,renderer.capabilities.getMaxAnisotropy());
     model.userData.setLivery?.(livery);
     for(const other of models.values()){
       other.visible=other===model&&(!flight||cameraMode===0)&&!flight?.cabinView;
@@ -2083,9 +2133,14 @@ function initialize(){
     }
     const viewerX=flight?.x??selectedAirport('departure').x;
     const viewerZ=flight?.z??selectedAirport('departure').z;
+    blocks.visible=!(detailedScenery&&sceneryLayers.visible);
+    cityWall.emissiveIntensity=(1-activeDay)*.85;
+    sunlight.target.position.set(viewerX,model.position.y,viewerZ);
+    sunlight.position.copy(sunlight.target.position).add(sunDirection);
+    if(renderer.shadowMap.enabled&&activeDay>.18) aircraftShadow.visible=false;
     if(detailedScenery&&sceneryLayers.visible){
       detailedScenery.plants.update(camera.position.x,camera.position.z,qualitySelect.value);
-      detailedScenery.region.update(camera.position.x,camera.position.z,qualitySelect.value,dt);
+      detailedScenery.region.update(camera.position.x,camera.position.z,qualitySelect.value,dt,activeDay);
       detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',paused||Boolean(replay),qualitySelect.value);
     }
     airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:byId('inspect').value==='night'?0:1);
@@ -2101,7 +2156,7 @@ function initialize(){
       const canvas=renderer.domElement;
       const width=Math.min(canvas.width,canvas.height*1.76);
       const height=width/1.76;
-      hangarPreview.drawImage(canvas,(canvas.width-width)/2,(canvas.height-height)/2,width,height,0,0,352,200);
+      hangarPreview.drawImage(canvas,(canvas.width-width)/2,(canvas.height-height)/2,width,height,0,0,hangarPreview.canvas.width,hangarPreview.canvas.height);
     }
   }
   let tacticalSelection='radar';

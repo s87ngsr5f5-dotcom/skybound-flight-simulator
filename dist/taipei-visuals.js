@@ -179,7 +179,7 @@ function buildTaipeiVisuals(scene,terrain){
   function update(dt,x,z,day,wet,paused,quality="balanced"){
     root.visible=Math.hypot(x,z)<26000;
     if(!root.visible)return;
-    const range=quality==='low'?6500:quality==='high'?19000:12000;
+    const range=quality==='ultra'?25500:quality==='low'?6500:quality==='high'?19000:12000;
     for(const tile of tiles)tile.visible=Math.hypot(x-tile.userData.center.x,z-tile.userData.center.z)<range+tile.userData.radius;
     facades.forEach(mat=>mat.emissiveIntensity=day<.2?.8:.03);
     roadMat.roughness=wet?.25:.92;roadMat.metalness=wet?.26:.04;

@@ -132,7 +132,7 @@ function buildVegetation(scene,ground,airports,map,cover,highways){
     if(last===id) return;
     last=id;
     for(const mesh of [trunks,crowns,branches,distant]) mesh.count=0;
-    const [near,mid,far]=quality==='low'?[215,930,2900]:quality==='high'?[450,1500,5300]:[320,1200,4200];
+    const [near,mid,far]=quality==='ultra'?[680,2200,7300]:quality==='low'?[215,930,2900]:quality==='high'?[450,1500,5300]:[320,1200,4200];
     const centerX=(col+.5)*spacing,centerZ=(row+.5)*spacing;
     for(const [grid,inner,outer,detail] of [[10,0,near,2],[23,near,mid,1],[54,mid,far,0]]){
       for(let iz=Math.floor((centerZ-outer)/grid);iz*grid<centerZ+outer;iz++){

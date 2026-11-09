@@ -61,9 +61,19 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
   for(let row=0;row<6;row++) for(let col=0;col<5;col++) ctx.fillRect(4+col*18,4+row*15,9,7);
   const facadeTexture=new THREE.CanvasTexture(facade);
   facadeTexture.colorSpace=THREE.SRGBColorSpace;
-  const wall=new THREE.MeshStandardMaterial({color:0xffffff,map:facadeTexture,roughness:.88});
+  const litWindows=document.createElement('canvas');litWindows.width=litWindows.height=96;
+  const ink=litWindows.getContext('2d');
+  ink.fillStyle='#000';ink.fillRect(0,0,96,96);
+  for(let row=0;row<6;row++) for(let col=0;col<5;col++){
+    if((row*3+col*7)%7<2) continue;
+    ink.fillStyle=(row+col)%3===0?'#e3bd83':'#7b8a96';
+    ink.fillRect(4+col*18,4+row*15,9,7);
+  }
+  const windowLights=new THREE.CanvasTexture(litWindows);
+  windowLights.colorSpace=THREE.SRGBColorSpace;
+  const wall=new THREE.MeshStandardMaterial({color:0xffffff,map:facadeTexture,roughness:.88,emissive:0xffe0ac,emissiveMap:windowLights,emissiveIntensity:0});
   const roof=new THREE.MeshStandardMaterial({color:0xb6b4a9,roughness:.95});
-  const buildings=new THREE.InstancedMesh(new THREE.BoxGeometry(),[wall,wall,roof,roof,wall,wall],40000);
+  const buildings=new THREE.InstancedMesh(new THREE.BoxGeometry(),[wall,wall,roof,roof,wall,wall],65000);
   buildings.name='Regional city volumes';
   buildings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   buildings.count=0;
@@ -133,12 +143,13 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
     mesh.geometry.dispose();
     mesh.geometry=geometry;
   }
-  function update(x,z,quality,dt){
+  function update(x,z,quality,dt,daylight=1){
+    wall.emissiveIntensity=(1-daylight)*.85;
     updateTraffic(x,z,dt,quality);
     const col=Math.floor(x/tileSize),row=Math.floor(z/tileSize),key=tileKey(col,row)+':'+quality;
     if(last===key) return;
     last=key;
-    const reach=quality==='low'?4:quality==='high'?8:6;
+    const reach=quality==='ultra'?11:quality==='low'?4:quality==='high'?8:6;
     const positions=[],marks=[];
     buildings.count=0;
     for(let j=row-reach;j<=row+reach;j++){
@@ -174,7 +185,7 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
         }
         if(Math.abs(i-col)>reach-1||Math.abs(j-row)>reach-1) continue;
         const distance=Math.max(Math.abs(i-col),Math.abs(j-row));
-        const stride=distance<=2?1:quality==='high'?2:3;
+        const stride=distance<=(quality==='ultra'?5:2)?1:quality==='high'||quality==='ultra'?2:3;
         for(let index=0;index<tile.buildings.length;index+=stride){
           const b=tile.buildings[index];
           if(buildings.count>=buildings.instanceMatrix.count) break;

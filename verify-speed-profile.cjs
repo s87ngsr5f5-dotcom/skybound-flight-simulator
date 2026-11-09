@@ -27,5 +27,5 @@ for(const [mode,fast] of [['realistic',false],['fast',true],['autonav-fast',true
  const {tas,gs,mach}=flightSpeeds(f),nmi=Math.hypot(f.x-start.x,f.z-start.z)/1852;
  console.log({mode,tas:tas*knotsPerMps,gs:gs*knotsPerMps,mach,nmi});
  assert(Math.abs(gs*knotsPerMps-tas*knotsPerMps)<1);
- assert(fast?tas*knotsPerMps>595&&nmi>37:tas*knotsPerMps<500&&nmi>29);
+ assert(fast?tas*knotsPerMps>655&&nmi>39:tas*knotsPerMps<500&&nmi>29);
 }
