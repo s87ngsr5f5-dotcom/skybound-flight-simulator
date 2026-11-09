@@ -150,23 +150,50 @@ function requestRunwayTow(f){
   f.hold=null;
   return true;
 }
+function arrivalTowReady(f){
+  return Boolean(f.service&&f.arrivalTaxi&&f.ground&&f.landed&&!f.ended&&!f.finished&&!f.tow&&!f.awaitingService&&
+    Math.hypot(f.vx,f.vz)<1.2);
+}
+function requestGateTow(f){
+  if(!arrivalTowReady(f)) return false;
+  const airport=f.destination;
+  const {along,cross}=runwayCoordinates(f.x,f.z,airport);
+  const exit=limit(Math.max(440,along+100),-airport.length/2+100,airport.length/2-90);
+  const onRunway=Math.abs(cross)<airport.width/2+10;
+  f.tow={index:0,arrival:true,points:[
+    ...(onRunway?[airportPoint(airport,exit,0)]:[]),
+    airportPoint(airport,onRunway?exit:limit(along,-airport.length/2+100,airport.length/2-90),airport.apron),
+    parkingPoint(airport)
+  ]};
+  f.parkingBrake=true;
+  f.power=0;
+  stopNavigation(f);
+  return true;
+}
 function finishRunwayTow(f){
   if(!f.tow) return false;
+  const arrival=Boolean(f.tow.arrival),airport=arrival?f.destination:f.departure;
   const target=f.tow.points[f.tow.points.length-1];
   f.x=target.x;f.z=target.z;
-  f.y=f.departure.elevation+f.aircraft.gearHeight;
-  f.heading=f.departure.heading;
+  f.y=airport.elevation+f.aircraft.gearHeight;
+  f.heading=arrival?wrapAngle(airport.heading+Math.PI):airport.heading;
   f.vx=f.vy=f.vz=f.vs=f.speed=0;
   f.pitch=f.bank=f.pitchRate=f.bankRate=f.yawRate=0;
   f.tow=null;
   f.parkingBrake=true;
+  if(arrival){
+    f.phase='arrival';
+    f.taxiIndex=f.arrivalTaxi.length-1;
+    f.awaitingService=true;
+    return true;
+  }
   f.taxiIndex=f.taxi.length;
   f.start='runway';f.phase='takeoff';
   if(f.service){f.service.pushed=true;f.service.pushing=0;}
   return true;
 }
 function stepRunwayTow(f,dt){
-  const tow=f.tow,airport=f.departure;
+  const tow=f.tow,airport=tow.arrival?f.destination:f.departure;
   f.parkingBrake=true;
   const target=tow.points[tow.index];
   const dx=target.x-f.x,dz=target.z-f.z;
@@ -354,7 +381,7 @@ function makeCruiseTrial(departure,destination,aircraft,tailwind,fast=false){
   const along=distance=>({x:departure.x+distance*Math.sin(heading),z:departure.z-distance*Math.cos(heading)});
   const route=[{...along(350000),name:'巡航驗證終點'}];
   const flight=makeRegionalFlight(departure,destination,aircraft,'air',0,route);
-  flight.fastCruise=fast&&aircraft.id==='b773';
+  flight.fastCruise=fast;
   const air=atmosphere(altitude);
   const tas=(flight.fastCruise?cruiseMachTarget(flight):.80)*air.sound;
   const wind=tailwind/knotsPerMps;
@@ -487,7 +514,8 @@ function navigationControls(f,target){
   hold.cruiseIAS??=limit(ias,f.aircraft.approach+65,320);
   const capture=distance>150&&distance<finalDistance+2500&&Math.abs(frame.cross)<850&&
     Math.abs(wrapAngle(runway.heading-f.heading))<.70;
-  const descentRange=Math.max(38000,(hold.altitude-runway.elevation)/.0524-finalDistance+28000);
+  const descentRange=Math.max(38000,(hold.altitude-runway.elevation)/.0524-finalDistance+28000)
+    +(f.fastCruise?Math.max(0,speeds.gs-250)*650:0);
   if(approachLeg&&capture) hold.stage='final';
   else if(hold.stage!=='final'&&hold.stage!=='descent'){
     hold.stage=approachLeg&&remaining<descentRange?'descent':'route';
@@ -558,7 +586,7 @@ function navigationControls(f,target){
   const minimumPower=approach?.12:.18;
   const power=flare?0:limit(.29+f.flaps*.065+(approach?-.06:0)+(targetIAS-ias)*.016,minimumPower,1);
   let throttle=limit((power-f.power)*2.6,-.8,.8);
-  if(!approach&&f.y>7000&&f.aircraft.cruiseMach){
+  if(!approach&&f.y>7000&&(f.aircraft.cruiseMach||f.fastCruise)){
     throttle=limit((cruiseMachTarget(f)-speeds.mach)*8,-.30,.65);
     throttle=Math.max(throttle,(minimumPower-f.power)*2.6);
   }
@@ -579,7 +607,7 @@ function rangeShot(f){
   return range.hit;
 }
 function activeTarget(f){
-  if(f.tow) return {...f.tow.points[f.tow.index],name:'拖車牽引至跑道'};
+  if(f.tow) return {...f.tow.points[f.tow.index],name:f.tow.arrival?'拖車牽引至停機位':'拖車牽引至跑道'};
   if(f.phase==='arrival') return f.arrivalTaxi[f.taxiIndex];
   if(f.phase==='taxi'||f.phase==='cold') return f.taxi[f.taxiIndex];
   return f.route[f.waypoint];

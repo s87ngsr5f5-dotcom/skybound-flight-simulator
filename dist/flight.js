@@ -813,7 +813,6 @@ function initialize(){
     const isClimb=byId('lesson').value==='climbLesson';
     const isCruise=isClimb||byId('lesson').value==='cruiseTrial';
     byId('cruiseWeather').hidden=!isCruise;
-    byId('speedProfileField').hidden=!isCruise&&selectedAircraft().id!=='b773';
     byId('voyageOptions').hidden=!isVoyage;
     const model=selectedAircraft();
     byId('aircraftInfo').textContent=model.type+' · 起飛 '+model.rotation+' KTS · 進場 '+model.approach+' KTS'+(model.sideCargo?' · 側門貨運 · 高雄至桃園':model.role?' · '+benchmarkMissions[model.role].label:'');
@@ -837,7 +836,7 @@ function initialize(){
       if(isCruise){
         departure=airports.find(a=>a.code==='RCTP');
         destination=airports.find(a=>a.code==='RCKH');
-        const profile=fleet.find(a=>a.id==='b773');
+        const profile=isClimb?fleet.find(a=>a.id==='b773'):model;
         const wind=Number(byId('cruiseWind').value);
         route=isClimb?makeClimbLesson(departure,profile,wind).route:makeCruiseTrial(departure,destination,profile,wind).route;
         if(isClimb) destination=departure;
@@ -958,18 +957,19 @@ function initialize(){
   }
   addEventListener('pagehide',()=>saveCurrentMission(flight));
   function callRunwayTow(f,skip=false){
-    if(!paused&&!replay&&(f.tow?skip:requestRunwayTow(f))){
+    if(!paused&&!replay&&(f.tow?skip:f.landed?requestGateTow(f):requestRunwayTow(f))){
       f.towMessage='';
       if(skip) finishRunwayTow(f);
       if(f.cabinView){f.cabinView=false;changeView();}
       if(skip) saveCurrentMission(f);
       return;
     }
-    if(!f.tow) f.towMessage='請在出發機場停住、收油，並關門收空橋；載客航班須完成登機及加油。';
+    if(!f.tow) f.towMessage=f.landed?'載客航班請先煞停，再呼叫拖車。':'請在出發機場停住、收油，並關門收空橋；載客航班須完成登機及加油。';
   }
   byId('skipRunwayTow').onclick=byId('gateSkipTow').onclick=()=>{
     if(flight) callRunwayTow(flight,true);
   };
+  byId('startGateTow').onclick=()=>{if(flight) callRunwayTow(flight);};
   function addPassengerSystems(f,entries){
     const service=f.service;
     const atGate=()=>!f.finished&&groundServiceAllowed(f)&&!service.pushing&&(!service.pushed||f.awaitingService);
@@ -1073,7 +1073,7 @@ function initialize(){
   function drawGateGuide(f){
     const service=f.service;
     const guide=byId('gateGuide');
-    guide.hidden=f.finished||!f.ground||service.pushing>0||Boolean(f.tow)||service.pushed&&!f.awaitingService;
+    guide.hidden=f.finished||!f.ground||service.pushing>0||Boolean(f.tow)||(f.landed||service.pushed)&&!f.awaitingService;
     if(guide.hidden) return;
     const arriving=f.awaitingService;
     const complete=arriving?service.delivered===f.passengers:service.boarded===f.passengers;
@@ -1131,11 +1131,11 @@ function initialize(){
     }
     if(f.aircraft.jet){
       entries.push(['擾流板',()=>f.spoilers,()=>f.spoilers=!f.spoilers]);
-      if(f.aircraft.id==='b773') entries.push(['高速遊戲 · 670 kt TAS',()=>Boolean(f.fastCruise),()=>{
+      entries.push(['高速遊戲 · 1,000 kt TAS',()=>Boolean(f.fastCruise),()=>{
         f.fastCruise=!f.fastCruise;
         if(f.hold?.mach) f.hold.mach=cruiseMachTarget(f);
       }]);
-      if(f.aircraft.cruiseMach) entries.push(['爬升／巡航 35,000 ft',()=>Boolean(f.hold?.climb),()=>{
+      entries.push(['爬升／巡航 35,000 ft',()=>Boolean(f.hold?.climb),()=>{
         if(f.hold?.climb){f.hold=null;return;}
         if(climbReady(f)){
           f.hold={heading:f.heading,altitude:35000*.3048,mach:cruiseMachTarget(f),climb:true};
@@ -1263,8 +1263,7 @@ function initialize(){
         flight=makeClimbLesson(airports.find(a=>a.code==='RCTP'),profile,Number(byId('cruiseWind').value));
       }else if(lesson==='cruiseTrial'){
         if(approach) throw new Error('請按開始飛行進入巡航驗證。');
-        const profile=fleet.find(a=>a.id==='b773');
-        byId('aircraft').value=profile.id;
+        const profile=selectedAircraft();
         flight=makeCruiseTrial(airports.find(a=>a.code==='RCTP'),airports.find(a=>a.code==='RCKH'),profile,Number(byId('cruiseWind').value),byId('speedProfile').value==='fast');
       }else if(lesson==='naritaCargo'){
         if(approach) byId('voyageNode').value='approach';
@@ -1324,7 +1323,7 @@ function initialize(){
         flight.fuel=aircraft.missionFuel??(aircraft.role==='fighter'?2700:aircraft.jet?18000:Math.round(aircraft.mass*.10));
         flight.fuelStart=flight.fuel;
       }
-      flight.fastCruise=flight.aircraft.id==='b773'&&byId('speedProfile').value==='fast';
+      flight.fastCruise=byId('speedProfile').value==='fast';
       beginFlight();
       if(savesMission){
         flight.checkpointId=crypto.randomUUID();
@@ -1466,7 +1465,6 @@ function initialize(){
   byId('resetLook').onclick=()=>action('Home');
   byId('fly').onclick=()=>{byId('fly').blur();start(false);};
   byId('quickFastCruise').onclick=()=>{
-    byId('aircraft').value='b773';
     byId('lesson').value='cruiseTrial';
     byId('speedProfile').value='fast';
     byId('cruiseWind').value='0';
@@ -1604,9 +1602,9 @@ function initialize(){
     const retry=mobile?'':' · R 重飛';
     if(replay) return '貨運回放 · '+Math.floor(replay.time/60)+' 分鐘 · '+f.phase;
     if(paused) return touchControls.mode.value==='mobile'?'已暫停 · 點「繼續」':'已暫停 · P 繼續';
-    if(f.tow) return '拖車牽引中 · 對正跑道後自動停住';
+    if(f.tow) return f.tow.arrival?'拖車牽引中 · 停妥後接空橋下客':'拖車牽引中 · 對正跑道後自動停住';
     if(f.ground&&f.towMessage) return f.towMessage;
-    if(f.ground&&f.start==='runway'&&f.parkingBrake&&f.taxiIndex>=f.taxi.length) return mobile?
+    if(f.ground&&!f.landed&&f.start==='runway'&&f.parkingBrake&&f.taxiIndex>=f.taxi.length) return mobile?
       '已對正跑道 · '+(!f.battery?'開電瓶':f.engines.every(Boolean)?'鬆開停機煞車':'啟動引擎'):
       '已對正跑道 · 啟動引擎後按 B 鬆開煞車';
     if(f.checkpointFailed&&!f.finished) return '任務存檔未更新 · 請檢查瀏覽器儲存空間或其他分頁';
@@ -1642,13 +1640,13 @@ function initialize(){
       return '自動導航 · '+phase+' · 油門 '+Math.round(f.power*100)+'%';
     }
     if(f.navMessage&&!f.ground) return f.navMessage;
-    const machLimit=f.fastCruise&&f.y>5000&&!f.gear&&!f.flaps?1.22:f.aircraft.maxMach;
+    const machLimit=fastCruiseActive(f)?cruiseMachTarget(f)+.07:f.aircraft.maxMach;
     if(machLimit&&flightSpeeds(f).mach>machLimit) return '超速 · 請降低油門';
     if(f.range&&!f.range.hit&&!f.ground){
       const d=Math.hypot(f.range.x-f.x,f.range.z-f.z);
       return (f.range.message||'對準橘色地面靶，距離 250–2600 m '+(mobile?'點「訓練射擊」':'按 M'))+' · '+Math.round(d)+' m · '+f.range.rounds+' 發';
     }
-    if(f.cruiseTrial) return (f.fastCruise?'777 高速遊戲 · 670 kt TAS':'777 寫實巡航')+' · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
+    if(f.cruiseTrial) return (f.fastCruise?'高速遊戲 · 1,000 kt TAS':'寫實巡航')+' · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
     if(!f.regional){
       if(f.landed) return '已接地 · 收油並煞車'+retry;
       if(f.ground) return knots>=51?(mobile?'向上拖搖桿拉升':'按 ↑ 拉升'):(mobile?'長按油門 ＋':'按住 W')+' 加速至約 51 KTS';
@@ -1657,6 +1655,7 @@ function initialize(){
     if(f.service){
       const service=f.service;
       if(f.awaitingService) return service.delivered===f.passengers?'下機完成 · 關艙門並收回空橋':'關閉引擎 · 接空橋、開艙門讓旅客下機';
+      if(f.landed) return arrivalTowReady(f)?'已停穩 · 可請拖車拖到機位':'已接地 · 煞停後可請拖車';
       if(!service.pushed) return service.pushing?'地勤推離中':service.boarded===f.passengers&&f.fuel>=service.targetFuel?
         '關艙門、收空橋，再按「拖車牽引至跑道」':'停妥後接空橋並開艙門，同時加油';
     }
@@ -1703,7 +1702,7 @@ function initialize(){
         if(!f.battery) label='';
       }else if(f.ground&&f.mission==='cargo'&&(f.awaitingService||f.noseDoor||f.sideDoor||!f.pallets.some(Boolean))){
         label='貨運操作';run=()=>setMobilePanel('systems');
-      }else if(f.ground&&!f.awaitingService){
+      }else if(f.ground&&!f.awaitingService&&!(f.landed&&f.service)){
         if(!f.battery){label='開電瓶';run=()=>{f.battery=true;};}
         else if(!f.engines.every(Boolean)){
           const engine=f.engines.findIndex(running=>!running);
@@ -2054,7 +2053,12 @@ function initialize(){
       const statusBox=byId('status');
       statusBox.hidden=Boolean(f.tactical&&!paused)||!byId('gateGuide').hidden&&!paused&&!f.towMessage;
       statusBox.textContent=status(f,knots,target);
-      byId('towControls').hidden=!f.tow;
+      const readyToTowIn=arrivalTowReady(f);
+      byId('towControls').hidden=!f.tow&&!readyToTowIn;
+      byId('startGateTow').hidden=!readyToTowIn;
+      byId('startGateTow').disabled=paused||Boolean(replay);
+      const skipTowLabel=f.tow?.arrival||readyToTowIn?'跳至機位':'跳至跑道';
+      if(byId('skipRunwayTow').textContent!==skipTowLabel) byId('skipRunwayTow').textContent=skipTowLabel;
       byId('skipRunwayTow').disabled=paused||Boolean(replay);
       drawFlightNext(f);
       if(now>=nextNavDraw){drawNav(f,target);nextNavDraw=now+100;}

@@ -9,8 +9,10 @@ assert(!startEngine(cold,0));
 cold.battery=true;
 assert(startEngine(cold,0)&&startEngine(cold,1));
 assert.equal(cold.power,.68);
-for(const [mode,fast] of [['realistic',false],['fast',true],['autonav-fast',true]]){
- const f=makeCruiseTrial(from,to,plane,0);
+const trials=[[plane,'realistic',false],[plane,'autonav-fast',true],
+  ...fleet.map(aircraft=>[aircraft,'fast',true])];
+for(const [aircraft,mode,fast] of trials){
+ const f=makeCruiseTrial(from,to,aircraft,0);
  f.fastCruise=fast;
  f.hold.mach=cruiseMachTarget(f);
  if(mode==='autonav-fast'){
@@ -25,7 +27,7 @@ for(const [mode,fast] of [['realistic',false],['fast',true],['autonav-fast',true
   if(mode==='autonav-fast') updateRegionalFlight(f,()=>true);
  }
  const {tas,gs,mach}=flightSpeeds(f),nmi=Math.hypot(f.x-start.x,f.z-start.z)/1852;
- console.log({mode,tas:tas*knotsPerMps,gs:gs*knotsPerMps,mach,nmi});
+ console.log({aircraft:aircraft.id,mode,tas:tas*knotsPerMps,gs:gs*knotsPerMps,mach,nmi});
  assert(Math.abs(gs*knotsPerMps-tas*knotsPerMps)<1);
- assert(fast?tas*knotsPerMps>655&&nmi>39:tas*knotsPerMps<500&&nmi>29);
+ assert(fast?Math.abs(tas*knotsPerMps-1000)<20&&nmi>58:tas*knotsPerMps<500&&nmi>29);
 }

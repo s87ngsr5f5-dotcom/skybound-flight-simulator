@@ -2,7 +2,7 @@
 
 這是靜態 HTML、JavaScript、Three.js 網頁。原始碼及素材在 dist，不需要 npm 建置。可以執行 python -m http.server 8765 --directory dist 預覽。電腦入口是 dist/index.html，手機入口是 dist/iphone.html。改到共用的腳本或樣式時，請同步兩個入口的載入版本。
 
-請保留手機觸控及階段指示、跳過拖車、旅客及燃油存檔、可接管的自動導航與降落、寫實巡航及約 670 kt TAS 的高速遊戲模式、極致畫質、雲上視角、夜空及城市燈光。六架 SB 系列已移出機庫，後續飛機以現有 777-300ER 為建模品質基準。素材來源與授權見 dist/models/SOURCES.txt 和 dist/VISUALS.txt。
+請保留手機觸控及階段指示、跳過拖車、降落後拖往機位、旅客及燃油存檔、可接管的自動導航與降落、寫實巡航及全機隊 1,000 kt TAS 的高速遊戲模式、極致畫質、雲上視角、夜空及城市燈光。六架 SB 系列已移出機庫，後續飛機以現有 777-300ER 為建模品質基準。素材來源與授權見 dist/models/SOURCES.txt 和 dist/VISUALS.txt。
 
 請提供可套用的 unified diff 或完整修改檔，附上路徑、測試步驟及實際結果。可執行 node verify-speed-profile.cjs、node verify-nav-thrust.cjs 和 node verify-autoland.cjs。請明確標示未執行的測試。
 
