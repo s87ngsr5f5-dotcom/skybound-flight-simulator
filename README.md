@@ -1,6 +1,6 @@
 # SKYBOUND GLOBAL
 
-目前同步版本為 0.9。共有 11 架可選機型，六架 SB 系列已移出機庫。既有訓練與區域任務改用 A220。手機版提供觸控提示、逐步地勤、跳過拖車、快速操控與引擎聲浪。自動導航可進場、接地並在跑道煞停。
+目前同步版本為 0.10。共有 11 架可選機型，六架 SB 系列已移出機庫。既有訓練與區域任務改用 A220。手機版提供觸控提示、逐步地勤、跳過拖車、快速操控與引擎聲浪。自動導航可進場、接地並在跑道煞停。777 可用「試飛 777 高速巡航」進入約 600 kt TAS 的遊戲速度，也可選寫實巡航。引擎可在非零油門時啟動。
 
 - [正式遊玩網址](https://skybound-global.alondragallard.chatgpt.site/)
 - [iPhone 手機相容版](https://skybound-global.alondragallard.chatgpt.site/iphone.html)

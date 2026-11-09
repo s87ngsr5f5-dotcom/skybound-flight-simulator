@@ -780,6 +780,7 @@ function initialize(){
     const isClimb=byId('lesson').value==='climbLesson';
     const isCruise=isClimb||byId('lesson').value==='cruiseTrial';
     byId('cruiseWeather').hidden=!isCruise;
+    byId('speedProfileField').hidden=!isCruise&&selectedAircraft().id!=='b773';
     byId('voyageOptions').hidden=!isVoyage;
     const model=selectedAircraft();
     byId('aircraftInfo').textContent=model.type+' · 起飛 '+model.rotation+' KTS · 進場 '+model.approach+' KTS'+(model.sideCargo?' · 側門貨運 · 高雄至桃園':model.role?' · '+benchmarkMissions[model.role].label:'');
@@ -1097,13 +1098,17 @@ function initialize(){
     }
     if(f.aircraft.jet){
       entries.push(['擾流板',()=>f.spoilers,()=>f.spoilers=!f.spoilers]);
+      if(f.aircraft.id==='b773') entries.push(['高速遊戲 · 600 kt TAS',()=>Boolean(f.fastCruise),()=>{
+        f.fastCruise=!f.fastCruise;
+        if(f.hold?.mach) f.hold.mach=cruiseMachTarget(f);
+      }]);
       if(f.aircraft.cruiseMach) entries.push(['爬升／巡航 35,000 ft',()=>Boolean(f.hold?.climb),()=>{
         if(f.hold?.climb){f.hold=null;return;}
         if(climbReady(f)){
-          f.hold={heading:f.heading,altitude:35000*.3048,mach:f.aircraft.cruiseMach,climb:true};
+          f.hold={heading:f.heading,altitude:35000*.3048,mach:cruiseMachTarget(f),climb:true};
         }
       }]);
-      entries.push(['航向／高度保持',()=>Boolean(f.hold),()=>{f.hold=f.hold?null:!f.ground&&f.battery?{heading:f.heading,altitude:f.y,mach:f.y>7000&&!f.flaps&&!f.gear?f.aircraft.cruiseMach:null}:null;}]);
+      entries.push(['航向／高度保持',()=>Boolean(f.hold),()=>{f.hold=f.hold?null:!f.ground&&f.battery?{heading:f.heading,altitude:f.y,mach:f.y>7000&&!f.flaps&&!f.gear?cruiseMachTarget(f):null}:null;}]);
     }
     entries.push(['自動導航',()=>Boolean(f.hold?.nav),()=>toggleNavigation(f)]);
     if(f.range) entries.push(['射擊訓練靶 M',()=>f.range.hit,()=>{if(!paused&&!replay) rangeShot(f);}]);
@@ -1227,7 +1232,7 @@ function initialize(){
         if(approach) throw new Error('請按開始飛行進入巡航驗證。');
         const profile=fleet.find(a=>a.id==='b773');
         byId('aircraft').value=profile.id;
-        flight=makeCruiseTrial(airports.find(a=>a.code==='RCTP'),airports.find(a=>a.code==='RCKH'),profile,Number(byId('cruiseWind').value));
+        flight=makeCruiseTrial(airports.find(a=>a.code==='RCTP'),airports.find(a=>a.code==='RCKH'),profile,Number(byId('cruiseWind').value),byId('speedProfile').value==='fast');
       }else if(lesson==='naritaCargo'){
         if(approach) byId('voyageNode').value='approach';
         const profile=fleet.find(m=>m.id==='sf748');
@@ -1286,6 +1291,7 @@ function initialize(){
         flight.fuel=aircraft.missionFuel??(aircraft.role==='fighter'?2700:aircraft.jet?18000:Math.round(aircraft.mass*.10));
         flight.fuelStart=flight.fuel;
       }
+      flight.fastCruise=flight.aircraft.id==='b773'&&byId('speedProfile').value==='fast';
       beginFlight();
       if(savesMission){
         flight.checkpointId=crypto.randomUUID();
@@ -1426,6 +1432,14 @@ function initialize(){
   byId('cockpitPreset').onclick=cycleCockpitView;
   byId('resetLook').onclick=()=>action('Home');
   byId('fly').onclick=()=>{byId('fly').blur();start(false);};
+  byId('quickFastCruise').onclick=()=>{
+    byId('aircraft').value='b773';
+    byId('lesson').value='cruiseTrial';
+    byId('speedProfile').value='fast';
+    byId('cruiseWind').value='0';
+    drawPlan();
+    start(false);
+  };
   byId('approach').onclick=()=>{byId('approach').blur();start(true);};
   byId('menu').onclick=menu;
   const mobilePanels=Array.from(byId('mobileToolbar').querySelectorAll('[data-panel]'));
@@ -1566,7 +1580,7 @@ function initialize(){
       }
       if(f.ground) return knots<f.aircraft.rotation?'桃園 05L · 增加油門，達到 '+f.aircraft.rotation+' IAS kt 再抬頭':'抬頭離地 · 正爬升後收起落架';
       if(f.stall) return '失速 · 放低機鼻';
-      if(f.hold?.climb||f.climbLesson.stable>0) return '自動油門 · 目標 35,000 ft · Mach 0.84 · 穩定 '+Math.floor(f.climbLesson.stable)+'/60 秒 · 剩油 '+Math.round(f.fuel)+' kg';
+      if(f.hold?.climb||f.climbLesson.stable>0) return '自動油門 · 目標 35,000 ft · Mach '+cruiseMachTarget(f).toFixed(2)+' · 穩定 '+Math.floor(f.climbLesson.stable)+'/60 秒 · 剩油 '+Math.round(f.fuel)+' kg';
       if(f.gear||f.flaps||f.spoilers) return '保持正爬升 · 收起落架、襟翼及擾流板';
       return climbReady(f)?'接通「爬升／巡航 35,000 ft」':'保持正爬升 · 離地約 500 呎且至少 164 IAS kt 後接通爬升';
     }
@@ -1578,12 +1592,13 @@ function initialize(){
       return '自動導航 · '+phase+' · 油門 '+Math.round(f.power*100)+'%';
     }
     if(f.navMessage&&!f.ground) return f.navMessage;
-    if(f.aircraft.maxMach&&flightSpeeds(f).mach>f.aircraft.maxMach) return '超速 · 請降低油門';
+    const machLimit=f.fastCruise&&f.y>5000&&!f.gear&&!f.flaps?1.10:f.aircraft.maxMach;
+    if(machLimit&&flightSpeeds(f).mach>machLimit) return '超速 · 請降低油門';
     if(f.range&&!f.range.hit&&!f.ground){
       const d=Math.hypot(f.range.x-f.x,f.range.z-f.z);
       return (f.range.message||'對準橘色地面靶，距離 250–2600 m '+(mobile?'點「訓練射擊」':'按 M'))+' · '+Math.round(d)+' m · '+f.range.rounds+' 發';
     }
-    if(f.cruiseTrial) return '777 巡航驗證 · 1× · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
+    if(f.cruiseTrial) return (f.fastCruise?'777 高速遊戲 · 600 kt TAS':'777 寫實巡航')+' · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
     if(!f.regional){
       if(f.landed) return '已接地 · 收油並煞車'+retry;
       if(f.ground) return knots>=51?(mobile?'向上拖搖桿拉升':'按 ↑ 拉升'):(mobile?'長按油門 ＋':'按住 W')+' 加速至約 51 KTS';
@@ -1631,7 +1646,7 @@ function initialize(){
       if(f.hold?.nav){label='接回手動';run=()=>toggleNavigation(f);}
       else if(f.climbLesson&&!f.hold?.climb&&climbReady(f)){
         label='自動爬升';
-        run=()=>{f.hold={heading:f.heading,altitude:35000*.3048,mach:f.aircraft.cruiseMach,climb:true};};
+        run=()=>{f.hold={heading:f.heading,altitude:35000*.3048,mach:cruiseMachTarget(f),climb:true};};
       }
       else if(!f.ground&&!f.tactical&&!f.climbLesson&&!f.cruiseTrial){
         label='自動導航與降落';run=()=>toggleNavigation(f);

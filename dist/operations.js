@@ -348,14 +348,15 @@ function makeRegionalFlight(departure,destination,aircraft,start,wind,waypoints)
     taxiIndex:0,arrivalTaxi:null,phase:cold?'cold':air?'cruise':'takeoff',recorded:false,finished:false
   };
 }
-function makeCruiseTrial(departure,destination,aircraft,tailwind){
+function makeCruiseTrial(departure,destination,aircraft,tailwind,fast=false){
   const heading=Math.atan2(destination.x-departure.x,departure.z-destination.z);
   const altitude=35000*.3048;
   const along=distance=>({x:departure.x+distance*Math.sin(heading),z:departure.z-distance*Math.cos(heading)});
   const route=[{...along(350000),name:'巡航驗證終點'}];
   const flight=makeRegionalFlight(departure,destination,aircraft,'air',0,route);
+  flight.fastCruise=fast&&aircraft.id==='b773';
   const air=atmosphere(altitude);
-  const tas=.80*air.sound;
+  const tas=(flight.fastCruise?cruiseMachTarget(flight):.80)*air.sound;
   const wind=tailwind/knotsPerMps;
   const speed=tas+wind;
   const pitch=(aircraft.mass*9.80665/(.5*air.density*tas*tas*aircraft.wingArea)-.27)/5.05-.036;
@@ -364,7 +365,7 @@ function makeCruiseTrial(departure,destination,aircraft,tailwind){
     vx:Math.sin(heading)*speed,vz:-Math.cos(heading)*speed,
     windVector:{x:Math.sin(heading)*wind,z:-Math.cos(heading)*wind},
     speed:tas,power:.72,fuel:45000,fuelStart:45000,cruiseTrial:true,
-    hold:{heading,altitude,mach:aircraft.cruiseMach}
+    hold:{heading,altitude,mach:cruiseMachTarget(flight)}
   });
 }
 function makeClimbLesson(airport,aircraft,tailwind){
@@ -391,7 +392,7 @@ function updateClimbLesson(f,save){
   if(!f.airborne) return;
   const speeds=flightSpeeds(f);
   const stable=Math.abs(f.y-35000*.3048)<60&&Math.abs(f.vy)<2&&
-    Math.abs(speeds.mach-f.aircraft.cruiseMach)<.015&&!f.gear&&!f.flaps&&!f.spoilers;
+    Math.abs(speeds.mach-cruiseMachTarget(f))<.015&&!f.gear&&!f.flaps&&!f.spoilers;
   lesson.stable=stable?lesson.stable+simTick:0;
   if(lesson.stable<60) return;
   f.finished=true;
@@ -404,7 +405,7 @@ function startEngine(f,index){
     return true;
   }
   if(f.service&&!f.airborne&&(!f.service.pushed||f.service.boarded!==f.passengers||f.fuel<=0)) return false;
-  if(!f.battery || f.power>.13 || f.noseDoor || f.sideDoor || (f.mission==='cargo'&&f.phase==='cold'&&!f.pallets.some(Boolean)) || (f.aircraft.cargoLimit&&cargoBalance(f).problems.length)) return false;
+  if(!f.battery || f.noseDoor || f.sideDoor || (f.mission==='cargo'&&f.phase==='cold'&&!f.pallets.some(Boolean)) || (f.aircraft.cargoLimit&&cargoBalance(f).problems.length)) return false;
   f.engines[index]=true;
   return true;
 }
@@ -558,8 +559,7 @@ function navigationControls(f,target){
   const power=flare?0:limit(.29+f.flaps*.065+(approach?-.06:0)+(targetIAS-ias)*.016,minimumPower,1);
   let throttle=limit((power-f.power)*2.6,-.8,.8);
   if(!approach&&f.y>7000&&f.aircraft.cruiseMach){
-    hold.cruiseMach??=limit(speeds.mach,f.aircraft.cruiseMach-.03,f.aircraft.cruiseMach);
-    throttle=limit((hold.cruiseMach-speeds.mach)*8,-.30,.65);
+    throttle=limit((cruiseMachTarget(f)-speeds.mach)*8,-.30,.65);
     throttle=Math.max(throttle,(minimumPower-f.power)*2.6);
   }
   return {roll:limit(wrapAngle(heading-f.heading)*(final?3:2.4)-f.bank*.45,final?-.31:-.65,final?.31:.65),

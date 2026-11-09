@@ -98,7 +98,8 @@
   justify-content: center;
 }
 .mobile-mode .stats .stat:nth-child(3),
-.mobile-mode .stats .stat:nth-child(n+6):nth-child(-n+9) { display: none; }
+.mobile-mode .stats .stat:nth-child(6),
+.mobile-mode .stats .stat:nth-child(9) { display: none; }
 .mobile-mode #flightLoad { font-size: 11px; flex-basis: 100%; text-align: center; }
 .mobile-mode #gateGuide {
   max-width: min(460px, 94%);

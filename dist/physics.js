@@ -36,6 +36,9 @@ function flightSpeeds(f){
     tas*Math.sqrt(air.density/1.225);
   return {tas,ias,mach,gs:Math.hypot(f.vx,f.vz)};
 }
+function cruiseMachTarget(f){
+  return f.fastCruise&&f.aircraft.id==='b773'?1.05:f.aircraft.cruiseMach;
+}
 function cruiseControls(f){
   const air=atmosphere(f.y,f.temperatureOffset);
   const {tas,mach}=flightSpeeds(f);
@@ -139,7 +142,9 @@ function stepTrainer(f, input, dt=simTick){
   f.stall=!f.ground && (alpha>stallAngle || forwardSpeed<12);
   const lift=q*aircraft.wingArea*cl;
   const cleanDrag=.031+((aircraft.cleanDrag??.031)-.031)*cruiseBlend;
-  const waveDrag=aircraft.cruiseMach ? .55*Math.pow(Math.max(0,mach-aircraft.cruiseMach+.012),2):0;
+  const fastCruise=f.fastCruise&&aircraft.id==='b773'&&!f.ground&&f.y>5000&&!f.gear&&!f.flaps;
+  const waveReference=fastCruise?cruiseMachTarget(f):aircraft.cruiseMach;
+  const waveDrag=waveReference ? .55*Math.pow(Math.max(0,mach-waveReference+.012),2):0;
   const drag=q*aircraft.wingArea*(cleanDrag+waveDrag+.052*cl*cl+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta));
   const engines=f.engines||[true];
   let running=engines.filter(Boolean).length/engines.length;
@@ -152,7 +157,7 @@ function stepTrainer(f, input, dt=simTick){
     if(f.fuel===0) running=0;
   }
   const fastJet=f.boost&&aircraft.role==='fighter'&&!f.gear&&!f.flaps;
-  const inletSpeed=fastJet?(aircraft.id==='sf16'?520:460):255+cruiseBlend*115;
+  const inletSpeed=fastCruise?510:fastJet?(aircraft.id==='sf16'?520:460):255+cruiseBlend*115;
   const available=aircraft.thrust?
     (aircraft.thrust+(f.boost&&f.power>.89?aircraft.boostThrust||0:0))*Math.pow(rho/1.225,.75)/(1+Math.pow(speed/inletSpeed,2)):
     Math.min(2700*aircraft.power/119000,aircraft.power*.78/Math.max(18,forwardSpeed));
