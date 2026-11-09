@@ -1,12 +1,19 @@
 # SKYBOUND GLOBAL
 
-瀏覽器飛行模擬器原型。開啟 GitHub Pages 網址，或執行 `python -m http.server 8765 --directory dist` 後開啟 http://localhost:8765 。
+目前同步版本為 0.8。共有 11 架可選機型，六架 SB 系列已移出機庫。既有訓練與區域任務改用 A220。手機版提供觸控提示、逐步地勤、跳過拖車、快速操控與引擎聲浪。自動導航可進場、接地並在跑道煞停。
 
-目前有 16 架可選機型、臺灣區域與成田周邊地景。52 架機隊及全球寫實場景仍未完成。來源與授權見 dist/VISUALS.txt、dist/README.txt、dist/THREE-LICENSE.txt。
+- [正式遊玩網址](https://skybound-global.alondragallard.chatgpt.site/)
+- [iPhone 手機相容版](https://skybound-global.alondragallard.chatgpt.site/iphone.html)
+- [GitHub Pages 鏡像](https://s87ngsr5f5-dotcom.github.io/skybound-global/)
+- [飛機建模基準](AIRCRAFT-QUALITY.md)
 
-本輪修正河道與道路穿地、分區顯示、畫質選項、機身曲面、立體翼型、引擎與輪轂。保留正常左右控制。
+本機預覽使用 `python -m http.server 8765 --directory dist`，再開啟 `http://127.0.0.1:8765/` 或 `http://127.0.0.1:8765/iphone.html`。不需要 npm 建置。
 
-軟體 WebGL 效能仍偏低；尚未完成硬體 GPU 效能驗收。
+GitHub Pages 的部署只更新鏡像。正式網址由既有 ChatGPT Sites 專案管理，發布時要在有該 Site 編輯權限的環境接續原專案。兩個網域的瀏覽器存檔各自獨立。
+
+機模和地景來源見 [模型授權](dist/models/SOURCES.txt)、[地景來源](dist/VISUALS.txt)及 [Three.js 授權](dist/THREE-LICENSE.txt)。飛行物理及機型細節為遊戲近似，地景重點在臺灣區域與成田周邊。
+
+以下為早期版本紀錄，操作說明以 0.8 畫面為準。
 ## ASTRA 航班經營 0.5
 
 選「立即接載客任務」預填 A320neo 桃園至高雄。確認油量後按「開始飛行」。在機位按加油、連接空橋、客艙門。登機與加油完成後，關門、收橋、推離，再開電瓶與引擎。抵達停機位、停機煞車拉起後，關引擎、接橋、開門。下機完畢後關門、收橋結算。進度與金幣只存於目前網站的瀏覽器儲存區。

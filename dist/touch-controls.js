@@ -35,29 +35,29 @@ const touchControls=(()=>{
   stick.addEventListener('pointerdown',event=>{
     if(event.button!==0||stickPointer!==null) return;
     stickPointer=event.pointerId;
-    stick.setPointerCapture(event.pointerId);
+    try{stick.setPointerCapture(event.pointerId);}catch{}
     move(event);
   });
-  stick.addEventListener('pointermove',event=>{
+  addEventListener('pointermove',event=>{
     if(event.pointerId===stickPointer) move(event);
   });
-  for(const name of ['pointerup','pointercancel','lostpointercapture']){
-    stick.addEventListener(name,event=>{
-      if(event.pointerId===stickPointer) center();
-    });
-    panel.addEventListener(name,event=>{
-      if(held.delete(event.pointerId)) updateButtons();
-    });
+  function release(event){
+    if(event.pointerId===stickPointer) center();
+    if(held.delete(event.pointerId)) updateButtons();
   }
+  for(const name of ['pointerup','pointercancel']) addEventListener(name,release,true);
+  panel.addEventListener('lostpointercapture',release);
+  panel.addEventListener('contextmenu',event=>event.preventDefault());
   panel.addEventListener('pointerdown',event=>{
     const button=event.target.closest('[data-hold]');
     if(!button||event.button!==0) return;
-    button.setPointerCapture(event.pointerId);
+    try{button.setPointerCapture(event.pointerId);}catch{}
     held.set(event.pointerId,button.dataset.hold);
     updateButtons();
   });
 
   try{mode.value=localStorage.getItem('skybound-device')||'';}catch{}
+  if(document.documentElement.dataset.device==='mobile') mode.value='mobile';
   if(!mode.value) mode.value=matchMedia('(pointer: coarse)').matches?'mobile':'desktop';
   function applyMode(){
     reset();
@@ -68,6 +68,7 @@ const touchControls=(()=>{
     try{localStorage.setItem('skybound-device',mode.value);}catch{}
   });
   addEventListener('blur',reset);
+  addEventListener('pagehide',reset);
   document.addEventListener('visibilitychange',reset);
   applyMode();
   return {input,reset,mode,panel};

@@ -1,0 +1,119 @@
+#mobileToolbar { display: none; }
+#flightNext { display: none; }
+.mobile-only { display: none; }
+.mobile-mode .desktop-only { display: none !important; }
+.mobile-mode .mobile-only { display: revert; }
+#towControls {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 4;
+}
+
+.mobile-mode header { flex-wrap: nowrap; gap: 5px; padding: 4px 8px; }
+.mobile-mode header strong { font-size: clamp(10px, 2.8vw, 15px); }
+.mobile-mode header button,
+.mobile-mode header select { min-height: 36px; font-size: 12px; }
+.mobile-mode header select { appearance: none; color-scheme: dark; background: #193a53; }
+.mobile-mode .hud { inset: 48px 8px 18px; --stick-size: 88px; }
+.mobile-mode #mobileToolbar {
+  display: flex;
+  position: absolute;
+  top: 0;
+  left: 0;
+  gap: 4px;
+  z-index: 5;
+}
+.mobile-mode #mobileToolbar button,
+.mobile-mode .touch-actions button,
+.mobile-mode #skipRunwayTow { min-height: 42px; min-width: 44px; }
+.mobile-mode #mobileToolbar button { font-size: 12px; padding: 4px 8px; }
+.mobile-mode #mobileToolbar button[aria-expanded="true"] { background: #206a76; }
+.mobile-mode #flightGuide,
+.mobile-mode #gateGuide {
+  position: absolute;
+  left: 50%;
+  bottom: 59px;
+  top: auto;
+  transform: translateX(-50%);
+  width: min(420px, 60%);
+  text-align: center;
+  z-index: 4;
+}
+.mobile-mode #status,
+.mobile-mode #towControls { position: static; width: auto; transform: none; }
+.mobile-mode #flightNext {
+  display: inline-block;
+  pointer-events: auto;
+  margin-top: 4px;
+  min-height: 40px;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.mobile-mode #towControls { margin-top: 4px; }
+.mobile-mode #skipRunwayTow { font-size: 12px; padding: 4px 8px; }
+.mobile-mode #gateView { display: none; }
+
+.mobile-mode .systems,
+.mobile-mode .right,
+.mobile-mode #mobileExtras { display: none; }
+.mobile-mode [data-mobile-panel="systems"] .systems,
+.mobile-mode [data-mobile-panel="nav"] .right { display: block; }
+.mobile-mode .systems,
+.mobile-mode .right {
+  top: 46px;
+  max-height: 45vh;
+  z-index: 5;
+}
+.mobile-mode [data-mobile-panel="more"] #mobileExtras {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(64px, 1fr));
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 5px);
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid #91cce18c;
+  background: #091e30f2;
+  z-index: 5;
+}
+.mobile-mode .touch-actions {
+  width: min(188px, 48vw);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.mobile-mode #touchQuick {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.mobile-mode #touchQuick button { font-size: 11px; }
+.mobile-mode #touchQuick button[aria-pressed="true"] { background: #206a76; }
+.mobile-mode .stats {
+  left: 94px;
+  right: 196px;
+  bottom: 0;
+  justify-content: center;
+}
+.mobile-mode .stats .stat:nth-child(3),
+.mobile-mode .stats .stat:nth-child(n+6):nth-child(-n+9) { display: none; }
+.mobile-mode #flightLoad { font-size: 11px; flex-basis: 100%; text-align: center; }
+.mobile-mode #gateGuide {
+  max-width: min(460px, 94%);
+  padding: 5px 8px;
+}
+.mobile-mode #gateCaption { margin-bottom: 4px; }
+.mobile-mode .gate-actions button { min-height: 40px; }
+.mobile-mode [data-mobile-panel]:not([data-mobile-panel=""]) #gateGuide,
+.mobile-mode [data-mobile-panel]:not([data-mobile-panel=""]) #flightGuide { visibility: hidden; }
+.mobile-mode #tacticalPanel { top: 0; }
+.mobile-mode .geo-credit { font-size: 8px; }
+
+@media (max-width: 520px) {
+  .mobile-mode .stats { left: 0; right: 0; bottom: calc(var(--stick-size) + 8px); }
+  .mobile-mode #flightGuide,
+  .mobile-mode #gateGuide { width: 96%; bottom: calc(var(--stick-size) + 68px); }
+  .mobile-mode header small { display: none; }
+}

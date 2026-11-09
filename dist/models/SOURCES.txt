@@ -1,0 +1,14 @@
+F-15 Eagle exterior model
+Source https://www.innerscene.com/tools/library/3d-parts/f-15-eagle-fighter-jet-e1d11142
+Author Innerscene. License CC0. Downloaded 2026-11-09.
+The author describes this as an original F-15 style model. It is not an official manufacturer model.
+The game uses an approximate independent flight configuration and its existing fighter cockpit.
+GLTFLoader and BufferGeometryUtils are from Three.js r160, MIT license, covered by ../THREE-LICENSE.txt.
+
+Airbus A220-300 and A380-800, Boeing 777-300ER, Cessna 172P, Diamond DA42
+Source https://github.com/stagworksde/skytrails-aircraft-models/releases/tag/v0.1.0
+FlightGear contributors and Skytrails. GPL-2.0-only. The original authors
+and conversion notices are included in each unmodified GLB and in the source archive.
+Corresponding source: skytrails-source.zip. License: SKYTRAILS-COPYING.txt.
+The game positions these low-poly traffic exteriors at runtime and uses its
+own cockpit and landing gear. The C172P exterior represents the SB-172 family.

@@ -1,13 +1,17 @@
 'use strict';
 const flightLogKey='skybound.flightLog.v2';
 function readFlightLog(){
-  try {return JSON.parse(localStorage.getItem(flightLogKey)||'[]');} catch {return [];}
+  try {
+    const rows=JSON.parse(localStorage.getItem(flightLogKey)||'[]');
+    return Array.isArray(rows)?rows.filter(row=>row&&typeof row==='object'):[];
+  }catch{return [];}
 }
 const careerKey='skybound.career.v1';
 function readCareer(){
   try{
     const saved=JSON.parse(localStorage.getItem(careerKey)||'null');
-    if(saved) return saved;
+    if(saved&&typeof saved==='object'&&Number.isFinite(saved.money)&&saved.receipts&&
+      typeof saved.receipts==='object') return saved;
     return {money:Math.max(0,Number(localStorage.getItem('skybound.money'))||0),active:null,receipts:{}};
   }catch{return {money:0,active:null,receipts:{}};}
 }
@@ -121,15 +125,19 @@ function makePassengerFlight(departure,destination,aircraft,wind,fuel,weather,ti
       boarded:0,delivered:0,door:false,pushed:false,pushing:0,progress:0,
       mode:null,seatBelts:true,cabinLights:true,comfort:100,weather,time,brief}});
 }
-function requestRunwayTow(f){
+function runwayTowReady(f){
   if(!f.regional||!f.ground||f.airborne||f.finished||f.tow||f.power>.08||
       Math.hypot(f.vx,f.vz)>1.2||f.bridge||f.service?.door||f.service?.pumping||
-      f.noseDoor||f.sideDoor) return false;
+      f.service?.pushing||f.noseDoor||f.sideDoor) return false;
   if(f.service&&(f.service.boarded!==f.passengers||f.fuel<f.service.targetFuel)) return false;
+  const frame=runwayCoordinates(f.x,f.z,f.departure);
+  return Math.abs(frame.along)<=f.departure.length/2+450&&Math.abs(frame.cross)<=750;
+}
+function requestRunwayTow(f){
+  if(!runwayTowReady(f)) return false;
   const airport=f.departure;
   const frame=runwayCoordinates(f.x,f.z,airport);
   const threshold=-airport.length/2+135;
-  if(Math.abs(frame.along)>airport.length/2+450||Math.abs(frame.cross)>750) return false;
   const pavedAlong=limit(frame.along,-airport.length/2+100,airport.length/2-100);
   f.tow={index:0,points:[
     airportPoint(airport,pavedAlong,airport.apron),
@@ -140,6 +148,21 @@ function requestRunwayTow(f){
   f.parkingBrake=true;
   f.phase='taxi';
   f.hold=null;
+  return true;
+}
+function finishRunwayTow(f){
+  if(!f.tow) return false;
+  const target=f.tow.points[f.tow.points.length-1];
+  f.x=target.x;f.z=target.z;
+  f.y=f.departure.elevation+f.aircraft.gearHeight;
+  f.heading=f.departure.heading;
+  f.vx=f.vy=f.vz=f.vs=f.speed=0;
+  f.pitch=f.bank=f.pitchRate=f.bankRate=f.yawRate=0;
+  f.tow=null;
+  f.parkingBrake=true;
+  f.taxiIndex=f.taxi.length;
+  f.start='runway';f.phase='takeoff';
+  if(f.service){f.service.pushed=true;f.service.pushing=0;}
   return true;
 }
 function stepRunwayTow(f,dt){
@@ -160,12 +183,7 @@ function stepRunwayTow(f,dt){
   }else{
     f.x=target.x;f.z=target.z;f.vx=f.vz=0;
     tow.index++;
-    if(tow.index===tow.points.length){
-      f.tow=null;f.heading=airport.heading;
-      f.taxiIndex=f.taxi.length;
-      f.start='runway';f.phase='takeoff';
-      if(f.service){f.service.pushed=true;f.service.pushing=0;}
-    }
+    if(tow.index===tow.points.length){finishRunwayTow(f);return;}
   }
   f.y=airport.elevation+f.aircraft.gearHeight;
   f.pitch=f.bank=f.pitchRate=f.bankRate=f.yawRate=f.vy=f.vs=0;
@@ -278,9 +296,10 @@ function attachContract(f,kind,base){
 function makeRegionalContract(kind,wind){
   const {departure,destination,route}=regionalContractPlan(kind);
   const sightseeing=kind==='sightseeing';
-  const aircraft=fleet.find(a=>a.id==='sb172');
+  const aircraft=fleet.find(a=>a.id==='a223');
   const f=makeRegionalFlight(departure,destination,aircraft,'cold',wind,route);
-  Object.assign(f,{lesson:kind,fuel:105,fuelStart:105,passengers:sightseeing?2:0});
+  const fuel=sightseeing?3000:4500;
+  Object.assign(f,{lesson:kind,fuel,fuelStart:fuel,passengers:sightseeing?2:0});
   return attachContract(f,kind,regionalContracts[kind].base);
 }
 function settleContract(f){
@@ -325,7 +344,7 @@ function makeRegionalFlight(departure,destination,aircraft,start,wind,waypoints)
     aircraft,departure,destination,start,regional:true,
     battery:!cold,engines:Array(aircraft.geometry[4]).fill(!cold),
     lights:false,parkingBrake:cold,gear:!air||!aircraft.retract,reverse:false,spoilers:false,
-    route:waypoints,waypoint:0,pallets:[0,0,0],noseDoor:false,boost:false,bridge:false,awaitingService:false,taxi:[{name:'滑行至跑道端',...first},{name:'轉入跑道',...holding}],
+    route:waypoints,waypoint:0,pallets:[0,0,0],noseDoor:false,boost:aircraft.role==='fighter',bridge:false,awaitingService:false,taxi:[{name:'滑行至跑道端',...first},{name:'轉入跑道',...holding}],
     taxiIndex:0,arrivalTaxi:null,phase:cold?'cold':air?'cruise':'takeoff',recorded:false,finished:false
   };
 }
@@ -445,17 +464,75 @@ function updateRegionalFlight(f,save=recordFlight){
   if(Math.hypot(f.x-target.x,f.z-target.z)<16){ f.taxiIndex++; if(f.taxiIndex===f.taxi.length) f.phase="takeoff"; }
 }
 function navigationControls(f,target){
+  const hold=f.hold, runway=f.destination;
+  if(f.landed){
+    hold.stage='rollout';
+    if(Math.hypot(f.vx,f.vz)<.8){f.parkingBrake=true;f.hold=null;}
+    return {roll:0,pitch:-.25,throttle:-.8,brake:true,
+      rudder:limit(wrapAngle(runway.heading-f.heading)*2,-.4,.4)};
+  }
+  const frame=runwayCoordinates(f.x,f.z,runway);
+  const distance=-frame.along-runway.length/2;
+  const approach=f.waypoint>=f.route.length-2;
+  if(approach&&!hold.finalDistance){
+    hold.finalDistance=limit((f.y-runway.elevation)/.046,12500,65000);
+  }
+  const finalDistance=hold.finalDistance??12500;
+  const intercept=airportPoint(runway,-runway.length/2-finalDistance,0);
+  const remaining=Math.hypot(f.x-intercept.x,f.z-intercept.z);
+  const speeds=flightSpeeds(f);
+  const capture=distance>150&&distance<finalDistance+2500&&Math.abs(frame.cross)<850&&
+    Math.abs(wrapAngle(runway.heading-f.heading))<.70;
+  if(approach&&capture) hold.stage='final';
+  else if(hold.stage!=='final') hold.stage=approach?'descent':'route';
+  const final=hold.stage==='final';
+  if(final&&distance<200&&(Math.abs(frame.cross)>runway.width*.42||
+      f.y-runway.elevation-f.aircraft.gearHeight>42||speeds.ias*knotsPerMps>f.aircraft.approach+30)){
+    f.hold=null;
+    f.navMessage='進場未穩定 · 自動導航已退出，請加油門重飛';
+    return {roll:0,pitch:.35,throttle:.7};
+  }
+  if(approach){
+    if(remaining<4600) hold.interceptPassed=true;
+    target=final?airportPoint(runway,frame.along+1800,0):
+      hold.interceptPassed?airportPoint(runway,-runway.length/2-5200,0):intercept;
+  }
   const dx=target.x-f.x,dz=target.z-f.z;
-  const desired=Math.atan2(dx,-dz);
+  const wind=flightWind(f);
+  const crosswind=wind.x*Math.cos(runway.heading)+wind.z*Math.sin(runway.heading);
+  const crab=Math.atan2(crosswind,Math.max(30,speeds.tas));
+  const desired=final?runway.heading-crab-limit(frame.cross/420,-.32,.32):Math.atan2(dx,-dz);
   const track=Math.atan2(f.vx,-f.vz);
   const heading=desired+limit(wrapAngle(desired-track)*.55,-.22,.22);
-  const tas=Math.max(24,flightSpeeds(f).tas);
+  const tas=Math.max(24,speeds.tas);
   const q=.5*1.225*Math.exp(-Math.max(0,f.y)/8500)*tas**2;
-  const desiredVS=limit((f.hold.altitude-f.y)*.095,-6,6);
+  let altitude=hold.altitude, feedForward=0;
+  let targetIAS=f.aircraft.approach+65;
+  if(approach){
+    const alongDistance=final?Math.max(0,distance+350):hold.interceptPassed?
+      Math.max(5200,distance):finalDistance+remaining;
+    const glide=runway.elevation+f.aircraft.gearHeight+alongDistance*.0524;
+    const lookAhead=Math.min(1400,Math.hypot(dx,dz));
+    const bearing=Math.atan2(dx,-dz);
+    const terrain=regionalHeight(f.x+Math.sin(bearing)*lookAhead,f.z-Math.cos(bearing)*lookAhead);
+    altitude=final?glide:Math.max(glide,terrain+220);
+    feedForward=-Math.min(6,speeds.gs*.0524);
+    targetIAS=final?f.aircraft.approach+5:f.aircraft.approach+Math.min(55,19+remaining/500);
+    if(final){
+      f.gear=true;
+      if(speeds.ias*knotsPerMps<f.aircraft.approach+31) f.flaps=2;
+      else if(speeds.ias*knotsPerMps<f.aircraft.approach+49) f.flaps=1;
+    }
+  }
+  const height=f.y-runway.elevation-f.aircraft.gearHeight;
+  const flare=final&&distance<0&&height<12;
+  const desiredVS=flare?-.75:limit(feedForward+(altitude-f.y)*(final?.29:.095),-8,6);
   const lift=flightMass(f)*(9.80665+limit((desiredVS-f.vy)*1.2,-4,4))/(q*f.aircraft.wingArea*Math.max(.72,Math.cos(f.bank)));
   const attitude=Math.atan2(f.vy,tas)+(lift-.27-f.aircraft.flapLift[f.flaps])/5.05-.036;
-  return {roll:limit(wrapAngle(heading-f.heading)*2.4-f.bank*.32,-.65,.65),
-    pitch:limit((attitude-.015-f.trim-f.flaps*.008)/.24,-.66,.70)};
+  const power=flare?0:limit(.29+f.flaps*.065+(approach?-.06:0)+(targetIAS-speeds.ias*knotsPerMps)*.016,0,1);
+  return {roll:limit(wrapAngle(heading-f.heading)*(final?3:2.4)-f.bank*.45,final?-.31:-.65,final?.31:.65),
+    pitch:limit((attitude-.015-f.trim-f.flaps*.008)/.24,-.80,.82),
+    throttle:limit((power-f.power)*2.6,-.8,.8)};
 }
 function rangeShot(f){
   const range=f.range;
@@ -466,7 +543,7 @@ function rangeShot(f){
   const yaw=Math.abs(wrapAngle(Math.atan2(dx,-dz)-f.heading));
   const pitch=Math.abs(Math.atan2(range.y-f.y,distance)-f.pitch);
   range.hit=distance>250&&distance<2600&&yaw<.105&&pitch<.12;
-  range.message=range.hit?'命中訓練靶 · 返回機場':range.rounds?'未命中 · 調整機鼻後再射擊':'彈藥用盡 · 可按 R 重試';
+  range.message=range.hit?'命中訓練靶 · 返回機場':range.rounds?'未命中 · 調整機鼻後再射擊':'彈藥用盡 · 可重飛';
   return range.hit;
 }
 function activeTarget(f){

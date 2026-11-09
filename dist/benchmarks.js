@@ -1,5 +1,9 @@
 'use strict';
 const benchmarkFleet=[
+  {id:'sf15',name:'SF-15 Eagle · 外部 3D 模型',reference:'F-15 style CC0 model',type:'雙發制空戰鬥機',role:'fighter',
+    mass:18000,wingArea:56.5,inertia:[42000,160000,180000],cgOffset:.022,gearHeight:2.3,stallAngle:.37,
+    rotation:135,approach:150,geometry:[9.73,1.15,6.52,-.22,2,2.3],thrust:150000,boostThrust:90000,jet:true,externalModel:'models/f15.glb'},
+
   {id:'sf16',name:'SF-16 Kestrel',reference:'F-16C Block 50',type:'單發戰鬥訓練機',role:'fighter',
     mass:10950,wingArea:27.87,inertia:[14000,70000,80000],cgOffset:.022,gearHeight:1.85,stallAngle:.37,
     rotation:126,approach:142,geometry:[7.40,.85,4.90,-.22,1,1.65],thrust:78000,boostThrust:42000,jet:true},
