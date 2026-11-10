@@ -19,7 +19,7 @@ const benchmarkFleet=[
     mass:9100,wingArea:24.26,inertia:[10600,55100,65000],cgOffset:.020,gearHeight:1.54,stallAngle:.37,
     rotation:131,approach:145,geometry:[7.01,.81,4.72,-.25,2,1.82],thrust:54000,boostThrust:28300,
     jet:true,sideIntakes:true,wideIntakes:true,noWinglet:true,maxMach:1.6,trimColor:0x68766f},
-  {id:'m2000',name:'Mirage 2000-5 幻象',reference:'Mirage 2000-5 single-seat',type:'臺灣機隊 · 單發無尾三角翼戰鬥機',role:'fighter',
+  {id:'m2000',name:'幻象 2000-5 · Mirage',reference:'Mirage 2000-5 single-seat',type:'臺灣機隊 · 單發無尾三角翼戰鬥機',role:'fighter',
     mass:10150,wingArea:41,inertia:[12700,62500,75000],cgOffset:.018,gearHeight:1.70,stallAngle:.40,
     rotation:133,approach:140,geometry:[7.15,.82,4.55,-.20,1,4.9],thrust:64000,boostThrust:34000,
     jet:true,sideIntakes:true,delta:true,noWinglet:true,maxMach:2.2,trimColor:0x5b7c93},

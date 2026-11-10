@@ -20,8 +20,6 @@ Object.assign(f,{mission:'cargo',fuel:18000,fuelStart:18000,checkpointId:crypto.
 attachContract(f,'cargo',9500);
 const startingBalance=readMoney();
 assert(!requestRunwayTow(f));
-assert.equal(effectiveFlightRate(f,32),1);
-assert.equal(effectiveFlightRate(f,.5),.5);
 assert(!setCargoManifest(f,[24000,30000,20000]));
 f.noseDoor=true;
 assert(!setCargoManifest(f,[24000,30000,90000]));
@@ -49,22 +47,16 @@ assert(f.airborne&&!f.ended&&f.y>=departure.elevation+450,JSON.stringify({y:f.y,
 f.gear=false;
 f.hold={nav:true,altitude:departure.elevation+1800};
 let input;
-const seenRates=new Set();
 for(let i=0;i<120*4200&&f.hold&&!f.ended;i++){
   if(i%4===0) input={rudder:0,...navigationControls(f,activeTarget(f)),trim:0};
   stepTrainer(f,smoothControls(f,input,simTick));
   updateRegionalFlight(f);
-  const rate=effectiveFlightRate(f,32);
-  seenRates.add(rate);
-  if(f.hold?.stage==='descent'||f.hold?.stage==='final') assert.equal(rate,1);
 }
 assert(f.landed&&!f.ended&&f.parkingBrake,JSON.stringify({
   waypoint:f.waypoint,seconds:f.elapsed,y:f.y,position:latLon(f.x,f.z),
   ias:flightSpeeds(f).ias*knotsPerMps,stage:f.hold?.stage,message:f.navMessage
 }));
 assert.equal(f.waypoint,route.length-1);
-assert.deepEqual([...seenRates].sort((a,b)=>a-b),[1,32]);
-assert.equal(effectiveFlightRate(f,32),1);
 assert.equal(f.contract.cargoAtTakeoff,74000);
 assert(f.fuel>0&&f.fuel<f.fuelStart);
 assert(requestGateTow(f));

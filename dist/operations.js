@@ -503,15 +503,6 @@ function stopNavigation(f){
   if(f.hold?.speedBrake) f.spoilers=false;
   f.hold=null;
 }
-function effectiveFlightRate(f,selected){
-  if(selected===.5) return .5;
-  if(selected<=1||f.ground||f.landed||f.ended||f.tactical||f.tow||
-      f.phase!=='cruise'||f.y-f.departure.elevation<650||
-      f.waypoint>=f.route.length-2||f.hold?.stage==='descent'||f.hold?.stage==='final') return 1;
-  const distance=Math.hypot(f.x-f.destination.x,f.z-f.destination.z);
-  const groundSpeed=Math.hypot(f.vx,f.vz);
-  return distance>Math.max(28000,groundSpeed*90)?selected:1;
-}
 function navigationControls(f,target){
   const hold=f.hold, runway=f.destination;
   if(f.landed){
@@ -597,13 +588,15 @@ function navigationControls(f,target){
   const flare=final&&distance<0&&height<12;
   const desiredVS=flare?-.75:limit(feedForward+(altitude-f.y)*(final?.29:.095),final?-8:-13,6);
   const lift=flightMass(f)*(9.80665+limit((desiredVS-f.vy)*1.2,-4,4))/(q*f.aircraft.wingArea*Math.max(.72,Math.cos(f.bank)));
-  const attitude=Math.atan2(f.vy,tas)+(lift-.27-f.aircraft.flapLift[f.flaps])/5.05-.036;
+  const fastQ=.5*atmosphere(f.y,f.temperatureOffset).density*tas**2;
+  const attitude=f.fastCruise&&fastQ>14000?fastLevelPitch(f,fastQ,tas,desiredVS):
+    Math.atan2(f.vy,tas)+(lift-.27-f.aircraft.flapLift[f.flaps])/5.05-.036;
   // Route navigation commands full power. Speed control takes over for landing.
   const approachPower=flare?0:limit(.23+f.flaps*.065+(targetIAS-ias)*.016,.12,1);
   const throttle=approach?limit((approachPower-f.power)*2.6,-.8,.8):1;
   return {roll:limit(wrapAngle(heading-f.heading)*(final?3:2.4)-f.bank*.45,final?-.31:-.65,final?.31:.65),
     pitch:limit((attitude-.015-f.trim-f.flaps*.008)/.24,-.80,.82),
-    throttle};
+    throttle,airBrake:f.fastCruise&&approach&&ias>targetIAS+55};
 }
 function rangeShot(f){
   const range=f.range;

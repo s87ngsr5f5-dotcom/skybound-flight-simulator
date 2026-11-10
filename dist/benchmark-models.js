@@ -309,7 +309,32 @@ function buildBenchmarkAirframe(profile,scene){
     geometry.rotateX(-Math.PI/2);
     return mesh(parent,geometry,material);
   }
-  const surfaces=[], flaps=[], lamps=[], fans=[];
+  const surfaces=[], flaps=[], lamps=[], fans=[], airBrakes=[], exhaustPlumes=[];
+  if(fighter){
+    const twin=profile.sideIntakes&&!profile.delta;
+    const nozzleZ=half*(twin?1.01:1)+.035;
+    for(const x of twin?[-1,1].map(side=>side*(profile.wideIntakes?.46:.38)):[0]){
+      const plume=new THREE.Group();
+      plume.position.set(x,twin?-.12:0,nozzleZ);
+      const nozzle=twin?.25:.43;
+      const layers=[
+        [nozzle,3.8,0xff3122,.54],
+        [nozzle*.67,2.8,0xff7025,.79],
+        [nozzle*.37,1.35,0xffd28c,.92]
+      ];
+      for(const [width,length,color,opacity] of layers){
+        const fire=new THREE.Mesh(new THREE.ConeGeometry(width,length,22,true),new THREE.MeshBasicMaterial({
+          color,transparent:true,opacity,side:THREE.DoubleSide,depthWrite:false,toneMapped:false
+        }));
+        fire.rotation.x=Math.PI/2;
+        fire.position.z=length/2;
+        plume.add(fire);
+      }
+      plume.visible=false;
+      group.add(plume);
+      exhaustPlumes.push(plume);
+    }
+  }
   for(const side of [-1,1]){
     const chord=profile.delta?6.3:fighter?(profile.wideIntakes?3.65:profile.sideIntakes?2.85:4.4):half*.51;
     const root=-half*(profile.delta?.39:fighter?.29:.24);
@@ -354,6 +379,13 @@ function buildBenchmarkAirframe(profile,scene){
     flap.position.set(side*span*.28,wingY,root+chord*.82);
     block(flap,metal,span*.32,.14,chord*.17,0,0,chord*.085);
     group.add(flap);flaps.push(flap);
+    if(profile.delta){
+      const brake=new THREE.Group();
+      brake.position.set(side*1.72,wingY+.22,.45);
+      block(brake,metal,.84,.045,.73,0,0,.365);
+      block(brake,surface,.81,.035,.69,0,.036,.365);
+      group.add(brake);airBrakes.push(brake);
+    }
     const lamp=mesh(group,new THREE.SphereGeometry(fighter?.085:.19,12,8),
       new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,wingY+.62,tip+(profile.rakedTip?2.2:0));
     lamps.push(lamp);
@@ -496,7 +528,7 @@ function buildBenchmarkAirframe(profile,scene){
   }
   cabin.visible=false;
   scene.add(group,cabin);
-  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
+  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,airBrakes,exhaustPlumes,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
   return group;
 }
 

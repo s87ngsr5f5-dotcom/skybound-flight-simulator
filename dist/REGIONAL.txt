@@ -38,6 +38,9 @@ RCQC 澎湖｜02/20｜3000×45｜018.22°｜生成跑道及地面起點
 地理及素材來源
 Terrain Tiles on AWS / Mapzen / Tilezen，Skadi WGS84，2026-11-07 擷取。主島及澎湖採 240 m 取樣，松山周邊保留第一階段的 120 m 高程資料供碰撞及近區採樣。海岸由高程網格推估；海面及地表材質為生成內容。區域資料全部內嵌；畫面按位置建立與回收網格區塊。未獨立驗證垂直基準差；機場以門檻平均高度平整接合。
 中央山脈在 3D 模式下按需載入同來源的 120 m 高程，供地形、接觸與導航共用。接近時以 120 m 網格顯示，遠處保留較疏的網格。森林與裸岩色依坡度、高度及可用樹冠覆蓋資料生成。可用 python tools/build-central-mountains.py <Skadi HGT 檔案資料夾> 重建此圖層。
+台北衛星底圖涵蓋約 39 × 33.5 公里。Contains modified Copernicus Sentinel data (2025)。使用 Sentinel-2A L2A 真彩影像 S2A_51RUH_20250114_0_L2A（2025-01-14），從 AWS Earth Search 取用，裁切及重投影至遊戲座標。標準畫質每像素約 10 公尺，流暢畫質每像素約 20 公尺。立體建物與道路由既有遊戲場景疊加。可用 python tools/build-taipei-imagery.py（需 rasterio、numpy、Pillow）重建。
+https://dataspace.copernicus.eu/data-collections/copernicus-sentinel-missions/sentinel-2
+https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/S2A_51RUH_20250114_0_L2A
 https://registry.opendata.aws/terrain-tiles/
 https://github.com/tilezen/joerd/blob/master/docs/attribution.md
 臺北飛航情報區 AIP AD 2.12：RCSS、RCTP 為 03-25（2025-05-15）；RCYU、RCMQ 為 05-26（2026-10-29）；RCKH 為 02-26（2026-05-14）；RCFN 為 05-25（2025-09-04）；RCQC 為 06-25（2025-12-25）。

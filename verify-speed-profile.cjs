@@ -3,6 +3,25 @@ for(const file of ['elevation','physics','regional-elevation','region','fleet','
  vm.runInThisContext(fs.readFileSync('dist/'+file+'.js','utf8'),{filename:file+'.js'});
 }
 const from=taiwanAirports.find(a=>a.code==='RCTP'),to=taiwanAirports.find(a=>a.code==='RCKH'),plane=fleet.find(a=>a.id==='b773');
+const mirage=fleet.find(a=>a.id==='m2000');
+const reverseRunway={...from,heading:from.heading+Math.PI};
+const low=makeRegionalFlight(reverseRunway,to,mirage,'runway',0,regionalRoute(reverseRunway,to));
+low.fastCruise=true;
+const controls={roll:0,rudder:0,trim:0,throttle:1};
+for(let i=0;i<120*150&&!low.ended&&flightSpeeds(low).ias*3.6<2000;i++){
+ const speed=flightSpeeds(low).ias*3.6;
+ const pitch=low.ground?speed>knotsToKmh(mirage.rotation)?.50:0:
+   low.y<210?.20:speed<510?.03:0;
+ stepTrainer(low,{...controls,pitch});
+}
+const beforeBrake=flightSpeeds(low).ias*3.6;
+assert(low.airborne&&!low.ended&&beforeBrake>=2000&&low.y<650,{beforeBrake,y:low.y});
+for(let i=0;i<120*12;i++) stepTrainer(low,{...controls,pitch:0,brake:true});
+const afterBrake=flightSpeeds(low).ias*3.6;
+assert(low.airBrake&&!low.ended&&afterBrake<beforeBrake-360&&low.power===1);
+stepTrainer(low,{...controls,pitch:0});
+assert.equal(low.airBrake,false);
+console.log({mode:'runway-to-IAS',aircraft:mirage.id,y:low.y,beforeBrake,afterBrake});
 
 for(const wind of [-50,50]){
  const aircraft=fleet.find(a=>a.id==='fck1');
@@ -51,9 +70,9 @@ for(const [aircraft,mode,fast] of trials){
   stepTrainer(f,input);
   if(mode==='autonav-fast') updateRegionalFlight(f,()=>true);
  }
- const {tas,gs,mach}=flightSpeeds(f),nmi=Math.hypot(f.x-start.x,f.z-start.z)/1852;
+ const {ias,tas,gs,mach}=flightSpeeds(f),nmi=Math.hypot(f.x-start.x,f.z-start.z)/1852;
  console.log({aircraft:aircraft.id,mode,tas:tas*knotsPerMps,gs:gs*knotsPerMps,mach,nmi});
  assert(Math.abs(gs*knotsPerMps-tas*knotsPerMps)<1);
  assert.equal(f.power,1,aircraft.id+' '+mode+' full cruise throttle');
- assert(fast?Math.abs(tas*3.6-fastCruiseKmh)<35&&nmi>61:tas*knotsPerMps<500&&nmi>29);
+ assert(fast?ias*3.6>=fastCruiseKmh&&ias*3.6<fastCruiseKmh+40&&nmi>61:tas*knotsPerMps<500&&nmi>29);
 }

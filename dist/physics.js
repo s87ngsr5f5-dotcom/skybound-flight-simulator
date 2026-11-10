@@ -40,19 +40,31 @@ function flightSpeeds(f){
   return {tas,ias,mach,gs:Math.hypot(f.vx,f.vz)};
 }
 function cruiseMachTarget(f){
-  if(f.fastCruise&&f.iasTrial){
+  if(f.fastCruise){
     const air=atmosphere(f.y,f.temperatureOffset);
-    return Math.min(2.15,(fastCruiseKmh+12)/(3.6*air.sound*Math.sqrt(air.density/1.225)));
+    return (fastCruiseKmh+12)/(3.6*air.sound*Math.sqrt(air.density/1.225));
   }
-  return f.fastCruise?(fastCruiseKmh+6)/(3.6*atmosphere(35000*.3048).sound):(f.aircraft.cruiseMach??.85);
+  return f.aircraft.cruiseMach??.85;
 }
 function fastCruiseActive(f){
-  return f.fastCruise&&!f.ground&&f.y>(f.iasTrial?650:7000)&&!f.gear&&!f.flaps&&
-    !(f.hold?.nav&&f.hold.stage!=='route'&&f.hold.stage!==undefined);
+  return f.fastCruise&&!f.ground&&!f.spoilers&&(!f.hold?.climb||f.hold.levelOff)&&
+    !['descent','final','rollout'].includes(f.hold?.stage);
 }
-// The fast trial uses an augmented pitch trim. Limit the effective CG
+// Game mode uses augmented pitch trim. Limit the effective CG
 // pitching moment as dynamic pressure rises to retain pitch stability.
 const fastTrimAuthority=q=>18000/Math.max(18000,q);
+const pitchResponse=q=>limit(q/420,.22,1.8);
+function fastLevelPitch(f,q,tas,verticalSpeed,pitchGain=1){
+  const aircraft=f.aircraft;
+  const weight=flightMass(f)*9.80665;
+  const verticalThrust=(f.engineThrust||0)*Math.sin(f.pitch);
+  const lift=(weight-verticalThrust)/Math.max(.55,Math.cos(f.bank));
+  const cg=aircraft.cgOffset+(f.cargoState?.shift||0)*.18;
+  const cgTrim=lift*cg*fastTrimAuthority(q)/(14500*pitchResponse(q)*pitchGain*aircraft.inertia[0]/1650);
+  const path=Math.atan2(f.vy,Math.max(tas,1));
+  return (lift/(Math.max(q,1)*aircraft.wingArea)-.27-aircraft.flapLift[f.flaps])/5.05-.036-cgTrim+
+    path*.25+limit((verticalSpeed-f.vy)*.00055,-.045,.045);
+}
 function cruiseControls(f){
   const air=atmosphere(f.y,f.temperatureOffset);
   const {tas}=flightSpeeds(f);
@@ -60,24 +72,10 @@ function cruiseControls(f){
   const q=.5*air.density*Math.max(tas*tas,1);
   const weight=flightMass(f)*9.80665;
   const levelCl=weight/(q*aircraft.wingArea);
-  if(fastCruiseActive(f)){
-    if(f.iasTrial){
-      const desiredVS=limit((hold.altitude-f.y)*.09,-22,22);
-      const verticalThrust=(f.engineThrust||0)*Math.sin(f.pitch);
-      const lift=(weight-verticalThrust)/Math.max(.7,Math.cos(f.bank));
-      const cgTrim=lift*aircraft.cgOffset*fastTrimAuthority(q)/(14500*1.8*aircraft.inertia[0]/1650);
-      const path=Math.atan2(f.vy,Math.max(tas,1));
-      const pitch=(lift/(q*aircraft.wingArea)-.27)/5.05-.036-cgTrim+
-        path*.25+limit((desiredVS-f.vy)*.00055,-.045,.045);
-      return {pitch:limit((pitch-.015-f.trim)/.24,-.8,.8),throttle:1};
-    }
-    const desiredVS=limit((hold.altitude-f.y)*.08,-8,8);
-    const cl=levelCl*(1+limit((desiredVS-f.vy)*.65,-3,3)/9.80665);
-    const pitch=Math.atan2(f.vy,Math.max(tas,1))+(cl-.27)/5.05-.036;
-    return {
-      pitch:limit((pitch-.015-f.trim)/.24,-.8,.8),
-      throttle:1
-    };
+  if(f.fastCruise&&q>12500){
+    const desiredVS=limit((hold.altitude-f.y)*.09,-22,22);
+    const pitch=fastLevelPitch(f,q,tas,desiredVS);
+    return {pitch:limit((pitch-.015-f.trim-f.flaps*.008)/.24,-.8,.8),throttle:1};
   }
   const levelPitch=(levelCl-.27)/5.05-.036;
   const desiredVS=limit((hold.altitude-f.y)*.07,-9,9);
@@ -165,7 +163,8 @@ function stepTrainer(f, input, dt=simTick){
   const beta=speed>5 ? wrapAngle(track-f.heading) : 0;
   const air=atmosphere(f.y,f.temperatureOffset);
   const fastCruise=fastCruiseActive(f);
-  const cruiseBlend=fastCruise&&f.iasTrial?1:aircraft.cruiseMach||fastCruise?limit((f.y-2500)/5500,0,1):0;
+  const gameAirborne=f.fastCruise&&!f.ground;
+  const cruiseBlend=gameAirborne?1:aircraft.cruiseMach?limit((f.y-2500)/5500,0,1):0;
   const rho=1.225*Math.exp(-Math.max(0,f.y)/8500)*(1-cruiseBlend)+air.density*cruiseBlend;
   const mach=speed/air.sound;
   const q=.5*rho*speed*speed;
@@ -176,11 +175,11 @@ function stepTrainer(f, input, dt=simTick){
   f.stall=!f.ground && (alpha>stallAngle || forwardSpeed<12);
   const lift=q*aircraft.wingArea*cl;
   const cleanDrag=.031+((aircraft.cleanDrag??.031)-.031)*cruiseBlend;
-  const waveReference=fastCruise?cruiseMachTarget(f):aircraft.cruiseMach;
+  const waveReference=gameAirborne?cruiseMachTarget(f):aircraft.cruiseMach;
   const waveDrag=waveReference ? .55*Math.pow(Math.max(0,mach-waveReference+.012),2):0;
   const drag=q*aircraft.wingArea*(cleanDrag+waveDrag+.052*cl*cl+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta));
   // The lever can stay at full power while the cruise Mach envelope limits thrust.
-  const cruiseProtection=waveReference&&!f.gear&&!f.flaps?
+  const cruiseProtection=waveReference&&(gameAirborne||!f.gear&&!f.flaps)?
     cruiseBlend*limit((mach-waveReference+.03)*24,0,.85):0;
   const enginePower=f.power*(1-cruiseProtection);
   const engines=f.engines||[true];
@@ -197,12 +196,16 @@ function stepTrainer(f, input, dt=simTick){
   const inletSpeed=fastJet?(aircraft.id==='sf16'?520:460):255+cruiseBlend*115;
   // Game mode budgets thrust from wing area so each airframe can sustain the
   // selected speed without changing the measured ground motion.
-  const fastThrust=.5*rho*aircraft.wingArea*(cruiseMachTarget(f)*air.sound)**2*.064;
-  const available=fastCruise?fastThrust:aircraft.thrust?
+  const normalThrust=aircraft.thrust?
     (aircraft.thrust+(f.boost&&f.power>.89?aircraft.boostThrust||0:0))*Math.pow(rho/1.225,.75)/(1+Math.pow(speed/inletSpeed,2)):
     Math.min(2700*aircraft.power/119000,aircraft.power*.78/Math.max(18,forwardSpeed));
-  const thrust=enginePower*running*(f.propLow?.82:1)*available;
-  if(f.iasTrial) f.engineThrust=thrust;
+  f.airBrake=!f.ground&&Boolean(input.brake||input.airBrake);
+  const boostBlend=fastCruise&&!f.airBrake?limit(q/10000,.05,1):0;
+  const boostedThrust=.5*1.225*aircraft.wingArea*((fastCruiseKmh+12)/3.6)**2*(.064+2*aircraft.flapDrag[f.flaps]);
+  const available=normalThrust+boostBlend*Math.max(0,boostedThrust-normalThrust);
+  const engineThrust=enginePower*running*(f.propLow?.82:1)*available;
+  const thrust=boostBlend>0?Math.min(engineThrust,drag+mass*15):engineThrust;
+  if(gameAirborne) f.engineThrust=thrust;
   const left=engines.slice(0,engines.length/2).filter(Boolean).length;
   const right=engines.slice(engines.length/2).filter(Boolean).length;
   const asymmetricYaw=engines.length>1?.26*f.power*(left-right)/engines.length:0;
@@ -210,18 +213,21 @@ function stepTrainer(f, input, dt=simTick){
   const fighterAirborne=aircraft.role==='fighter'&&!f.ground;
   const fighterManual=fighterAirborne&&!f.hold&&!f.gear&&!f.flaps;
   const maneuver=input.maneuver??1;
-  const highSpeedAuthority=f.iasTrial&&fighterManual?limit(1.65-mach*.65,.40,1):1;
+  const highSpeedAuthority=gameAirborne?limit(1.65-mach*.65,.40,1):1;
   // Feed in part of the additional lift needed for a steep turn.
   const turnLift=fighterManual?limit(mass*g/(Math.max(q,1)*aircraft.wingArea*liftSlope)*
     (1/Math.max(.32,Math.cos(f.bank))-1),0,.15)*(1-Math.abs(input.pitch)):0;
-  const pitchTarget=limit(.015+f.trim+input.pitch*(fighterManual?.50*highSpeedAuthority:.24*maneuver)+f.flaps*.008+turnLift,
+  const trimBlend=gameAirborne&&!f.hold?limit((q-9000)/12000,0,1):0;
+  const normalPitch=.015+f.trim+f.flaps*.008+turnLift;
+  const centerPitch=trimBlend>0?normalPitch+trimBlend*(fastLevelPitch(f,q,speed,0,fighterManual?1.4:1)+f.trim*.25-normalPitch):normalPitch;
+  const pitchTarget=limit(centerPitch+input.pitch*(fighterManual?.50*highSpeedAuthority:.24*maneuver*(f.hold?1:highSpeedAuthority)),
     fighterManual?-.48:-.36,fighterManual?.54:.38);
   const bankTarget=input.roll*(fighterManual?1.25*highSpeedAuthority:.57*maneuver);
   f.commandPitch=pitchTarget;
   f.commandBank=bankTarget;
-  const response=limit(q/420,.22,1.8);
+  const response=pitchResponse(q);
   const pitchDamping=(fighterManual?9200:7800)+(input.yokeDamping?2100:0);
-  const cgMoment=lift*(aircraft.cgOffset+(payload?.shift||0)*.18)*(f.iasTrial?fastTrimAuthority(q):1);
+  const cgMoment=lift*(aircraft.cgOffset+(payload?.shift||0)*.18)*(gameAirborne?fastTrimAuthority(q):1);
   const pitchMoment=(pitchTarget-f.pitch)*14500*response*(fighterManual?1.4:1)*aircraft.inertia[0]/1650-f.pitchRate*pitchDamping*aircraft.inertia[0]/1650+cgMoment;
   const bankMoment=(bankTarget-f.bank)*14000*response*(fighterManual?2.2:1)*aircraft.inertia[1]/2450-f.bankRate*(fighterManual?9500:5300)*aircraft.inertia[1]/2450;
   const targetYaw=f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40): Math.tan(f.bank)*g/Math.max(20,speed)+input.rudder*(fighterManual?.37:.25)+beta*.35;
@@ -254,7 +260,8 @@ function stepTrainer(f, input, dt=simTick){
     const side=lift*Math.sin(f.bank)-q*aircraft.wingArea*.19*Math.sin(beta);
     const vertical=lift*Math.cos(f.bank)*Math.cos(pathAngle);
     const axial=thrust*Math.cos(f.pitch)-lift*Math.sin(pathAngle);
-    const d=(drag+(f.spoilers?q*aircraft.wingArea*.10:0))/Math.max(1,speed);
+    const airBrakeDrag=f.airBrake?Math.min(q*aircraft.wingArea*.24,mass*17):0;
+    const d=(drag+airBrakeDrag+(f.spoilers?q*aircraft.wingArea*.10:0))/Math.max(1,speed);
     f.vx+=(s*axial+c*side-airX*d)/mass*dt;
     const upForce=vertical+thrust*Math.sin(f.pitch)-airY*d;
     const rightForce=side-(airX*c+airZ*s)*d;
