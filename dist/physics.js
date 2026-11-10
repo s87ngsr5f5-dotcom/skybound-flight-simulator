@@ -194,6 +194,8 @@ function stepTrainer(f, input, dt=simTick){
   const pitchTarget=limit(.015+f.trim+input.pitch*(fighterManual?.50:.24*maneuver)+f.flaps*.008+turnLift,
     fighterManual?-.48:-.36,fighterManual?.54:.38);
   const bankTarget=input.roll*(fighterManual?1.25:.57*maneuver);
+  f.commandPitch=pitchTarget;
+  f.commandBank=bankTarget;
   const response=limit(q/420,.22,1.8);
   const pitchMoment=(pitchTarget-f.pitch)*14500*response*(fighterManual?1.4:1)*aircraft.inertia[0]/1650-f.pitchRate*(fighterManual?9200:7800)*aircraft.inertia[0]/1650+lift*(aircraft.cgOffset+(payload?.shift||0)*.18);
   const bankMoment=(bankTarget-f.bank)*14000*response*(fighterManual?2.2:1)*aircraft.inertia[1]/2450-f.bankRate*(fighterManual?9500:5300)*aircraft.inertia[1]/2450;
@@ -209,6 +211,7 @@ function stepTrainer(f, input, dt=simTick){
   if(Math.abs(f.bank)===bankLimit&&f.bank*f.bankRate>0) f.bankRate=0;
   f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/6,0,1):1));
   if(f.ground){
+    f.lateralAcceleration=0;
     f.bank=f.bankRate=0;
     f.pitch=Math.max(0,f.pitch);
     const rollSpeed=Math.hypot(f.vx,f.vz);
@@ -228,7 +231,10 @@ function stepTrainer(f, input, dt=simTick){
     const axial=thrust*Math.cos(f.pitch)-lift*Math.sin(pathAngle);
     const d=(drag+(f.spoilers?q*aircraft.wingArea*.10:0))/Math.max(1,speed);
     f.vx+=(s*axial+c*side-airX*d)/mass*dt;
-    f.vy+=((vertical+thrust*Math.sin(f.pitch)-airY*d)/mass-g)*dt;
+    const upForce=vertical+thrust*Math.sin(f.pitch)-airY*d;
+    const rightForce=side-(airX*c+airZ*s)*d;
+    f.lateralAcceleration=(rightForce*Math.cos(f.bank)-upForce*Math.sin(f.bank))/mass;
+    f.vy+=(upForce/mass-g)*dt;
     f.vz+=(-c*axial+s*side-airZ*d)/mass*dt;
   }
   f.x+=f.vx*dt;f.y+=f.vy*dt;f.z+=f.vz*dt;

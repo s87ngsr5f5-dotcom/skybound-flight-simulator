@@ -9,9 +9,16 @@ function random(){
   return seed / 4294967296;
 }
 let renderer;
-try {
-  renderer = new THREE.WebGLRenderer({antialias:touchControls.mode.value!=='mobile'});
-} catch(error) {
+const mobileRenderer=touchControls.mode.value==='mobile';
+const rendererOptions=[
+  {antialias:!mobileRenderer},
+  {antialias:false,powerPreference:'low-power',precision:'mediump'}
+];
+for(const options of rendererOptions){
+  // Three creates a new canvas for each attempt, including after context failure.
+  try{renderer=new THREE.WebGLRenderer(options);break;}catch{}
+}
+if(!renderer){
   byId('startupMessage').textContent = '3D 引擎無法啟動。請用支援 WebGL 的瀏覽器開啟。';
   byId('retryStartup').hidden=false;
   byId('fly').disabled = byId('approach').disabled = true;
@@ -539,6 +546,17 @@ function initialize(){
   let hangarStage,planPreviewAirport;
   let flight=null, cameraMode=0, last=performance.now(), accumulator=0, paused=false, previousFlightRate=1;
   let nextNavDraw=0,nextInstrumentDraw=0;
+  const attitudeCanvas=byId('adiCanvas'), attitudeToggle=byId('attitudeMode');
+  const attitude=new FlightAttitudeIndicator(attitudeCanvas);
+  const attitudePanel=byId('attitudePanel');
+  let attitudeMode='pfd';
+  function toggleAttitude(){
+    attitudeMode=attitudeMode==='pfd'?'hud':'pfd';
+    attitudePanel.dataset.mode=attitudeMode;
+    attitudeToggle.textContent=attitudeMode==='pfd'?'PFD':'HUD';
+    attitudeToggle.setAttribute('aria-pressed',String(attitudeMode==='hud'));
+  }
+  attitudeToggle.onclick=()=>{toggleAttitude();attitudeToggle.blur();};
   let savedControls={};
   try{savedControls=JSON.parse(localStorage.getItem('skybound.controls.v2')||'{}')||{};}catch{}
   let settings=upgradeControls(savedControls);
@@ -603,7 +621,7 @@ function initialize(){
     resetLook();
     changeView();
   }
-  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM']);
+  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH']);
   const radar=byId('radar').getContext('2d');
   const planMap=byId('planMap').getContext('2d');
   const flightRate=byId('flightRate'),flightRateStatus=byId('flightRateStatus');
@@ -990,7 +1008,6 @@ function initialize(){
     byId('cockpit').hidden=byId('struts').hidden=!cockpit||Boolean(flight?.aircraft.role);
     byId('systems').hidden=!flight?.regional;
     byId('reticle').hidden=!cockpit||Boolean(flight?.aircraft.role);
-    byId('benchmarkHUD').hidden=!cockpit||!flight?.aircraft.role;
     document.body.classList.toggle('cockpit-active',cockpit);
     document.body.classList.toggle('cockpit-panel-view',
       cockpit&&cockpitView.preset===(twoSeats(flight.aircraft)?2:1));
@@ -1442,6 +1459,7 @@ function initialize(){
     button.setAttribute('aria-pressed',String(isPaused));
   }
   function action(code){
+    if(code==='KeyH'&&!attitudePanel.hidden){toggleAttitude();return;}
     if(replay&&!['KeyC','KeyP','KeyN','Home'].includes(code)) return;
     if(replay&&code==='KeyP'){byId('replayToggle').click();return;}
     if(code==='KeyJ') toggleNavigation(flight);
@@ -1825,6 +1843,20 @@ function initialize(){
     const geo=latLon(f.x,f.z);
     byId('coords').textContent=geo.lat.toFixed(4)+'°N · '+geo.lon.toFixed(4)+'°E';
   }
+  function takeoffCoach(f,knots,mobile){
+    if(f.start!=='runway'||!['free','circuit'].includes(f.lesson)||f.approach||f.landed) return '';
+    if(!f.airborne){
+      if(f.parkingBrake) return '起飛 1/4 · 鬆開停機煞車';
+      if(f.power<.55&&knots<10) return '起飛 1/4 · '+(mobile?'將油門滑桿推到 100%':'按住 W 加油門');
+      if(knots<f.aircraft.rotation) return '起飛 2/4 · 保持跑道中線 · '+knots+' / '+f.aircraft.rotation+' IAS kt';
+      const rotate=mobile?(settings.invert?'輕推搖桿向下':'輕推搖桿向上'):(settings.invert?'輕按 ↓':'輕按 ↑');
+      return '起飛 3/4 · '+rotate+'，緩慢抬起機鼻';
+    }
+    if(f.y-f.departure.elevation<110&&f.phase!=='approach'){
+      return '起飛 4/4 · 保持正爬升'+(f.gear&&f.aircraft.retract?'，確認離地後收起落架':'');
+    }
+    return '';
+  }
   function status(f,knots,target){
     const mobile=touchControls.mode.value==='mobile';
     const retry=mobile?'':' · R 重飛';
@@ -1832,6 +1864,19 @@ function initialize(){
     if(paused) return touchControls.mode.value==='mobile'?'已暫停 · 點「繼續」':'已暫停 · P 繼續';
     if(f.tow) return f.tow.arrival?(f.mission==='cargo'?'拖往貨運機位':'拖往下客機位'):'拖往跑道';
     if(f.ground&&f.towMessage) return f.towMessage;
+    if(f.approach&&!f.voyage&&f.touchdown&&(f.finished||f.ended)){
+      const {cross,verticalSpeed}=f.touchdown;
+      const impact=Math.round(-verticalSpeed*196.85);
+      const score=f.ended?'降落失敗':impact<240&&Math.abs(cross)<5?'降落 ★★★':impact<460&&Math.abs(cross)<14?'降落 ★★':'降落 ★';
+      return score+' · 接地 '+impact+' ft/min · 偏離中線 '+Math.round(Math.abs(cross))+' m'+retry;
+    }
+    if(f.approach&&f.lesson==='free'&&f.landed&&!f.hold?.nav){
+      return '已接地 · 收油煞停，再拉上停機煞車查看成績';
+    }
+    if(!f.finished&&!f.ended&&!f.hold){
+      const coach=takeoffCoach(f,knots,mobile);
+      if(coach) return coach;
+    }
     if(f.ground&&!f.landed&&f.start==='runway'&&f.parkingBrake&&f.taxiIndex>=f.taxi.length) return mobile?
       '已對正跑道 · '+(!f.battery?'開電瓶':f.engines.every(Boolean)?'鬆開停機煞車':'啟動引擎'):
       '已對正跑道 · 啟動引擎後按 B 鬆開煞車';
@@ -2169,8 +2214,42 @@ function initialize(){
       byId('instrumentType').textContent+=' · 燃油 '+Math.round(f.fuel)+' kg'+(f.passengers?' · '+f.passengers+' 名旅客':'');
     }
     if(f.mission==='passenger') byId('instrumentType').textContent='旅客 '+f.passengers+' 人 · 燃油 '+Math.round(f.fuel).toLocaleString()+' kg · 餘額 $'+readMoney().toLocaleString();
-    byId('hudHeading').textContent='HDG '+values[3];
-    byId('hudNumbers').textContent=knots+' IAS kt　 '+values[1]+' FT　 VAPP '+profile.approach;
+  }
+  const approachGateGeometry=new THREE.BufferGeometry();
+  approachGateGeometry.setAttribute('position',new THREE.Float32BufferAttribute(
+    [-27,-12,0,27,-12,0,27,12,0,-27,12,0],3));
+  const nextGateMaterial=new THREE.LineBasicMaterial({color:0x76ffd4,transparent:true,opacity:.90,depthWrite:false});
+  const laterGateMaterial=new THREE.LineBasicMaterial({color:0x8bcaff,transparent:true,opacity:.40,depthWrite:false});
+  const approachGates=new THREE.Group();
+  let approachGateRunway;
+  const approachGateDistances=[4.5,3.9,3.3,2.7,2.1,1.5,.9,.3].map(nm=>nm*1852);
+  for(const distance of approachGateDistances){
+    const gate=new THREE.LineLoop(approachGateGeometry,laterGateMaterial);
+    gate.userData.distance=distance;
+    approachGates.add(gate);
+  }
+  scene.add(approachGates);
+  function drawApproachGates(f){
+    const visible=f?.regional&&f.approach&&!f.voyage&&!f.tactical&&!replay&&!f.ground&&!f.ended;
+    approachGates.visible=Boolean(visible);
+    if(!visible) return;
+    const runway=f.destination;
+    const {along}=runwayCoordinates(f.x,f.z,runway);
+    const distance=-along-runway.length/2;
+    let first=true;
+    for(const gate of approachGates.children){
+      const d=gate.userData.distance;
+      gate.visible=d<distance-15;
+      if(runway!==approachGateRunway){
+        const {x,z}=airportPoint(runway,-runway.length/2-d,0);
+        gate.position.set(x,runway.elevation+15+d*Math.tan(Math.PI/60),z);
+        gate.rotation.y=-runway.heading;
+      }
+      if(!gate.visible) continue;
+      gate.material=first?nextGateMaterial:laterGateMaterial;
+      first=false;
+    }
+    approachGateRunway=runway;
   }
   function animateCargoDoors(data,noseOpen,sideOpen,dt){
     const blend=Math.min(1,dt*2.8);
@@ -2207,6 +2286,7 @@ function initialize(){
     bridgeQueue.visible=tug.visible=tanker.visible=false;
     cargoLoader.visible=false;
     serviceLamp.intensity=0;
+    drawApproachGates(flight);
     if(flight){
       const f=flight,input=replay?{roll:0}:inputs(f);
       if(poseFlight!==f){
@@ -2459,11 +2539,10 @@ function initialize(){
         nextInstrumentDraw=now+80;
         drawInstruments(f,profile,speeds,knots,live);
       }
-      const straightAhead=cockpitView.preset!==(twoSeats(profile)?2:1)&&
-        Math.abs(cockpitView.yaw)<.18&&Math.abs(cockpitView.pitch)<.16;
-      const hud=byId('benchmarkHUD');
-      hud.hidden=Boolean(f.tactical)||!profile.role||!cockpitActive()||!live||!straightAhead;
-      if(!hud.hidden) byId('hudCross').style.transform='rotate('+(-bank/rad)+'deg) translateY('+clamp(pitch/rad*2,-40,40)+'px)';
+      attitudePanel.hidden=!live||Boolean(f.tactical)||Boolean(f.cabinView)||Boolean(f.tow);
+      if(!attitudePanel.hidden){
+        attitude.draw(f,pitch,bank,heading,attitudeCanvas.clientWidth,attitudeMode);
+      }
       if(!f.regional&&!f.ground&&f.waypoint<4&&Math.hypot(legacyRoute[f.waypoint].x-f.x,legacyRoute[f.waypoint].z-f.z)<420) f.waypoint++;
       const target=f.regional?activeTarget(f):legacyRoute[f.waypoint];
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}
@@ -2471,6 +2550,7 @@ function initialize(){
       statusBox.hidden=Boolean(f.tactical&&!paused)||!byId('gateGuide').hidden&&!paused&&!f.towMessage;
       const statusText=status(f,knots,target);
       if(statusBox.textContent!==statusText) statusBox.textContent=statusText;
+      statusBox.classList.toggle('practice-status',statusText.startsWith('起飛 ')||Boolean(f.approach&&!f.voyage));
       const readyToTowIn=arrivalTowReady(f);
       byId('towControls').hidden=!f.tow&&!readyToTowIn;
       byId('startGateTow').hidden=!readyToTowIn;

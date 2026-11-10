@@ -1,6 +1,6 @@
 'use strict';
 function makeFlightAudio(){
-  let context, fan, core, roar, air, roarFilter, windFilter;
+  let context, fan, core, roar, air, stall, roarFilter, windFilter;
   function layer(source,filter){
     const gain=context.createGain();
     gain.gain.value=0;
@@ -22,6 +22,8 @@ function makeFlightAudio(){
       try{context=new Audio();}catch{return false;}
       fan=tone('triangle');
       core=tone('sine');
+      stall=tone('triangle');
+      stall.frequency.value=830;
       const buffer=context.createBuffer(1,context.sampleRate*2,context.sampleRate);
       const sample=buffer.getChannelData(0);
       for(let i=0;i<sample.length;i++) sample[i]=Math.random()*2-1;
@@ -61,6 +63,8 @@ function makeFlightAudio(){
     roar.setTargetAtTime(strength*(.10+power*(afterburner?.57:.39)),t,.29);
     windFilter.frequency.setTargetAtTime(cockpit?420:760,t,.20);
     air.setTargetAtTime(enabled&&f?(cockpit?.55:1)*Math.min(.08,f.speed*.00053):0,t,.20);
+    const warning=enabled&&f?.stall&&!f.ground&&!f.ended;
+    stall.gain.setTargetAtTime(warning&&Math.floor(t*6)%2===0?.095:0,t,.025);
   }
   function effect(frequency,volume){
     if(!context) return;

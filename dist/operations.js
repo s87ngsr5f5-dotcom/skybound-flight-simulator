@@ -446,6 +446,11 @@ function updateRegionalFlight(f,save=recordFlight){
     return;
   }
   if(f.landed){
+    if(f.approach&&f.lesson==='free'&&Math.hypot(f.vx,f.vz)<1&&f.parkingBrake){
+      f.finished=true;
+      f.recorded=save(f,'降落練習完成');
+      return;
+    }
     if(!f.arrivalTaxi){
       const end=f.touchdown.along<40?440:Math.min(f.destination.length/2-90,950);
       f.arrivalTaxi=[

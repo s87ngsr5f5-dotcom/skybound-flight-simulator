@@ -141,6 +141,43 @@ body:not(.mobile-mode) #flightNext.cargo-action {
   .mobile-mode #flightTimeControls label { font-size: 0; }
 }
 body.hangar-active .quick-controls { display: none; }
+#deviceMode { color-scheme: dark; }
+#adiCanvas {
+  position: absolute;
+  left: 0;
+  bottom: 148px;
+  width: clamp(110px, 25vh, 184px);
+  aspect-ratio: 1;
+  filter: drop-shadow(0 1px 4px #0414209e);
+}
+#attitudeMode {
+  position: absolute;
+  left: 0;
+  bottom: 114px;
+  padding: 5px 10px;
+  font: 700 12px system-ui, sans-serif;
+  background: #0a2135ed;
+}
+#attitudePanel[data-mode="hud"] #adiCanvas {
+  left: 50%;
+  top: 47%;
+  bottom: auto;
+  width: min(320px, 56vh, 72vw);
+  transform: translate(-50%, -50%);
+}
+#attitudeMode[aria-pressed="true"] { color: #a2ffd2; }
+#hud:has(#attitudePanel[data-mode="hud"]:not([hidden])) #reticle { visibility: hidden; }
+body:not(.mobile-mode) #status.practice-status { bottom: 126px; top: auto; }
+.mobile-mode #adiCanvas { top: 49px; bottom: auto; width: clamp(84px, 24vh, 110px); }
+.mobile-mode #attitudeMode { top: 49px; bottom: auto; left: clamp(88px, 25vh, 114px); min-height: 42px; min-width: 44px; }
+.mobile-mode #attitudePanel[data-mode="hud"] #adiCanvas { top: 44%; width: min(220px, 54vh, 63vw); }
+.mobile-mode [data-mobile-panel]:not([data-mobile-panel=""]) #attitudePanel { visibility: hidden; }
+body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudePanel[data-mode="pfd"] #adiCanvas {
+  left: min(49vw, 370px);
+}
+body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudeMode {
+  left: min(49vw, 370px);
+}
 @media (max-width: 700px) {
   #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }
   #plan .plan-setup, #plan .plan-preview, #plan .plan-intro, #plan .plan-history { padding-inline: 14px; }
