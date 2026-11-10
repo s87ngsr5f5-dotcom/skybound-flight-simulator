@@ -90,7 +90,7 @@
   width: max-content;
   text-align: center;
 }
-.flight-ui #status,.flight-ui #towControls,.flight-ui #flightNext.cargo-action {
+.flight-ui #status,.flight-ui #towControls {
   position: static;
   transform: none;
   max-width: 100%;
@@ -99,7 +99,18 @@
 .flight-ui #status { padding: 5px 9px; background: #111f26d9; font-size: 12px; }
 .flight-ui #status.coach-warning { background: #85332bf0; }
 .flight-ui #towControls { margin-top: 4px; }
-.flight-ui #flightNext.cargo-action { margin: 4px auto 0; }
+.flight-ui #flightNext,.flight-ui #gateStep {
+  display: inline-block;
+  margin: 4px auto 0;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #83e6c4;
+  color: #102623;
+  font-weight: 700;
+  pointer-events: auto;
+}
+.flight-ui #gateStep { margin: 0; }
 .flight-ui #flightNavigation,.flight-ui #systems,.flight-ui #mobileExtras {
   display: none;
   position: absolute;
@@ -124,6 +135,17 @@
 .flight-ui #hud:has(#replayControls:not([hidden])) #systems { display: block; }
 .flight-ui #flightNavigation .glass-map-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .flight-ui #flightNavigation canvas { display: block; margin: 6px 0; }
+.flight-ui #flightNavigation { width: min(350px,90vw); }
+.flight-ui #flightNavigation #nav { display: block; white-space: pre-line; margin: 6px 0; font-size: 13px; }
+.flight-ui #flightNavigation #radar { border: 1px solid #709ca7; border-radius: 8px; }
+.flight-ui #flightNavigation details { margin: 6px 0; color: #aacbd7; font-size: 12px; }
+.map-legend { display: flex; gap: 8px; flex-wrap: wrap; color: #deedf2; font-size: 11px; }
+.map-legend b { color: #ffcf5e; }
+.map-legend i { color: #80dcff; font-style: normal; }
+@media (orientation: landscape) and (max-height: 550px) {
+  .mobile-mode.flight-ui #flightNavigation { width: min(315px,85vw); max-height: 76vh; }
+  .mobile-mode.flight-ui #flightNavigation #radar { max-width: 61vh; margin-inline: auto; }
+}
 #mobileExtras p { margin: 0 0 8px; font-size: 13px; line-height: 1.45; }
 .glass-actions { display: flex; flex-wrap: wrap; gap: 5px; }
 .flight-ui #flightTimeControls { position: static; margin-top: 8px; text-align: left; }

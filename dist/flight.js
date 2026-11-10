@@ -146,6 +146,18 @@ function initialize(){
   const terrainHeights=new Map();
   let previousChunk='',terrainQueue=[],terrainBuild=null,terrainColorRevision=0;
   const terrainStep=(col,row)=>col>=-1&&col<=0&&row>=-1&&row<=0?120:240;
+  let mountainLayerRequested=false;
+  function loadMountainTerrain(col,row){
+    if(mountainLayerRequested||col< -18||col>6||row< -1||row>27) return;
+    mountainLayerRequested=true;
+    const script=document.createElement('script');
+    script.src='central-mountains.js?v=terrain24';
+    script.onload=()=>{
+      terrainHeights.clear();
+      terrainColorRevision++;
+    };
+    document.head.appendChild(script);
+  }
   function terrainVertex(x,z){
     const key=x+':'+z;
     let height=terrainHeights.get(key);
@@ -157,7 +169,7 @@ function initialize(){
     return height;
   }
   function stitchedHeight(x,z,step){
-    // Fine Taipei patches share the coarse edge profile, so adjacent meshes meet.
+    // Fine tiles share the coarse edge profile, so adjacent meshes meet.
     if(step===120){
       if(x%span===0&&z%240!==0) return (terrainVertex(x,z-120)+terrainVertex(x,z+120))/2;
       if(z%span===0&&x%240!==0) return (terrainVertex(x-120,z)+terrainVertex(x+120,z))/2;
@@ -167,6 +179,7 @@ function initialize(){
   function updateTerrain(x,z){
     if(renderer.instrumentOnly) return;
     const cx=Math.floor(x/span),cz=Math.floor(z/span),id=cx+':'+cz+':'+terrainColorRevision;
+    loadMountainTerrain(cx,cz);
     if(id!==previousChunk){
       previousChunk=id;
       const visible=new Set();
@@ -175,8 +188,12 @@ function initialize(){
         for(let col=cx-3;col<=cx+3;col++){
           const key=col+':'+row;
           visible.add(key);
-          if(terrainChunks.get(key)?.userData.colorRevision!==terrainColorRevision){
-            terrainQueue.push({col,row,key,distance:(x/span-col-.5)**2+(z/span-row-.5)**2});
+          const mountain=Boolean(centralMountainTile(col,row));
+          const near=Math.max(Math.abs(col-cx),Math.abs(row-cz))<=1;
+          const step=mountain&&near?120:terrainStep(col,row);
+          const old=terrainChunks.get(key)?.userData;
+          if(old?.colorRevision!==terrainColorRevision||old.step!==step){
+            terrainQueue.push({col,row,key,step,mountain,distance:(x/span-col-.5)**2+(z/span-row-.5)**2});
           }
         }
       }
@@ -196,13 +213,13 @@ function initialize(){
     const deadline=performance.now()+2.5;
     while(terrainBuild||terrainQueue.length){
       if(!terrainBuild){
-        const {col,row,key}=terrainQueue.shift(),step=terrainStep(col,row);
+        const {col,row,key,step,mountain}=terrainQueue.shift();
         const mesh=new THREE.PlaneGeometry(span,span,span/step,span/step);
         mesh.rotateX(-Math.PI/2);
-        terrainBuild={key,mesh,step,px:(col+.5)*span,pz:(row+.5)*span,index:0,
+        terrainBuild={key,mesh,step,mountain,px:(col+.5)*span,pz:(row+.5)*span,index:0,
           colors:new THREE.BufferAttribute(new Float32Array(mesh.attributes.position.count*3),3)};
       }
-      const {key,mesh,step,px,pz,colors}=terrainBuild,pos=mesh.attributes.position;
+      const {key,mesh,step,mountain,px,pz,colors}=terrainBuild,pos=mesh.attributes.position;
       const end=Math.min(pos.count,terrainBuild.index+128);
       for(let i=terrainBuild.index;i<end;i++){
         const worldX=px+pos.getX(i),worldZ=pz+Math.round(pos.getZ(i));
@@ -211,7 +228,13 @@ function initialize(){
         const forest=height>=1.5&&height<=3500?(treeCover(worldX,worldZ)||0):0;
         const urban=height<160&&worldX>-9000&&worldX<11000&&worldZ>-4500&&worldZ<9500;
         if(height<.7) colors.setXYZ(i,.17,.42,.83);
-        else if(forest>.08) colors.setXYZ(i,.76-.44*forest,.90-.45*forest,.76-.47*forest);
+        else if(mountain&&height>350){
+          const slope=Math.hypot(terrainVertex(worldX+120,worldZ)-height,terrainVertex(worldX,worldZ+120)-height)/120;
+          const rock=Math.max(clamp((height-2800)/1200,0,1)*.66,clamp((slope-.7)/1.1,0,.86));
+          const canopy=height<3300?Math.max(forest,.52):.25;
+          const r=.69-.39*canopy,g=.85-.42*canopy,b=.64-.34*canopy;
+          colors.setXYZ(i,r+(.66-r)*rock,g+(.64-g)*rock,b+(.58-b)*rock);
+        }else if(forest>.08) colors.setXYZ(i,.76-.44*forest,.90-.45*forest,.76-.47*forest);
         else if(height>1000) colors.setXYZ(i,.71,.77,.72);
         else if(urban) colors.setXYZ(i,.68,.72,.72);
         else colors.setXYZ(i,.78,.92,.77);
@@ -224,6 +247,7 @@ function initialize(){
         patch.receiveShadow=true;
         patch.position.set(px,0,pz);
         patch.userData.colorRevision=terrainColorRevision;
+        patch.userData.step=step;
         const old=terrainChunks.get(key);
         if(old){scene.remove(old);old.geometry.dispose();}
         terrainChunks.set(key,patch);
@@ -461,7 +485,8 @@ function initialize(){
   }
   scene.add(blocks);
   function renderedGround(x,z){
-    const step=terrainStep(Math.floor(x/span),Math.floor(z/span));
+    const col=Math.floor(x/span),row=Math.floor(z/span);
+    const step=terrainChunks.get(col+':'+row)?.userData.step??terrainStep(col,row);
     const cx=Math.floor(x/step)*step,cz=Math.floor(z/step)*step;
     const u=(x-cx)/step,v=(z-cz)/step;
     const a=stitchedHeight(cx,cz,step),b=stitchedHeight(cx+step,cz,step);
@@ -604,17 +629,28 @@ function initialize(){
   const waypointChip=byId('waypointChip');
   const flightBar=byId('flightBar'),flightAircraft=byId('flightAircraft');
   const glideButton=byId('touchGlide'),helpGlide=byId('helpGlide'),touchAssist=byId('touchAssist');
-  let attitudeMode='hud';
+  const attitudeModes=['clear','hud','pfd'];
+  const instrumentLabels={clear:'姿態儀：隱藏',hud:'姿態儀：抬頭',pfd:'姿態儀：面板'};
+  let attitudeMode='clear';
+  try{
+    const saved=localStorage.getItem('skybound.attitudeMode');
+    if(attitudeModes.includes(saved)) attitudeMode=saved;
+  }catch{}
   let glideEnabled=false;
-  attitudePanel.dataset.mode=attitudeMode;
-  function toggleAttitude(){
-    attitudeMode=attitudeMode==='pfd'?'hud':'pfd';
+  const helpInstruments=byId('helpInstruments');
+  function applyAttitudeMode(){
     attitudePanel.dataset.mode=attitudeMode;
-    attitudeToggle.textContent=attitudeMode==='pfd'?'PFD':'HUD';
-    attitudeToggle.setAttribute('aria-pressed',String(attitudeMode==='hud'));
+    attitudeCanvas.hidden=attitudeMode==='clear';
+    helpInstruments.textContent=instrumentLabels[attitudeMode];
+  }
+  applyAttitudeMode();
+  function toggleAttitude(){
+    attitudeMode=attitudeModes[(attitudeModes.indexOf(attitudeMode)+1)%attitudeModes.length];
+    applyAttitudeMode();
+    try{localStorage.setItem('skybound.attitudeMode',attitudeMode);}catch{}
   }
   attitudeToggle.onclick=()=>{toggleAttitude();attitudeToggle.blur();};
-  byId('helpInstruments').onclick=()=>{
+  helpInstruments.onclick=()=>{
     toggleAttitude();
     setMobilePanel('');
   };
@@ -800,9 +836,9 @@ function initialize(){
     }).concat(auto.slice(-2)):auto;
     return {departure,destination,route};
   }
-  function mapPath(context,points,project,color){
+  function mapPath(context,points,project,color,width=2){
     context.strokeStyle=color;
-    context.lineWidth=2;
+    context.lineWidth=width;
     context.beginPath();
     points.forEach((point,i)=>i===0?context.moveTo(...project(point)):context.lineTo(...project(point)));
     context.stroke();
@@ -962,12 +998,12 @@ function initialize(){
   terrainPreview.width=430;terrainPreview.height=440;
   const terrainPreviewInk=terrainPreview.getContext('2d');
   terrainPreviewInk.fillStyle='#12364d';terrainPreviewInk.fillRect(0,0,430,440);
-  for(let y=0;y<440;y+=4){
-    for(let x=0;x<430;x+=4){
+  for(let y=0;y<440;y+=2){
+    for(let x=0;x<430;x+=2){
       const h=regionalHeight((x-290)*900,(y-43)*900);
       if(h<.8) continue;
       terrainPreviewInk.fillStyle=h>1900?'#afb7a1':h>550?'#5d805f':'#426d56';
-      terrainPreviewInk.fillRect(x,y,4,4);
+      terrainPreviewInk.fillRect(x,y,2,2);
     }
   }
   for(const button of planModes) button.onclick=()=>{
@@ -1142,6 +1178,10 @@ function initialize(){
     f.checkpointFailed=!writeMissionCheckpoint(f,options,f.voyage?voyageFrames:[],replaces);
     nextCheckpoint=performance.now()+15000;
   }
+  function setBattery(f,on){
+    f.battery=on;
+    saveCurrentMission(f);
+  }
   addEventListener('pagehide',()=>saveCurrentMission(flight));
   function callRunwayTow(f,skip=false){
     if(!paused&&!replay&&(f.tow?skip:f.landed?requestGateTow(f):requestRunwayTow(f))){
@@ -1170,6 +1210,7 @@ function initialize(){
         f.engines.forEach((running,index)=>{if(running) startEngine(f,index);});
         return;
       }
+      if(atGate()&&!f.awaitingService&&!f.battery){setBattery(f,true);return;}
       const complete=f.awaitingService?service.delivered===f.passengers:service.boarded===f.passengers;
       if(!f.awaitingService&&complete&&!f.bridge&&f.fuel>=service.targetFuel){callRunwayTow(f);return;}
       if(f.bridge&&(service.door||!complete)) door();
@@ -1271,6 +1312,7 @@ function initialize(){
     if(!f.parkingBrake){prompt='停妥後拉上停機煞車。';next='停機煞車';}
     else if(f.engines.some(Boolean)){prompt='請關閉引擎，才能使用空橋。';next='關閉引擎';}
     else if(!available){prompt='請在機位停妥後開始地勤作業。';}
+    else if(!arriving&&!f.battery){prompt='先開電瓶，供電後再準備登機。';next='開電瓶';}
     else if(!f.bridge&&!complete){prompt='接上空橋，準備'+activity+'。';next='接上空橋';}
     else if(!service.door&&!complete){prompt='開門後，旅客會自動'+activity+'。';next='開艙門';}
     else if(!complete){prompt='旅客正在'+activity+'，請保持艙門開啟。';}
@@ -1288,8 +1330,8 @@ function initialize(){
     skip.hidden=next!=='拖車牽引至跑道';
     skip.disabled=Math.hypot(f.vx,f.vz)>=.8||paused;
     if(next&&step.textContent!==next) step.textContent=next;
-    step.disabled=Math.hypot(f.vx,f.vz)>=.8;
-    fuel.hidden=arriving||f.fuel>=service.targetFuel;
+    step.disabled=paused||Boolean(replay)||Math.hypot(f.vx,f.vz)>=.8;
+    fuel.hidden=arriving||!f.battery||f.fuel>=service.targetFuel;
     fuel.disabled=!available||f.fuel>=service.targetFuel;
     const fuelLabel=service.pumping?'停止加油':f.fuel>=service.targetFuel?'加油完成':'開始加油';
     if(fuel.textContent!==fuelLabel) fuel.textContent=fuelLabel;
@@ -1305,7 +1347,7 @@ function initialize(){
   function showSystems(f){
     switches.replaceChildren();special.replaceChildren();
     const entries=[
-      ['電瓶',()=>f.battery,()=>f.battery=!f.battery],
+      ['電瓶',()=>f.battery,()=>setBattery(f,!f.battery)],
       ...f.engines.map((_,i)=>['引擎 '+(i+1),()=>f.engines[i],()=>startEngine(f,i)]),
       ['停機煞車',()=>f.parkingBrake,()=>f.parkingBrake=!f.parkingBrake],
       ['燈光',()=>f.lights,()=>{if(f.battery) f.lights=!f.lights;}],
@@ -1507,6 +1549,12 @@ function initialize(){
         if(flight.mission==='passenger'){
           const fuel=chosen.missionFuel??56000;
           Object.assign(flight,{passengers:chosen.passengers??320,fuel,fuelStart:fuel});
+        }
+        if(preset==='mountains'){
+          const position=geoPoint(24.16,121.67),heading=275*rad,speed=160;
+          const altitude=4600;
+          Object.assign(flight,{...position,y:altitude,heading,speed,vx:Math.sin(heading)*speed,vz:-Math.cos(heading)*speed,
+            power:.66,hold:{heading,altitude},gear:false,parkingBrake:false});
         }
         if(flight.approach){
           const distance=preset==='landing'?9100:3700-destination.length/2;
@@ -1800,6 +1848,18 @@ function initialize(){
   byId('cockpitPreset').onclick=cycleCockpitView;
   byId('resetLook').onclick=()=>action('Home');
   byId('fly').onclick=()=>{byId('fly').blur();start(false);};
+  byId('quickMountains').onclick=()=>{
+    byId('lesson').value='free';
+    byId('aircraft').value='fck1';
+    byId('departure').value='RCSS';
+    byId('destination').value='RCYU';
+    byId('startType').value='air';
+    byId('weather').value='0';
+    byId('time').value='14:00';
+    byId('waypoints').value='';
+    drawPlan();
+    start(false,false,'mountains');
+  };
   byId('quickFlights').onclick=event=>{
     const button=event.target.closest('[data-quick]');
     if(!button) return;
@@ -1982,21 +2042,75 @@ function initialize(){
   const trail=[];
   let trailFrame=0;
   function drawNav(f,target){
-    radar.fillStyle='#112c41';radar.fillRect(0,0,155,100);
+    if(byId('hud').dataset.mobilePanel!=='nav') return;
+    const {width,height}=radar.canvas;
+    radar.fillStyle='#12364d';radar.fillRect(0,0,width,height);
     if(f.regional&&!f.battery){byId('speedDetails').textContent='';byId('nav').textContent='航電未供電';byId('coords').textContent='';return;}
+    const destination=f.destination;
+    const destinationDistance=destination?Math.hypot(destination.x-f.x,destination.z-f.z):Infinity;
+    const visiblePoints=!f.ground&&destinationDistance<120000?[f,target,destination]:[f,target];
     const distance=Math.hypot(target.x-f.x,target.z-f.z);
     const speeds=flightSpeeds(f);
     const closing=distance>0?((target.x-f.x)*f.vx+(target.z-f.z)*f.vz)/distance:0;
     byId('speedDetails').textContent='TAS '+displayKmh(speeds.tas)+' km/h · GS '+displayKmh(speeds.gs)+
       ' km/h · Mach '+speeds.mach.toFixed(2)+(closing>5&&!f.ground?' · 航點 ETA '+(distance/closing/60).toFixed(1)+' 分':'');
-    const scale=f.ground?.13:Math.min(.018,58/Math.max(1000,distance));
-    const project=p=>[77+(p.x-f.x)*scale,50+(p.z-f.z)*scale];
-    radar.setLineDash([3,2]);mapPath(radar,[f,target],project,'#65ceff');radar.setLineDash([]);
-    if(trail.length>1) mapPath(radar,trail,project,'#dba04e');
-    radar.save();radar.translate(77,50);radar.rotate(f.heading);
-    radar.fillStyle='#ffcf5e';radar.beginPath();radar.moveTo(0,-7);radar.lineTo(5,6);radar.lineTo(-5,6);radar.closePath();radar.fill();radar.restore();
+    const xs=visiblePoints.map(p=>p.x),zs=visiblePoints.map(p=>p.z);
+    const minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
+    const centerX=(minX+maxX)/2,centerZ=(minZ+maxZ)/2;
+    const scale=Math.min(f.ground?.11:.018,width*.72/Math.max(1,maxX-minX),height*.64/Math.max(1,maxZ-minZ));
+    const project=p=>[width/2+(p.x-centerX)*scale,height/2+(p.z-centerZ)*scale];
+    if(f.ground) {
+      radar.fillStyle='#314c41';
+      radar.fillRect(0,0,width,height);
+    }else{
+      const [left,top]=project({x:-290*900,z:-43*900});
+      radar.drawImage(terrainPreview,left,top,terrainPreview.width*900*scale,terrainPreview.height*900*scale);
+    }
+    const nextLegs=f.ground?[]:f.route?.slice((f.waypoint??0)+1)||[];
+    radar.lineWidth=2;
+    if(trail.length>1) mapPath(radar,trail,project,'#dcb771');
+    radar.setLineDash([5,4]);
+    mapPath(radar,[target,...nextLegs],project,'#9ae6fc');
+    radar.setLineDash([]);
+    mapPath(radar,[f,target],project,'#80dcff');
+    const [ownX,ownY]=project(f);
+    const labeled=[[ownX,ownY]];
+    const mapAirports=[...new Set([destination,f.departure,...airports].filter(Boolean))];
+    radar.font='bold 13px system-ui';
+    for(const airport of mapAirports){
+      const [x,y]=project(airport);
+      if(x<11||x>width-11||y<14||y>height-18) continue;
+      const active=airport===destination&&!f.ground;
+      radar.fillStyle=active?'#78effe':'#e6f4f9';
+      if(f.ground){
+        mapPath(radar,[airportPoint(airport,-airport.length/2,0),airportPoint(airport,airport.length/2,0)],project,'#d9e2e5',4);
+      }else{
+        radar.fillRect(x-3,y-3,6,6);
+      }
+      if(!active&&labeled.some(([px,py])=>Math.abs(px-x)<63&&Math.abs(py-y)<20)) continue;
+      radar.textBaseline='middle';
+      const name=active?'目的地 '+airport.name:airport.name;
+      const labelWidth=radar.measureText(name).width;
+      const labelX=clamp(x+9,4,width-labelWidth-5);
+      radar.strokeStyle='#122b31';radar.lineWidth=3;
+      radar.strokeText(name,labelX,y);
+      radar.fillText(name,labelX,y);
+      labeled.push([x,y]);
+    }
+    radar.save();radar.translate(ownX,ownY);radar.rotate(f.heading);
+    radar.beginPath();radar.moveTo(0,-9);radar.lineTo(6,7);radar.lineTo(0,4);radar.lineTo(-6,7);radar.closePath();
+    radar.fillStyle='#ffcf5e';radar.fill();radar.strokeStyle='#122b31';radar.lineWidth=1.5;radar.stroke();radar.restore();
+    radar.font='bold 12px system-ui';radar.textBaseline='middle';
+    radar.fillStyle='#102638';radar.fillRect(width-32,5,26,21);
+    radar.fillStyle='#eef9ff';radar.fillText('北 ↑',width-31,16);
+    const scaleDistance=([100,250,500,1000,2000,5000,10000,25000,50000,100000,250000,500000].find(n=>n*scale>=32)||1000000);
+    radar.fillStyle='#102638';radar.fillRect(5,height-26,Math.max(53,scaleDistance*scale+12),20);
+    radar.fillStyle='#eef9ff';
+    radar.fillRect(10,height-12,scaleDistance*scale,2);
+    radar.fillText(scaleDistance>=1000?(scaleDistance/1000)+' km':scaleDistance+' m',10,height-19);
     const bearing=(Math.atan2(target.x-f.x,f.z-target.z)/rad+360)%360;
-    byId('nav').textContent=(target.name||'RCSS 10')+' · '+Math.round(bearing)+'° / '+(f.ground?Math.round(distance)+' m':(distance/1000).toFixed(1)+' km');
+    const direction=['北','東北','東','東南','南','西南','西','西北'][Math.round(bearing/45)%8];
+    byId('nav').textContent='下一站 '+(target.name||'松山跑道')+'\n往'+direction+' '+Math.round(bearing)+'° · '+(f.ground?Math.round(distance)+' m':(distance/1000).toFixed(1)+' km');
     const geo=latLon(f.x,f.z);
     byId('coords').textContent=geo.lat.toFixed(4)+'°N · '+geo.lon.toFixed(4)+'°E';
   }
@@ -2005,6 +2119,7 @@ function initialize(){
     waypointChip.hidden=!airport||f.ground||f.tactical||f.finished||Boolean(f.cabinView)||Boolean(replay);
     if(waypointChip.hidden) return;
     const distance=Math.hypot(airport.x-f.x,airport.z-f.z);
+    if(distance<2600){waypointChip.hidden=true;return;}
     const bearing=(Math.atan2(airport.x-f.x,f.z-airport.z)/rad+360)%360;
     waypointChip.textContent='✈ '+airport.code+' '+airport.name+' · '+(distance/1000).toFixed(distance<10?1:0)+' km · '+
       String(Math.round(bearing)%360).padStart(3,'0')+'°';
@@ -2093,9 +2208,8 @@ function initialize(){
       const coach=takeoffCoach(f,knots,mobile);
       if(coach) return coach;
     }
-    if(f.ground&&!f.landed&&f.start==='runway'&&f.parkingBrake&&f.taxiIndex>=f.taxi.length) return mobile?
-      '已對正跑道 · '+(!f.battery?'開電瓶':f.engines.every(Boolean)?'鬆開停機煞車':'啟動引擎'):
-      '已對正跑道 · 啟動引擎後按 B 鬆開煞車';
+    if(f.ground&&!f.landed&&f.start==='runway'&&f.parkingBrake&&f.taxiIndex>=f.taxi.length)
+      return '已對正跑道 · '+(!f.battery?'請開電瓶':f.engines.every(Boolean)?'可鬆開停機煞車':'請啟動引擎');
     if(f.checkpointFailed&&!f.finished) return '任務存檔未更新 · 請檢查瀏覽器儲存空間或其他分頁';
     if(f.contract&&f.finished){
       const receipt=f.receipt;
@@ -2151,8 +2265,9 @@ function initialize(){
     if(arrivalTowReady(f)&&f.mission==='cargo') return '已停穩 · 選擇前往貨運機位的方式';
     if(f.awaitingService) return f.mission==='cargo'?'關閉引擎 · 開貨門卸貨，卸完關門':'關閉引擎 · 連接空橋';
     if(f.phase==='cold'){
+      if(!f.battery) return '冷艙 · 請開電瓶';
       if(f.mission==='cargo'&&!f.pallets.some(Boolean)) return '開貨門，裝載貨盤後關門';
-      return '開電瓶，再啟動引擎';
+      return '電瓶已供電 · 請啟動引擎';
     }
     if(f.phase==='taxi'||f.phase==='arrival'){
       if(f.parkingBrake) return '停機煞車已拉上 · '+(mobile?'點「停機煞車」鬆開':'B 鬆開');
@@ -2190,11 +2305,12 @@ function initialize(){
       else if(!f.ground&&!f.tactical&&!f.climbLesson&&!f.cruiseTrial){
         label='自動導航與降落';run=()=>toggleNavigation(f);
         if(!f.battery) label='';
+      }else if(f.ground&&!f.awaitingService&&!f.landed&&!f.battery){
+        label='開電瓶';run=()=>setBattery(f,true);
       }else if(f.ground&&f.mission==='cargo'&&(f.awaitingService||f.phase==='cold')){
         ({label,run}=cargoNextAction(f));
       }else if(f.ground&&!f.awaitingService&&!(f.landed&&f.service)){
-        if(!f.battery){label='開電瓶';run=()=>{f.battery=true;};}
-        else if(!f.engines.every(Boolean)){
+        if(!f.engines.every(Boolean)){
           const engine=f.engines.findIndex(running=>!running);
           label='啟動引擎 '+(engine+1);run=()=>startEngine(f,engine);
         }else if(f.start==='cold'&&runwayTowReady(f)){label='跳至跑道';run=()=>callRunwayTow(f,true);}
@@ -2202,7 +2318,6 @@ function initialize(){
       }
     }
     nextFlightAction=run;
-    flightNext.classList.toggle('cargo-action',f.mission==='cargo');
     flightNext.classList.toggle('flight-assist-duplicate',label==='自動導航與降落'||label==='接回手動');
     flightNext.hidden=!label;
     if(flightNext.textContent!==label) flightNext.textContent=label;
@@ -2462,17 +2577,33 @@ function initialize(){
   }));
   airportLabel.scale.set(.34,.0744,1);
   airportLabel.renderOrder=20;
-  scene.add(airportLabel);
+  const runwayMarker=new THREE.Mesh(new THREE.RingGeometry(.70,1,32),new THREE.MeshBasicMaterial({
+    color:0x71e9ff,transparent:true,depthWrite:false,side:THREE.DoubleSide
+  }));
+  runwayMarker.rotation.x=-Math.PI/2;
+  const markerStem=new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(),new THREE.Vector3(0,1,0)
+  ]),new THREE.LineBasicMaterial({color:0x71e9ff,transparent:true,depthWrite:false}));
+  scene.add(airportLabel,runwayMarker,markerStem);
   let lastAirportLabel='';
   function drawAirportLabel(f){
     const r=f?.destination;
     const distance=r?Math.hypot(f.x-r.x,f.z-r.z):Infinity;
-    const visible=!renderer.instrumentOnly&&f&&!f.ground&&!f.tactical&&!replay&&!overviewActive&&
-      distance>2200&&distance<(byId('weather').value==='fog'?5500:45000);
-    airportLabel.visible=Boolean(visible);
+    const range=byId('weather').value==='fog'?6500:65000;
+    const visible=!renderer.instrumentOnly&&f&&!f.ground&&!f.tactical&&!f.finished&&!replay&&!overviewActive&&
+      distance>2600&&distance<range;
+    airportLabel.visible=runwayMarker.visible=markerStem.visible=Boolean(visible);
     if(!visible) return;
-    airportLabel.position.set(r.x,r.elevation+130+distance*.009,r.z);
-    const name=r.code+' '+r.designator+' · '+(distance/1000).toFixed(1)+' km';
+    const alpha=clamp(Math.min((distance-2600)/1800,(range-distance)/1600),0,1);
+    const height=90+distance*.021,radius=clamp(distance*.012,40,390);
+    airportLabel.material.opacity=alpha;
+    runwayMarker.material.opacity=markerStem.material.opacity=.78*alpha;
+    airportLabel.position.set(r.x,r.elevation+height+6,r.z);
+    runwayMarker.position.set(r.x,r.elevation+6,r.z);
+    runwayMarker.scale.set(radius,radius,1);
+    markerStem.position.copy(runwayMarker.position);
+    markerStem.scale.y=height;
+    const name=r.name+' '+r.designator+' 跑道 · '+(distance/1000).toFixed(1)+' km';
     if(name!==lastAirportLabel){
       lastAirportLabel=name;
       labelInk.clearRect(0,0,384,84);
@@ -2824,7 +2955,7 @@ function initialize(){
       attitudePanel.hidden=!live||Boolean(f.cabinView)||Boolean(f.tow);
       glassCanvas.hidden=attitudePanel.hidden;
       if(!attitudePanel.hidden){
-        attitude.draw(f,pitch,bank,heading,attitudeCanvas.clientWidth,attitudeMode);
+        if(attitudeMode!=='clear') attitude.draw(f,pitch,bank,heading,attitudeCanvas.clientWidth,attitudeMode);
         glassReadouts.draw(f,speeds,cockpitActive()?'駕駛艙':'追蹤視角');
       }
       if(!f.regional&&!f.ground&&f.waypoint<4&&Math.hypot(legacyRoute[f.waypoint].x-f.x,legacyRoute[f.waypoint].z-f.z)<420) f.waypoint++;

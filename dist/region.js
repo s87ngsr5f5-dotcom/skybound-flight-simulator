@@ -37,6 +37,27 @@ function regionalRoute(from,to){
   return finish;
 }
 const regionalGridStep=240;
+let centralMountainTiles;
+function registerCentralMountains(tiles){centralMountainTiles=tiles;}
+function centralMountainTile(col,row){return centralMountainTiles?.[col+':'+row];}
+function detailedMountainHeight(x,z,base){
+  const span=11520,step=120,side=span/step+1;
+  const col=Math.floor(x/span),row=Math.floor(z/span),key=col+':'+row;
+  let samples=centralMountainTile(col,row);
+  if(!samples||base<350) return base;
+  if(typeof samples==='string'){
+    const raw=atob(samples);
+    samples=new Uint16Array(side*side);
+    for(let i=0;i<samples.length;i++) samples[i]=raw.charCodeAt(2*i)|raw.charCodeAt(2*i+1)<<8;
+    centralMountainTiles[key]=samples;
+  }
+  const u=x/step-col*(side-1),v=z/step-row*(side-1);
+  const i=Math.min(side-2,Math.floor(u)),j=Math.min(side-2,Math.floor(v)),a=u-i,b=v-j,k=j*side+i;
+  const detail=(samples[k]*(1-a)+samples[k+1]*a)*(1-b)+(samples[k+side]*(1-a)+samples[k+side+1]*a)*b;
+  const edge=Math.min(u,v,side-1-u,side-1-v);
+  const blend=Math.min(1,edge/4,(base-350)/250);
+  return base+(detail-base)*blend;
+}
 function regionalHeight(x,z){
   let height=0;
   if(x>=-18000&&x<=18000&&z>=-18000&&z<=18000){
@@ -61,6 +82,7 @@ function regionalHeight(x,z){
     }
   }
   if(typeof naritaHeight==='function'&&x>1500000) height=naritaHeight(x,z);
+  if(centralMountainTiles&&height>350) height=detailedMountainHeight(x,z,height);
   for(const r of typeof naritaAirport==='undefined'?taiwanAirports:allAirports){
     const reach=r.length/2+550;
     if(Math.abs(x-r.x)>reach||Math.abs(z-r.z)>reach) continue;

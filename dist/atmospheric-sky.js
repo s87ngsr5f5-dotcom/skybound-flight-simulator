@@ -133,7 +133,8 @@ function createAtmosphericSky(scene){
       void main(){
         vec2 p=(world.xz-seconds*vec2(11.,4.))/1650.;
         float shape=field(p);
-        float alpha=smoothstep(coverage-.04,coverage+.12,shape);
+        float deckCoverage=coverage>.50?coverage+.13:coverage;
+        float alpha=smoothstep(deckCoverage-.04,deckCoverage+.12,shape);
         alpha*=1.-smoothstep(30000.,67000.,length(world.xz-eye.xz));
         if(alpha<.012) discard;
         float shading=clamp(.66+(shape-field(p+sun.xz*.16))*2.8,0.,1.);
