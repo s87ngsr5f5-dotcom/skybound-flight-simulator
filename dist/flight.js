@@ -115,7 +115,8 @@ function initialize(){
       if(Math.abs(x-airport.x)>half+950||Math.abs(z-airport.z)>half+950) continue;
       const {along,cross}=runwayCoordinates(x,z,airport);
       if(airport.shortField){
-        const blend=shortFieldBlend(airport,along,cross,70);
+        // A 120 m terrain triangle can span the runway even when its vertices are outside the strip.
+        const blend=shortFieldBlend(airport,along,cross,natural>airport.elevation?180:72);
         if(blend>0) return natural+(airport.elevation-natural)*blend;
         continue;
       }
