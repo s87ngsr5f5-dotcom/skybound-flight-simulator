@@ -130,6 +130,7 @@ function runwayTowReady(f){
       Math.hypot(f.vx,f.vz)>1.2||f.bridge||f.service?.door||f.service?.pumping||
       f.service?.pushing||f.noseDoor||f.sideDoor) return false;
   if(f.service&&(f.service.boarded!==f.passengers||f.fuel<f.service.targetFuel)) return false;
+  if(f.mission==='cargo'&&(!f.pallets.some(Boolean)||cargoBalance(f).problems.length)) return false;
   const frame=runwayCoordinates(f.x,f.z,f.departure);
   return Math.abs(frame.along)<=f.departure.length/2+450&&Math.abs(frame.cross)<=750;
 }
@@ -151,7 +152,7 @@ function requestRunwayTow(f){
   return true;
 }
 function arrivalTowReady(f){
-  return Boolean(f.service&&f.arrivalTaxi&&f.ground&&f.landed&&!f.ended&&!f.finished&&!f.tow&&!f.awaitingService&&
+  return Boolean((f.service||f.mission==='cargo')&&f.arrivalTaxi&&f.ground&&f.landed&&!f.ended&&!f.finished&&!f.tow&&!f.awaitingService&&
     Math.hypot(f.vx,f.vz)<1.2);
 }
 function requestGateTow(f){
@@ -494,6 +495,15 @@ function updateRegionalFlight(f,save=recordFlight){
 function stopNavigation(f){
   if(f.hold?.speedBrake) f.spoilers=false;
   f.hold=null;
+}
+function effectiveFlightRate(f,selected){
+  if(selected===.5) return .5;
+  if(selected<=1||f.ground||f.landed||f.ended||f.tactical||f.tow||
+      f.phase!=='cruise'||f.y-f.departure.elevation<650||
+      f.waypoint>=f.route.length-2||f.hold?.stage==='descent'||f.hold?.stage==='final') return 1;
+  const distance=Math.hypot(f.x-f.destination.x,f.z-f.destination.z);
+  const groundSpeed=Math.hypot(f.vx,f.vz);
+  return distance>Math.max(28000,groundSpeed*90)?selected:1;
 }
 function navigationControls(f,target){
   const hold=f.hold, runway=f.destination;

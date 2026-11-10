@@ -3,8 +3,8 @@ const touchControls=(()=>{
   const panel=document.getElementById('touchFlight');
   const stick=document.getElementById('touchStick');
   const thumb=stick.querySelector('span');
-  const input={roll:0,pitch:0,throttle:0,brake:false};
-  const held=new Map();
+  const input={roll:0,pitch:0,brake:false};
+  const brakePointers=new Set();
   let stickPointer=null;
 
   function center(){
@@ -12,15 +12,10 @@ const touchControls=(()=>{
     input.roll=input.pitch=0;
     thumb.style.transform='';
   }
-  function updateButtons(){
-    const active=[...held.values()];
-    input.throttle=(Number(active.includes('more'))-Number(active.includes('less')))*.48;
-    input.brake=active.includes('brake');
-  }
   function reset(){
     center();
-    held.clear();
-    updateButtons();
+    brakePointers.clear();
+    input.brake=false;
   }
   function move(event){
     const bounds=stick.getBoundingClientRect();
@@ -43,17 +38,17 @@ const touchControls=(()=>{
   });
   function release(event){
     if(event.pointerId===stickPointer) center();
-    if(held.delete(event.pointerId)) updateButtons();
+    if(brakePointers.delete(event.pointerId)) input.brake=brakePointers.size>0;
   }
   for(const name of ['pointerup','pointercancel']) addEventListener(name,release,true);
   panel.addEventListener('lostpointercapture',release);
   panel.addEventListener('contextmenu',event=>event.preventDefault());
   panel.addEventListener('pointerdown',event=>{
-    const button=event.target.closest('[data-hold]');
+    const button=event.target.closest('[data-hold="brake"]');
     if(!button||event.button!==0) return;
     try{button.setPointerCapture(event.pointerId);}catch{}
-    held.set(event.pointerId,button.dataset.hold);
-    updateButtons();
+    brakePointers.add(event.pointerId);
+    input.brake=true;
   });
 
   try{mode.value=localStorage.getItem('skybound-device')||'';}catch{}

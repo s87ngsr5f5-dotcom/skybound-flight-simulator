@@ -4,9 +4,8 @@
 #plan .plan-intro {
   padding-bottom: 14px;
 }
-#plan .plan-intro p {
-  margin: 0 0 10px;
-}
+#plan .plan-intro h1 { margin: 0; font-size: clamp(26px, 4vw, 40px); }
+#plan #message:empty { display: none; }
 #plan a {
   color: #a8d9ef;
 }
@@ -40,10 +39,8 @@
 .plan-primary label { margin-top: 0; }
 .plan-start { margin: 4px 0 16px; }
 .plan-start #fly { flex: 1; min-height: 46px; }
-.plan-preview #hangarPreview { display: block; height: auto; max-height: 215px; object-fit: contain; }
 .plan-preview .map { margin-top: 16px; min-height: 130px; }
 .plan-preview #planMap { max-height: 290px; width: auto; }
-.plan-preview #aircraftInfo { min-height: 2.25em; }
 .plan-reference a { display: inline-block; margin: 6px 12px 0 0; }
 #plan .plan-history { padding-top: 0; }
 .mobile-mode #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }
@@ -60,6 +57,65 @@
 #hangarControls label { margin: 5px 0; }
 #hangarControls select { min-width: 0; padding: 7px; }
 #hangarControls p { margin: 6px 0 0; }
+.hangar-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hangar-heading button { flex: none; }
+#hangarOptions { max-height: min(52vh, 240px); overflow: auto; }
+body.hangar-active { overflow: hidden; }
+body.hangar-active::before {
+  content: '';
+  position: fixed;
+  inset: 80px 0 0;
+  touch-action: none;
+}
+body.hangar-active:has(#hangarOptions[hidden]) #hangarControls { width: auto; }
+body.hangar-active #hangarControls { bottom: max(24px, env(safe-area-inset-bottom)); }
+body:not(.mobile-mode) #flightNext.cargo-action {
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 4;
+}
+#flightTimeControls {
+  position: absolute;
+  bottom: 54px;
+  right: 0;
+  z-index: 4;
+  pointer-events: auto;
+  text-align: right;
+}
+#flightTimeControls label { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+#flightTimeControls select { min-height: 40px; padding: 5px; }
+#flightRateStatus:not(:empty) { display: block; margin-top: 4px; padding: 3px 5px; background: #0a2135e8; }
+.mobile-mode #flightTimeControls { top: 0; bottom: auto; font-size: 11px; }
+.mobile-mode #flightTimeControls select { min-height: 42px; font-size: 12px; }
+.mobile-mode .touch-actions { grid-template-columns: minmax(0, 1fr) 48px; }
+.mobile-mode #touchThrottleControl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  margin: 0;
+  gap: 0 6px;
+  padding: 4px 6px 0;
+  pointer-events: auto;
+  background: #0b2439e8;
+  border: 1px solid #a8ccdf66;
+  font-size: 11px;
+}
+.mobile-mode #touchThrottle {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  height: 33px;
+  margin: 0;
+  accent-color: #65ceff;
+  touch-action: none;
+}
+.mobile-mode #touchQuick { grid-template-columns: repeat(3,minmax(0,1fr)); }
+@media (max-width: 380px) {
+  .mobile-mode #flightTimeControls label { font-size: 0; }
+}
 body.hangar-active .quick-controls { display: none; }
 @media (max-width: 700px) {
   #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }

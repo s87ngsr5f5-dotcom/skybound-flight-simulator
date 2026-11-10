@@ -85,6 +85,16 @@ function setPallet(f,index,mass){
   f.cargoState=cargoBalance(f);
   return true;
 }
+function setCargoManifest(f,masses){
+  if(f.finished||!groundServiceAllowed(f)||!(f.noseDoor||f.sideDoor)) return false;
+  if(masses.length!==palletStations.length||masses.some(mass=>!Number.isFinite(mass))) return false;
+  const balance=cargoBalance({...f,pallets:masses});
+  if(balance.problems.length) return false;
+  f.pallets=[...masses];
+  f.cargoState=balance;
+  if(f.phase==='cold'&&balance.mass>0) f.loadedAtDeparture=true;
+  return true;
+}
 function trainingRoute(airport){
   return [
     {name:'爬升至 2,000 呎以上',...airportPoint(airport,10500,0)},
@@ -102,7 +112,15 @@ function benchmarkRoute(role,from,to){
     {name:'西南外海',...geoPoint(23.11,119.98)},
     {name:'高雄外海',...geoPoint(22.58,120.09)}
   ];
-  if(role==='cargo') west.reverse();
+  if(role==='cargo'){
+    west.reverse();
+    if(from.code==='RCKH'){
+      west.unshift(
+        {name:'高雄東南離場',...geoPoint(22.47,120.45)},
+        {name:'小琉球外海',...geoPoint(22.33,120.30)}
+      );
+    }
+  }
   return [...west,...regionalRoute(from,to).slice(-2)];
 }
 function approachGuidance(f){

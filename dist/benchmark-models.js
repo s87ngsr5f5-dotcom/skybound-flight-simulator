@@ -1,6 +1,8 @@
 'use strict';
 function buildBenchmarkAirframe(profile,scene){
   const group=new THREE.Group(), gear=new THREE.Group(), cabin=new THREE.Group();
+  const closeDetails=new THREE.Group();
+  group.add(closeDetails);
   const [half,radius,span,wingY,engineCount,sweep]=profile.geometry;
   const fighter=profile.role==='fighter', freight=profile.role==='cargo';
   const antonov=Boolean(profile.antonov), upperDeck=profile.upperDeck;
@@ -285,7 +287,7 @@ function buildBenchmarkAirframe(profile,scene){
       panelGeometry.setAttribute('position',new THREE.Float32BufferAttribute(panels,3));
       const panelLines=new THREE.LineSegments(panelGeometry,new THREE.LineBasicMaterial({color:0x77838b,transparent:true,opacity:.35}));
       panelLines.name='Fuselage service panels';
-      group.add(panelLines);
+      closeDetails.add(panelLines);
     }
   }
   function foil(parent,points,material,depth=.13){
@@ -461,13 +463,29 @@ function buildBenchmarkAirframe(profile,scene){
       }
     }
     if(freight){
-      for(let i=-13;i<14;i++) block(cabin,metal,3.4,.035,.07,0,-.68,i*1.43);
+      const trackLength=half*1.34;
+      const tracks=[-1.35,-.68,.68,1.35];
+      const rollersPerTrack=Math.floor((trackLength-.8)/.52)+1;
+      const rollerGeometry=new THREE.CylinderGeometry(.035,.035,.19,8);
+      rollerGeometry.rotateZ(Math.PI/2);
+      const rollers=new THREE.InstancedMesh(rollerGeometry,metal,tracks.length*rollersPerTrack);
+      const transform=new THREE.Matrix4();
+      let instance=0;
+      for(const x of tracks){
+        block(cabin,dark,.24,.04,trackLength,x,-.686,0);
+        for(let i=0;i<rollersPerTrack;i++){
+          transform.makeTranslation(x,-.653,(i-(rollersPerTrack-1)/2)*.52);
+          rollers.setMatrixAt(instance++,transform);
+        }
+      }
+      rollers.name='Main deck roller tracks';
+      cabin.add(rollers);
       for(const slot of palletStations) palletMeshes.push(block(cabin,seat,3.35,1.35,3.8,0,-.01,slot.arm));
     }
   }
   cabin.visible=false;
   scene.add(group,cabin);
-  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
+  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
   return group;
 }
 

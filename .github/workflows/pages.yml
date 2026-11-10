@@ -22,6 +22,7 @@ jobs:
       - run: node verify-nav-thrust.cjs
       - run: node verify-autoland.cjs
       - run: node verify-arrival-tow.cjs
+      - run: node verify-heavy-cargo.cjs
       - run: node verify-fighter-controls.cjs
       - run: node verify-tactical-lock.cjs
   deploy:
