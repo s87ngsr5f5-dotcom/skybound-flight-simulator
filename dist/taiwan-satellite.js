@@ -73,7 +73,7 @@ function createTaiwanSatellite(makeMaterial,renderer,onLoaded){
       tiles.delete(key);
     }
     candidates.sort((a,b)=>a.distance-b.distance);
-    const highTiles=quality==='ultra'?4:quality==='high'?2:quality==='balanced'?1:0;
+    const highTiles=quality==='ultra'?4:quality==='high'||quality==='satellite'?2:quality==='balanced'?1:0;
     candidates.forEach(({key,x,z,distance},index)=>{
       let tile=tiles.get(key);
       if(!tile){

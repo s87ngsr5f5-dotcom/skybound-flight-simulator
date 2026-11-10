@@ -582,9 +582,10 @@ function initialize(){
   const sceneryLayers=new THREE.Group();
   scene.add(sceneryLayers);
   let detailedScenery,sceneryBuild,loadingScenery=false;
+  const renderingQuality=()=>byId('quality').value==='satellite'?'low':byId('quality').value;
   function syncSceneryMode(){
     if(renderer.instrumentOnly) return;
-    const detailed=touchControls.mode.value==='desktop'||byId('quality').value!=='low';
+    const detailed=touchControls.mode.value==='desktop'||renderingQuality()!=='low';
     sceneryLayers.visible=detailed&&Boolean(detailedScenery);
     if(!detailed||loadingScenery) return;
     loadingScenery=true;
@@ -2077,7 +2078,7 @@ function initialize(){
   let measuredFrameTime=0,measuredFrames=0;
   function resize(){
     const ultra=qualitySelect.value==='ultra';
-    const scale={low:.6,balanced:1,high:1.75}[qualitySelect.value]||1;
+    const scale={low:.6,balanced:1,high:1.75}[renderingQuality()]||1;
     const mobile=touchControls.mode.value==='mobile';
     basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(innerWidth*innerHeight))):
       Math.min(devicePixelRatio,scale,mobile?1:Infinity);
@@ -3208,7 +3209,7 @@ function initialize(){
     sunlight.target.position.set(viewerX,model.position.y,viewerZ);
     sunlight.position.copy(sunlight.target.position).add(sunDirection);
     if(renderer.shadowMap.enabled&&activeDay>.18&&!hangarMode) aircraftShadow.visible=false;
-    if(sceneryBuild&&(touchControls.mode.value==='desktop'||qualitySelect.value!=='low')){
+    if(sceneryBuild&&(touchControls.mode.value==='desktop'||renderingQuality()!=='low')){
       const budget=performance.now()+3;
       try{
         do {
@@ -3220,10 +3221,10 @@ function initialize(){
       const {x,y,z}=camera.position;
       const heightAboveGround=y-renderedGround(x,z);
       const groundTraffic=heightAboveGround<1500;
-      detailedScenery.plants.update(x,z,qualitySelect.value,heightAboveGround<3200);
-      detailedScenery.region.update(x,z,qualitySelect.value,dt,activeDay,groundTraffic);
+      detailedScenery.plants.update(x,z,renderingQuality(),heightAboveGround<3200);
+      detailedScenery.region.update(x,z,renderingQuality(),dt,activeDay,groundTraffic);
       detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',
-        paused||Boolean(replay),qualitySelect.value,groundTraffic);
+        paused||Boolean(replay),renderingQuality(),groundTraffic);
     }
     airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:previewInspection==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);
@@ -3253,7 +3254,7 @@ function initialize(){
       camera.position.set(flight.x,flight.y+1.4,flight.z);
       camera.rotation.set(flight.pitch,-flight.heading,-flight.bank,'YXZ');
       renderer.draw(flight,camera,approachGates,activeDay);
-    }else if(!renderer.instrumentOnly) atmosphericSky.update(camera,dt,qualitySelect.value);
+    }else if(!renderer.instrumentOnly) atmosphericSky.update(camera,dt,renderingQuality());
     tacticalView.render(flight,dt,now,qualitySelect.value==='low'||touchControls.mode.value==='mobile');
     if(overviewActive) taiwanOverview.draw(renderer,flight);
     else renderer.render(scene,camera);
