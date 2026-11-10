@@ -1,0 +1,291 @@
+.flight-ui {
+  --flight-left: max(14px,env(safe-area-inset-left));
+  --flight-right: max(14px,env(safe-area-inset-right));
+  --flight-top: max(10px,env(safe-area-inset-top));
+  --flight-bottom: max(20px,env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+#flightBar { display: flex; gap: 8px; align-items: center; }
+.flight-ui header {
+  position: fixed;
+  z-index: 8;
+  inset: var(--flight-top) var(--flight-right) auto var(--flight-left);
+  background: none;
+  border: 0;
+  padding: 0;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+.flight-ui header > strong:first-child,.flight-ui #deviceMode { display: none; }
+#flightAircraft {
+  max-width: 42vw;
+  padding: 7px 9px;
+  color: #fff;
+  background: #101a22b8;
+  border-radius: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#flightBar button,.glass-actions button,.flight-ui #touchQuick button {
+  min-height: 44px;
+  padding: 6px 11px;
+  color: #f6fafb;
+  background: #101b22db;
+  border: 2px solid #bdcad299;
+  border-radius: 12px;
+  font-weight: 700;
+  pointer-events: auto;
+}
+#flightBar button:first-child { background: #103a52e8; border-color: #7bc9ed; }
+#flightBar #menu { background: #872e2ced; border-color: #ef9e92; }
+#flightBar button[aria-expanded="true"],.flight-ui #touchQuick button[aria-pressed="true"] {
+  background: #155346ed;
+  border-color: #8fffc6;
+}
+.flight-ui #hud { inset: 0 var(--flight-right) 0 var(--flight-left); }
+.flight-ui #glassReadouts {
+  position: absolute;
+  top: 43%;
+  left: 50%;
+  width: min(72vw,110vh,740px);
+  height: min(61vh,76vw,560px);
+  transform: translate(-50%,-50%);
+}
+.flight-ui #attitudePanel[data-mode="hud"] #adiCanvas {
+  top: 49%;
+  width: min(41vh,49vw,384px);
+}
+.flight-ui #attitudePanel #attitudeMode,
+.flight-ui #reticle,.flight-ui #tacticalInstruments,.flight-ui .keys { display: none !important; }
+.flight-ui #stats { left: 0; right: auto; bottom: var(--flight-bottom); padding: 0; background: none; }
+.flight-ui #stats .stat:not(#flightLoad) { display: none; }
+.flight-ui #flightLoad {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: #101f28c9;
+  border-radius: 7px;
+}
+#waypointChip {
+  position: absolute;
+  top: 75%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  width: max-content;
+  max-width: 56vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid #8afec3;
+  border-radius: 24px;
+  padding: 4px 12px;
+  background: #0c2420e8;
+  font: 700 clamp(11px,1.5vw,16px) system-ui,sans-serif;
+}
+.flight-ui #flightGuide,.flight-ui #gateGuide {
+  position: absolute;
+  inset: auto auto calc(var(--flight-bottom) + 8px) 50%;
+  transform: translateX(-50%);
+  max-width: 62vw;
+  width: max-content;
+  text-align: center;
+}
+.flight-ui #status,.flight-ui #towControls,.flight-ui #flightNext.cargo-action {
+  position: static;
+  transform: none;
+  max-width: 100%;
+  border-radius: 8px;
+}
+.flight-ui #status { padding: 5px 9px; background: #111f26d9; font-size: 12px; }
+.flight-ui #status.coach-warning { background: #85332bf0; }
+.flight-ui #towControls { margin-top: 4px; }
+.flight-ui #flightNext.cargo-action { margin: 4px auto 0; }
+.flight-ui #flightNavigation,.flight-ui #systems,.flight-ui #mobileExtras {
+  display: none;
+  position: absolute;
+  top: calc(var(--flight-top) + 51px);
+  right: 0;
+  left: auto;
+  bottom: auto;
+  width: min(310px,90vw);
+  max-width: 90vw;
+  max-height: 60vh;
+  overflow: auto;
+  z-index: 7;
+  padding: 10px;
+  border: 1px solid #a9bdc9ab;
+  border-radius: 12px;
+  background: #11242ff5;
+  pointer-events: auto;
+}
+.flight-ui #hud[data-mobile-panel="nav"]:not(:has(#tacticalPanel:not([hidden]))) #flightNavigation,
+.flight-ui #hud[data-mobile-panel="systems"] #systems,
+.flight-ui #hud[data-mobile-panel="more"] #mobileExtras { display: block; }
+.flight-ui #hud:has(#replayControls:not([hidden])) #systems { display: block; }
+.flight-ui #flightNavigation .glass-map-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.flight-ui #flightNavigation canvas { display: block; margin: 6px 0; }
+#mobileExtras p { margin: 0 0 8px; font-size: 13px; line-height: 1.45; }
+.glass-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.flight-ui #flightTimeControls { position: static; margin-top: 8px; text-align: left; }
+.flight-ui #quickControls:not([open]) { display: none; }
+.flight-ui #quickControls[open] {
+  top: calc(var(--flight-top) + 51px);
+  right: var(--flight-right);
+  bottom: auto;
+  left: auto;
+  width: min(305px,86vw);
+  max-height: 68vh;
+  z-index: 10;
+}
+.flight-ui #tacticalPanel { top: calc(var(--flight-top) + 51px); }
+.flight-ui #tacticalPanel:not([open]) { display: none; }
+.flight-ui #tacticalGuide { bottom: calc(var(--flight-bottom) + 34px); }
+.flight-ui #tacticalReport { z-index: 9; }
+.overview-active #glassReadouts,.overview-active #waypointChip { visibility: hidden; }
+
+.mobile-mode.flight-ui #hud {
+  --stick-size: clamp(108px,34vh,168px);
+  --throttle-height: clamp(134px,39vh,230px);
+  --throttle-width: clamp(44px,7.1vw,65px);
+}
+.mobile-mode.flight-ui #touchFlight {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+.mobile-mode.flight-ui #hud:has(#gateGuide:not([hidden])) #touchFlight { visibility: hidden; }
+.mobile-mode.flight-ui #flightNext.flight-assist-duplicate { display: none; }
+#touchLeft {
+  position: absolute;
+  bottom: var(--flight-bottom);
+  left: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+#touchRudderControl {
+  display: grid;
+  gap: 2px;
+  width: var(--stick-size);
+  margin: 0;
+  text-align: center;
+  text-shadow: 0 1px 3px #09171d;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: auto;
+}
+#touchRudder {
+  appearance: none;
+  touch-action: none;
+  margin: 0;
+  width: 100%;
+  height: 38px;
+  background: #19252b75;
+  border: 2px solid #dbe4e6ac;
+  border-radius: 24px;
+}
+#touchRudder::-webkit-slider-thumb {
+  appearance: none;
+  width: 40px;
+  height: 30px;
+  border: 2px solid #f3fbf9;
+  border-radius: 18px;
+  background: #f8fffa32;
+}
+#touchRudder::-moz-range-thumb {
+  width: 40px;
+  height: 28px;
+  border: 2px solid #f3fbf9;
+  border-radius: 18px;
+  background: #f8fffa32;
+}
+.mobile-mode.flight-ui #touchStick { background: #14252f63; border: 2px solid #e4edf2a3; }
+.mobile-mode.flight-ui #touchStick span { width: 38%; height: 38%; background: #e9f2f128; border: 2px solid #f2fbf7d9; }
+.mobile-mode.flight-ui #touchQuick {
+  position: absolute;
+  right: calc(var(--throttle-width) + 9px);
+  bottom: var(--flight-bottom);
+  display: grid;
+  grid-template-columns: repeat(3,minmax(48px,1fr));
+  gap: 5px;
+  width: min(29vw,220px);
+}
+.mobile-mode.flight-ui #touchQuick button {
+  min-width: 0;
+  padding-inline: 3px;
+  font-size: clamp(11px,1.65vw,15px);
+  touch-action: none;
+}
+.mobile-mode.flight-ui #touchThrottleControl {
+  position: absolute;
+  inset: auto 0 var(--flight-bottom) auto;
+  display: block;
+  width: var(--throttle-width);
+  height: var(--throttle-height);
+  padding: 0;
+  border: 2px solid #d6e1d5a3;
+  border-radius: 14px;
+  background: #172a2bba;
+  touch-action: none;
+  pointer-events: auto;
+}
+.mobile-mode.flight-ui #touchThrottleValue {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  width: 100%;
+  text-align: center;
+  font-weight: 700;
+  text-shadow: 0 1px 3px #081515;
+}
+.mobile-mode.flight-ui #touchThrottle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  appearance: none;
+  width: calc(var(--throttle-height) - 10px);
+  height: calc(var(--throttle-width) - 9px);
+  margin: 0;
+  transform: translate(-50%,-50%) rotate(-90deg);
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(90deg,#ed9c3f var(--throttle-level,0%),#344446 var(--throttle-level,0%));
+  touch-action: none;
+}
+.mobile-mode.flight-ui #touchThrottle::-webkit-slider-thumb {
+  appearance: none;
+  width: 9px;
+  height: calc(var(--throttle-width) - 13px);
+  border-radius: 3px;
+  background: #fff2d0;
+}
+.mobile-mode.flight-ui #touchThrottle::-moz-range-thumb {
+  width: 9px;
+  height: calc(var(--throttle-width) - 13px);
+  border: 0;
+  border-radius: 3px;
+  background: #fff2d0;
+}
+.mobile-mode.flight-ui #stats { left: 50%; transform: translateX(-50%); width: max-content; bottom: var(--flight-bottom); }
+.mobile-mode.flight-ui #flightGuide,.mobile-mode.flight-ui #gateGuide { bottom: calc(var(--flight-bottom) + 27px); left: 43%; max-width: 33vw; }
+.mobile-mode.flight-ui #tacticalGuide { bottom: calc(var(--flight-bottom) + 26px); max-width: 43vw; }
+.mobile-mode.flight-ui #waypointChip { top: 72%; max-width: 34vw; }
+.mobile-mode.flight-ui #overviewScale { bottom: calc(var(--throttle-height) + var(--flight-bottom) + 31px); }
+
+@media (orientation: portrait) {
+  .mobile-mode.flight-ui #hud { --stick-size: min(29vw,130px); --throttle-height: clamp(138px,25vh,195px); }
+  .mobile-mode.flight-ui #glassReadouts { top: 36%; width: 94%; height: min(39vh,96vw); }
+  .mobile-mode.flight-ui #attitudePanel[data-mode="hud"] #adiCanvas { top: 40%; width: min(54vw,32vh); }
+  .mobile-mode.flight-ui #waypointChip { top: 58%; max-width: 76vw; }
+  .mobile-mode.flight-ui #touchQuick { width: min(43vw,186px); }
+  .mobile-mode.flight-ui #flightGuide,.mobile-mode.flight-ui #gateGuide,.mobile-mode.flight-ui #tacticalGuide {
+    bottom: calc(var(--throttle-height) + var(--flight-bottom) + 30px);
+    left: 50%;
+    max-width: 90vw;
+  }
+  .mobile-mode.flight-ui #stats { bottom: calc(var(--throttle-height) + var(--flight-bottom) + 4px); }
+  .mobile-mode.flight-ui #flightAircraft { max-width: 34vw; }
+}
+@media (max-width: 450px) {
+  #flightBar { gap: 4px; }
+  #flightBar button { padding-inline: 6px; }
+}

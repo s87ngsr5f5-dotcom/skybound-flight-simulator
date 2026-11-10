@@ -376,15 +376,17 @@ function makeRegionalFlight(departure,destination,aircraft,start,wind,waypoints)
     taxiIndex:0,arrivalTaxi:null,phase:cold?'cold':air?'cruise':'takeoff',recorded:false,finished:false
   };
 }
-function makeCruiseTrial(departure,destination,aircraft,tailwind,fast=false){
+function makeCruiseTrial(departure,destination,aircraft,tailwind,fast=false,indicated=false){
   const heading=Math.atan2(destination.x-departure.x,departure.z-destination.z);
-  const altitude=35000*.3048;
-  const along=distance=>({x:departure.x+distance*Math.sin(heading),z:departure.z-distance*Math.cos(heading)});
+  const altitude=indicated?2500:35000*.3048;
+  const along=distance=>({x:departure.x+distance*Math.sin(heading)-(indicated?38000:0),z:departure.z-distance*Math.cos(heading)});
   const route=[{...along(350000),name:'巡航驗證終點'}];
   const flight=makeRegionalFlight(departure,destination,aircraft,'air',0,route);
   flight.fastCruise=fast;
+  flight.iasTrial=indicated;
+  flight.y=altitude;
   const air=atmosphere(altitude);
-  const tas=(flight.fastCruise?cruiseMachTarget(flight):.80)*air.sound;
+  const tas=(flight.fastCruise?cruiseMachTarget(flight)*(indicated?.86:1):.80)*air.sound;
   const wind=tailwind/knotsPerMps;
   const speed=tas+wind;
   const pitch=(aircraft.mass*9.80665/(.5*air.density*tas*tas*aircraft.wingArea)-.27)/5.05-.036;
