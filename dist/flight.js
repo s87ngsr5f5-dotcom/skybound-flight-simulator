@@ -1783,27 +1783,77 @@ function initialize(){
     return person;
   });
   scene.add(bridgeQueue);
-  function serviceVehicle(color,truck){
-    const vehicle=new THREE.Group(),paint=material(color),wheel=material('#252932');
-    const length=truck?6.2:3.6;
-    box(vehicle,paint,truck?2.3:2.6,.58,length,0,.58,0);
-    box(vehicle,paint,2.05,truck?1.68:.95,1.6,0,truck?1.55:1.23,-length*.31);
-    box(vehicle,material('#405d76'),1.72,.35,.08,0,truck?2:1.56,-length*.44);
+  function makeFuelTanker(){
+    const vehicle=new THREE.Group(),paint=material('#f1eeea'),wheel=material('#252932');
+    const length=6.2;
+    box(vehicle,paint,2.3,.58,length,0,.58,0);
+    box(vehicle,paint,2.05,1.68,1.6,0,1.55,-length*.31);
+    box(vehicle,material('#405d76'),1.72,.35,.08,0,2,-length*.44);
     for(const side of [-1,1]) for(const end of [-1,1]){
       const tire=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.24,12),wheel);
       tire.rotation.z=Math.PI/2;
       tire.position.set(side*1.11,.34,end*length*.30);
       vehicle.add(tire);
     }
-    if(truck){
-      const tank=new THREE.Mesh(new THREE.CylinderGeometry(.84,.84,3.7,16),material('#ccd8df'));
-      tank.rotation.x=Math.PI/2;tank.position.set(0,1.35,.96);vehicle.add(tank);
-    }
+    const tank=new THREE.Mesh(new THREE.CylinderGeometry(.84,.84,3.7,16),material('#ccd8df'));
+    tank.rotation.x=Math.PI/2;tank.position.set(0,1.35,.96);vehicle.add(tank);
     vehicle.visible=false;scene.add(vehicle);
     return vehicle;
   }
-  const tug=serviceVehicle('#e6b94b',false);
-  const tanker=serviceVehicle('#f1eeea',true);
+  const tug=new THREE.Group(),towbar=new THREE.Group(),tugWheels=[];
+  tug.name='Airport tug';
+  towbar.name='Aircraft towbar';
+  const tugPaint=material('#ffbd30'),tugTrim=material('#293039'),tugHub=material('#b3c0ca');
+  const tugGlass=new THREE.MeshStandardMaterial({color:0x354f60,roughness:.22,metalness:.22});
+  const tugLight=new THREE.MeshBasicMaterial({color:0xfff3d5});
+  const tugTailLight=new THREE.MeshBasicMaterial({color:0xdb3127});
+  const tugBeacon=new THREE.MeshBasicMaterial({color:0xffaf37});
+  const towbarLength=5.5,tugWheelRadius=.43,tugHitchZ=2.52,tugHitchHeight=.48;
+  box(tug,tugTrim,2.9,.23,4.9,0,.47,0);
+  box(tug,tugPaint,2.75,.61,4.55,0,.80,0);
+  box(tug,tugTrim,2.91,.31,.23,0,.65,-2.41);
+  box(tug,tugTrim,2.91,.31,.23,0,.65,2.41);
+  box(tug,tugPaint,2.58,.25,1.66,0,1.22,.68);
+  box(tug,tugTrim,1.3,.035,.77,0,1.36,.68);
+  for(let i=0;i<5;i++) box(tug,tugHub,1.18,.012,.035,0,1.382,.40+i*.14);
+  box(tug,tugPaint,1.53,1.12,1.59,-.46,1.55,-1.13);
+  box(tug,tugPaint,1.67,.12,1.68,-.46,2.16,-1.13);
+  box(tug,tugGlass,1.29,.53,.035,-.46,1.75,-1.94);
+  box(tug,tugGlass,1.29,.53,.035,-.46,1.75,-.32);
+  box(tug,tugTrim,.26,.13,.26,.09,2.26,-1.49);
+  box(tug,tugBeacon,.18,.13,.18,.09,2.38,-1.49);
+  for(const side of [-1,1]){
+    box(tug,tugGlass,.04,.53,1.21,-.46+side*.776,1.75,-1.13);
+    box(tug,tugTrim,.09,.10,.29,-.46+side*.80,1.38,-1.22);
+    box(tug,tugTrim,.31,.10,.67,-.46+side*.88,.53,-1.11);
+    box(tug,tugLight,.29,.15,.042,side*1.10,.81,-2.54);
+    box(tug,tugTailLight,.23,.14,.042,side*1.12,.82,2.54);
+    for(let i=0;i<3;i++){
+      box(tug,tugPaint,.20,.16,.015,side*(.68-i*.25),.64,-2.535).rotation.z=side*.56;
+      box(tug,tugPaint,.20,.16,.015,side*(.68-i*.25),.64,2.535).rotation.z=-side*.56;
+    }
+    for(const axle of [-1.53,1.52]){
+      const wheel=new THREE.Mesh(new THREE.CylinderGeometry(tugWheelRadius,tugWheelRadius,.37,16),tugTrim);
+      wheel.position.set(side*1.29,tugWheelRadius,axle);
+      wheel.rotation.z=Math.PI/2;
+      const hub=new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,.055,12),tugHub);
+      hub.position.y=-side*.19;
+      wheel.add(hub);
+      box(wheel,tugTrim,.12,.014,.062,.10,-side*.22,.03);
+      tug.add(wheel);
+      tugWheels.push(wheel);
+    }
+  }
+  box(tug,tugHub,.28,.20,.21,0,tugHitchHeight,tugHitchZ);
+  box(towbar,tugPaint,.18,1,.18,0,.5,0);
+  const towEye=new THREE.Mesh(new THREE.TorusGeometry(.15,.035,8,14),tugHub);
+  towEye.rotation.x=Math.PI/2;
+  towbar.add(towEye);
+  const tugShadow=groundShadow(ink=>ink.fillRect(16,6,96,116));
+  const tugHitch=new THREE.Vector3(),noseHitch=new THREE.Vector3(),towSpan=new THREE.Vector3();
+  const towbarAxis=new THREE.Vector3(0,1,0);
+  scene.add(tug,towbar);
+  const tanker=makeFuelTanker();
   const cargoLoader=new THREE.Group();
   const loaderPaint=material('#ebad35'), loaderMetal=material('#667480');
   box(cargoLoader,loaderPaint,4.2,.65,6,0,0,0);
@@ -1832,7 +1882,8 @@ function initialize(){
     rangeMarker.visible=Boolean(flight?.range&&!flight.range.hit);
     if(rangeMarker.visible) rangeMarker.position.set(flight.range.x,flight.range.y+12,flight.range.z);
     bridgeMesh.visible=false;
-    aircraftShadow.visible=jetwayShadow.visible=false;
+    aircraftShadow.visible=jetwayShadow.visible=tugShadow.visible=false;
+    towbar.visible=false;
     bridgeQueue.visible=tug.visible=tanker.visible=false;
     cargoLoader.visible=false;
     serviceLamp.intensity=0;
@@ -1895,9 +1946,26 @@ function initialize(){
       }
       if(f.ground){
         if(f.tow||f.service?.pushing){
-          tug.position.copy(pos).addScaledVector(dir,profile.geometry[0]+2.5);
+          const noseWheel=model.userData.wheels?.[0];
+          const noseOffset=noseWheel?.position.z??-profile.geometry[0]*.55;
+          noseHitch.set(0,noseWheel?.position.y??(-profile.gearHeight+.25),noseOffset)
+            .applyQuaternion(model.quaternion).add(pos);
+          tug.position.copy(noseHitch).addScaledVector(dir,towbarLength+tugHitchZ);
           tug.position.y=terrainHeight(tug.position.x,tug.position.z);
-          tug.rotation.y=-f.heading;tug.visible=true;
+          tug.rotation.y=-f.heading;
+          tugHitch.copy(tug.position).addScaledVector(dir,-tugHitchZ);
+          tugHitch.y+=tugHitchHeight;
+          towSpan.subVectors(noseHitch,tugHitch);
+          towbar.position.copy(tugHitch);
+          towbar.scale.y=towSpan.length();
+          towbar.quaternion.setFromUnitVectors(towbarAxis,towSpan.normalize());
+          if(!paused){
+            const travel=f.service?.pushing?-2:Math.hypot(f.vx,f.vz);
+            for(const wheel of tugWheels) wheel.rotateY(travel*dt/tugWheelRadius);
+          }
+          tugBeacon.color.setHex(activeDay<.6&&now%1000<360?0xffe2aa:0xe5891d);
+          placeGroundShadow(tugShadow,tug.position.x,tug.position.z,tug.position.y,f.heading,3.35,5.4,.7);
+          tug.visible=towbar.visible=true;
         }
         if(f.service?.pumping){
           const side=new THREE.Vector3(Math.cos(f.heading),0,Math.sin(f.heading));
@@ -1970,9 +2038,18 @@ function initialize(){
       }
       model.userData.surfaces.forEach((part,i)=>part.rotation.x=-f.flaps*.16+input.roll*(i===0?-.22:.22));
       if(cameraMode===0){
-        camera.position.copy(pos).addScaledVector(dir,-profile.geometry[0]*(profile.id==='b773'?2.7:5));
-        camera.position.y+=profile.gearHeight*4;camera.up.set(0,1,0);
-        camera.lookAt(pos.clone().addScaledVector(dir,12));
+        camera.up.set(0,1,0);
+        if(tug.visible){
+          camera.position.copy(tug.position).addScaledVector(dir,5);
+          camera.position.x+=Math.cos(f.heading)*15;
+          camera.position.z+=Math.sin(f.heading)*15;
+          camera.position.y+=5.8;
+          camera.lookAt(tug.position.x-dir.x*4,tug.position.y+1.7,tug.position.z-dir.z*4);
+        }else{
+          camera.position.copy(pos).addScaledVector(dir,-profile.geometry[0]*(profile.id==='b773'?2.7:5));
+          camera.position.y+=profile.gearHeight*4;
+          camera.lookAt(pos.clone().addScaledVector(dir,12));
+        }
       }else{
         const airliner=twoSeats(profile);
         const panel=cockpitView.preset===(airliner?2:1);
