@@ -1,5 +1,5 @@
 'use strict';
-function buildTaipeiVisuals(scene,terrain){
+function* buildTaipeiVisuals(scene,terrain){
   const root=new THREE.Group();scene.add(root);
   const batches=new Map();
   const tiles=[];
@@ -66,6 +66,7 @@ function buildTaipeiVisuals(scene,terrain){
   }
   const waterPaths=[];
   for(const river of taipeiData.rivers){
+    yield;
     const points=river.p.map(([lat,lon])=>geoPoint(lat,lon));
     waterPaths.push(points);
     const width=river.name.includes('基隆')?120:river.name.includes('淡水')?180:river.name.includes('新店')?130:river.name.includes('大漢')?160:18;
@@ -74,12 +75,23 @@ function buildTaipeiVisuals(scene,terrain){
   }
   const routes=[];
   for(const road of taipeiData.roads){
+    yield;
     if(road.tunnel) continue;
     const points=road.p.map(([lat,lon])=>geoPoint(lat,lon));
     const width=road.kind==='motorway'?20:road.kind==='trunk'?16:road.kind==='primary'?13:9;
     ribbon(points,width+1.6,bankMat,.72,road.bridge);
     ribbon(points,width,roadMat,.82,road.bridge);
-    ribbon(points,.20,lineMat,.88,road.bridge);
+    if(width>=13){
+      ribbon(points,.20,lineMat,.88,road.bridge);
+      for(const side of [-1,1]){
+        const edge=points.map((p,i)=>{
+          const a=points[Math.max(0,i-1)],b=points[Math.min(points.length-1,i+1)];
+          const offset=side*(width/2-.6)/(Math.hypot(b.x-a.x,b.z-a.z)||1);
+          return {x:p.x-(b.z-a.z)*offset,z:p.z+(b.x-a.x)*offset};
+        });
+        ribbon(edge,.15,lineMat,.89,road.bridge);
+      }
+    }
     if(road.bridge&&points.length>1){
       for(let i=0;i<points.length;i+=3) block(bankMat,1.7,9,1.7,points[i].x,terrain(points[i].x,points[i].z)+4.5,points[i].z);
     }
@@ -101,6 +113,7 @@ function buildTaipeiVisuals(scene,terrain){
   const emissiveMap=new THREE.CanvasTexture(night);emissiveMap.wrapS=emissiveMap.wrapT=THREE.RepeatWrapping;
   const facades=['#c8c4b7','#9ba9aa','#b1b0ac','#8c9eab'].map(color=>makeMat(color,{map,emissiveMap,emissive:0xffdf9b,emissiveIntensity:0}));
   for(let index=0;index<taipeiData.buildings.length;index++){
+    yield;
     const building=taipeiData.buildings[index],points=building.p.map(([lat,lon])=>geoPoint(lat,lon));
     const center=points.reduce((a,p)=>({x:a.x+p.x/points.length,z:a.z+p.z/points.length}),{x:0,z:0});
     const frame=localRunway(center.x,center.z);
@@ -111,26 +124,26 @@ function buildTaipeiVisuals(scene,terrain){
     const minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
     block(bankMat,maxX-minX+2,.08,maxZ-minZ+2,(minX+maxX)/2,base+.04,(minZ+maxZ)/2);
     const shape=new THREE.Shape(points.map(p=>new THREE.Vector2(p.x-center.x,-p.z+center.z)));
-    const geometry=new THREE.ExtrudeGeometry(shape,{depth:building.h,bevelEnabled:false});
-    geometry.rotateX(-Math.PI/2);geometry.translate(center.x,base,center.z);
+    const foot=Math.min(base,...points.map(p=>ground(p.x,p.z)))-.30;
+    const geometry=new THREE.ExtrudeGeometry(shape,{depth:building.h+base-foot,bevelEnabled:false});
+    geometry.rotateX(-Math.PI/2);geometry.translate(center.x,foot,center.z);
     const pos=geometry.attributes.position,normal=geometry.attributes.normal,uv=geometry.attributes.uv;
     for(let i=0;i<pos.count;i++) uv.setXY(i,(Math.abs(normal.getX(i))>.6?pos.getZ(i):pos.getX(i))/3.2,pos.getY(i)/3.2);
-    const flat=geometry.toNonIndexed();
     const wall=[],top=[];
-    for(let i=0;i<flat.attributes.position.count;i+=3){
-      const target=Math.abs(flat.attributes.normal.getY(i))>.8?top:wall;
+    for(let i=0;i<pos.count;i+=3){
+      const target=Math.abs(normal.getY(i))>.8?top:wall;
       for(let j=0;j<3;j++)target.push(i+j);
     }
     for(const [indices,mat] of [[wall,facades[index%4]],[top,roofMat]]){
       const part=new THREE.BufferGeometry();
       for(const name of ['position','normal','uv']){
-        const source=flat.attributes[name],values=[];
+        const source=geometry.attributes[name],values=[];
         for(const i of indices)for(let k=0;k<source.itemSize;k++)values.push(source.array[i*source.itemSize+k]);
         part.setAttribute(name,new THREE.Float32BufferAttribute(values,source.itemSize));
       }
       batch(part,mat);
     }
-    flat.dispose();geometry.dispose();
+    geometry.dispose();
     if(index%4===0) block(roofMat,2.1,1.3,2.1,center.x,base+building.h+.65,center.z);
     if(index%9===0) block(bankMat,4,1.7,2.8,center.x+1.5,base+building.h+.85,center.z+2);
   }
@@ -145,16 +158,20 @@ function buildTaipeiVisuals(scene,terrain){
     const p=worldRunway(x,175);
     block(lineMat,.12,.02,220,p.x,4.20,p.z,-runway10.heading);
   }
-  function flush(){
+  function* flush(){
     for(const {material:mat,geometries} of batches.values()){
-      const attrs={position:[],normal:[],uv:[]};
-      for(const geo of geometries){
-        for(const name of ['position','normal']) geo.attributes[name].array.forEach(v=>attrs[name].push(v));
-        if(geo.attributes.uv) attrs.uv.push(...geo.attributes.uv.array);
-        else attrs.uv.push(...Array(geo.attributes.position.count*2).fill(0));
-      }
+      yield;
+      const count=geometries.reduce((sum,geo)=>sum+geo.attributes.position.count,0);
       const merged=new THREE.BufferGeometry();
-      for(const name of Object.keys(attrs))merged.setAttribute(name,new THREE.Float32BufferAttribute(attrs[name],name==='uv'?2:3));
+      for(const name of ['position','normal','uv']){
+        const width=name==='uv'?2:3,values=new Float32Array(count*width);
+        let offset=0;
+        for(const geo of geometries){
+          if(geo.attributes[name]) values.set(geo.attributes[name].array,offset);
+          offset+=geo.attributes.position.count*width;
+        }
+        merged.setAttribute(name,new THREE.BufferAttribute(values,width));
+      }
       merged.computeBoundingSphere();
       const tile=new THREE.Mesh(merged,mat);tile.userData.center=merged.boundingSphere.center.clone();
       tile.userData.radius=merged.boundingSphere.radius;tiles.push(tile);root.add(tile);
@@ -162,7 +179,7 @@ function buildTaipeiVisuals(scene,terrain){
     }
     batches.clear();
   }
-  flush();
+  yield* flush();
   const vehicleCount=Math.min(160,routes.length*2);
   const vehiclePaint=makeMat('#ffffff',{roughness:.42,metalness:.15});
   const cars=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),vehiclePaint,vehicleCount);
@@ -175,8 +192,8 @@ function buildTaipeiVisuals(scene,terrain){
   const palette=['#d9dfdf','#313c4a','#a4a9ad','#b24035','#e6b63e','#eee8dd'];
   for(let i=0;i<vehicleCount;i++)cars.setColorAt(i,new THREE.Color(palette[i%palette.length]));
   groundCache.clear();
-  let seconds=0,trafficElapsed=0;
-  function update(dt,x,z,day,wet,paused,quality="balanced"){
+  let trafficElapsed=0;
+  function update(dt,x,z,day,wet,paused,quality="balanced",traffic=true){
     root.visible=Math.hypot(x,z)<26000;
     if(!root.visible)return;
     const range=quality==='ultra'?25500:quality==='low'?6500:quality==='high'?19000:12000;
@@ -184,7 +201,9 @@ function buildTaipeiVisuals(scene,terrain){
     facades.forEach(mat=>mat.emissiveIntensity=day<.2?.8:.03);
     roadMat.roughness=wet?.25:.92;roadMat.metalness=wet?.26:.04;
     waterMat.color.set(day<.2?'#19333c':'#426f78');
-    if(!paused)seconds+=dt;
+    cars.visible=windows.visible=wheels.visible=traffic;
+    lamps.visible=traffic&&day<.2;
+    if(!traffic) return;
     trafficElapsed+=dt;
     if(trafficElapsed<1/20)return;
     dt=trafficElapsed;trafficElapsed=0;
@@ -211,7 +230,6 @@ function buildTaipeiVisuals(scene,terrain){
       transform.position.set(px-dx/norm*long*.46,y+.44,pz-dz/norm*long*.46);transform.scale.set(1.45,.18,.14);transform.updateMatrix();lamps.setMatrixAt(i,transform.matrix);
     }
     cars.instanceMatrix.needsUpdate=windows.instanceMatrix.needsUpdate=lamps.instanceMatrix.needsUpdate=wheels.instanceMatrix.needsUpdate=true;
-    lamps.visible=day<.2;
   }
   return {update,root,coverage:taipeiData.bounds,counts:{roads:taipeiData.roads.length,buildings:taipeiData.buildings.length,vehicles:vehicleCount}};
 }

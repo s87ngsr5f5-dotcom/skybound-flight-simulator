@@ -203,6 +203,8 @@ function stepTrainer(f, input, dt=simTick){
   f.pitch=limit(f.pitch+f.pitchRate*dt,-.62,.66);
   const bankLimit=fighterAirborne?1.28:.86;
   f.bank=limit(f.bank+f.bankRate*dt,-bankLimit,bankLimit);
+  if((f.pitch===-.62&&f.pitchRate<0)||(f.pitch===.66&&f.pitchRate>0)) f.pitchRate=0;
+  if(Math.abs(f.bank)===bankLimit&&f.bank*f.bankRate>0) f.bankRate=0;
   f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/6,0,1):1));
   if(f.ground){
     f.bank=f.bankRate=0;

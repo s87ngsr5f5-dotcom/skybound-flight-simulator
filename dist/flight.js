@@ -83,14 +83,33 @@ function initialize(){
   const landTexture = new THREE.CanvasTexture(atlas);
   landTexture.colorSpace = THREE.SRGBColorSpace;
   landTexture.wrapS = landTexture.wrapT = THREE.RepeatWrapping;
-  landTexture.repeat.set(18,45);
   landTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const terrainMaterial=new THREE.MeshStandardMaterial({map:landTexture,roughness:1,vertexColors:true});
   const terrainChunks=new Map();
   const span=11520;
-  let previousChunk='',terrainQueue=[];
+  const terrainHeights=new Map();
+  let previousChunk='',terrainQueue=[],terrainBuild=null,terrainColorRevision=0;
+  const terrainStep=(col,row)=>col>=-1&&col<=0&&row>=-1&&row<=0?120:240;
+  function terrainVertex(x,z){
+    const key=x+':'+z;
+    let height=terrainHeights.get(key);
+    if(height===undefined){
+      height=terrainHeight(x,z);
+      if(terrainHeights.size>=90000) terrainHeights.clear();
+      terrainHeights.set(key,height);
+    }
+    return height;
+  }
+  function stitchedHeight(x,z,step){
+    // Fine Taipei patches share the coarse edge profile, so adjacent meshes meet.
+    if(step===120){
+      if(x%span===0&&z%240!==0) return (terrainVertex(x,z-120)+terrainVertex(x,z+120))/2;
+      if(z%span===0&&x%240!==0) return (terrainVertex(x-120,z)+terrainVertex(x+120,z))/2;
+    }
+    return terrainVertex(x,z);
+  }
   function updateTerrain(x,z){
-    const cx=Math.floor(x/span),cz=Math.floor(z/span),id=cx+':'+cz;
+    const cx=Math.floor(x/span),cz=Math.floor(z/span),id=cx+':'+cz+':'+terrainColorRevision;
     if(id!==previousChunk){
       previousChunk=id;
       const visible=new Set();
@@ -99,10 +118,16 @@ function initialize(){
         for(let col=cx-3;col<=cx+3;col++){
           const key=col+':'+row;
           visible.add(key);
-          if(!terrainChunks.has(key)) terrainQueue.push({col,row,key,distance:(cx-col)**2+(cz-row)**2});
+          if(terrainChunks.get(key)?.userData.colorRevision!==terrainColorRevision){
+            terrainQueue.push({col,row,key,distance:(x/span-col-.5)**2+(z/span-row-.5)**2});
+          }
         }
       }
       terrainQueue.sort((a,b)=>a.distance-b.distance);
+      if(terrainBuild){
+        terrainBuild.mesh.dispose();
+        terrainBuild=null;
+      }
       for(const [key,patch] of terrainChunks){
         if(visible.has(key)) continue;
         scene.remove(patch);
@@ -111,34 +136,44 @@ function initialize(){
       }
     }
     // Build the nearest patches first without generating a whole region in one frame.
-    const deadline=performance.now()+3;
-    for(let count=0;terrainQueue.length&&(count===0||count<3&&performance.now()<deadline);count++){
-      const {col,row,key}=terrainQueue.shift();
-        const mesh=new THREE.PlaneGeometry(span,span,48,48);
+    const deadline=performance.now()+2.5;
+    while(terrainBuild||terrainQueue.length){
+      if(!terrainBuild){
+        const {col,row,key}=terrainQueue.shift(),step=terrainStep(col,row);
+        const mesh=new THREE.PlaneGeometry(span,span,span/step,span/step);
         mesh.rotateX(-Math.PI/2);
-        const px=(col+.5)*span,pz=(row+.5)*span;
-        const pos=mesh.attributes.position;
-        const rgb=[];
-        for(let i=0;i<pos.count;i++){
-          const height=terrainHeight(px+pos.getX(i),pz+pos.getZ(i));
-          pos.setY(i,height-.14);
-          const forest=height>=1.5&&height<=3500?(treeCover(px+pos.getX(i),pz+pos.getZ(i))||0):0;
-          if(height<.7) rgb.push(.17,.42,.83);
-          else if(forest>.08) rgb.push(.76-.44*forest,.90-.45*forest,.76-.47*forest);
-          else if(height>1000) rgb.push(.71,.77,.72);
-          else{
-            const worldX=px+pos.getX(i),worldZ=pz+pos.getZ(i);
-            const urban=height<160&&worldX>-9000&&worldX<11000&&worldZ>-4500&&worldZ<9500;
-            if(urban)rgb.push(.68,.72,.72);else rgb.push(.78,.92,.77);
-          }
-        }
-        mesh.setAttribute('color',new THREE.Float32BufferAttribute(rgb,3));
+        terrainBuild={key,mesh,step,px:(col+.5)*span,pz:(row+.5)*span,index:0,
+          colors:new THREE.BufferAttribute(new Float32Array(mesh.attributes.position.count*3),3)};
+      }
+      const {key,mesh,step,px,pz,colors}=terrainBuild,pos=mesh.attributes.position;
+      const end=Math.min(pos.count,terrainBuild.index+128);
+      for(let i=terrainBuild.index;i<end;i++){
+        const worldX=px+pos.getX(i),worldZ=pz+Math.round(pos.getZ(i));
+        const height=stitchedHeight(worldX,worldZ,step);
+        pos.setY(i,height-.14);
+        const forest=height>=1.5&&height<=3500?(treeCover(worldX,worldZ)||0):0;
+        const urban=height<160&&worldX>-9000&&worldX<11000&&worldZ>-4500&&worldZ<9500;
+        if(height<.7) colors.setXYZ(i,.17,.42,.83);
+        else if(forest>.08) colors.setXYZ(i,.76-.44*forest,.90-.45*forest,.76-.47*forest);
+        else if(height>1000) colors.setXYZ(i,.71,.77,.72);
+        else if(urban) colors.setXYZ(i,.68,.72,.72);
+        else colors.setXYZ(i,.78,.92,.77);
+      }
+      terrainBuild.index=end;
+      if(end===pos.count){
+        mesh.setAttribute('color',colors);
         mesh.computeVertexNormals();
         const patch=new THREE.Mesh(mesh,terrainMaterial);
         patch.receiveShadow=true;
         patch.position.set(px,0,pz);
+        patch.userData.colorRevision=terrainColorRevision;
+        const old=terrainChunks.get(key);
+        if(old){scene.remove(old);old.geometry.dispose();}
         terrainChunks.set(key,patch);
         scene.add(patch);
+        terrainBuild=null;
+      }
+      if(performance.now()>=deadline) break;
     }
   }
   landTexture.repeat.set(9,9);
@@ -369,46 +404,48 @@ function initialize(){
   }
   scene.add(blocks);
   function renderedGround(x,z){
-    const step=240,cx=Math.floor(x/step)*step,cz=Math.floor(z/step)*step;
+    const step=terrainStep(Math.floor(x/span),Math.floor(z/span));
+    const cx=Math.floor(x/step)*step,cz=Math.floor(z/step)*step;
     const u=(x-cx)/step,v=(z-cz)/step;
-    const a=terrainHeight(cx,cz),b=terrainHeight(cx+step,cz),c=terrainHeight(cx,cz+step),d=terrainHeight(cx+step,cz+step);
+    const a=stitchedHeight(cx,cz,step),b=stitchedHeight(cx+step,cz,step);
+    const c=stitchedHeight(cx,cz+step,step),d=stitchedHeight(cx+step,cz+step,step);
     return (u+v<=1?a*(1-u-v)+b*u+c*v:d*(u+v-1)+b*(1-v)+c*(1-u))-.14;
   }
   // Keep the city dataset off the mobile startup path. Failed optional
   // layers must not prevent loading the runway and flight controls.
   const sceneryLayers=new THREE.Group();
   scene.add(sceneryLayers);
-  let detailedScenery, loadingScenery=false;
+  let detailedScenery,sceneryBuild,loadingScenery=false;
   function syncSceneryMode(){
-    const detailed=touchControls.mode.value==='desktop'||byId('quality').value==='ultra';
-    sceneryLayers.visible=detailed;
+    const detailed=touchControls.mode.value==='desktop'||byId('quality').value!=='low';
+    sceneryLayers.visible=detailed&&Boolean(detailedScenery);
     if(!detailed||loadingScenery) return;
     loadingScenery=true;
-    const assets=['taipei-data.js','taipei-visuals.js?v=ultra11','forest-cover.js?v=1',
-      'vegetation.js?v=ultra11','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=ultra11'];
+    const assets=['taipei-data.js','taipei-visuals.js?v=flow15','forest-cover.js?v=1',
+      'vegetation.js?v=flow15','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=flow15'];
     Promise.all(assets.map(src=>new Promise((resolve,reject)=>{
       const script=document.createElement('script');
       script.src=src;
       script.onload=resolve;
       script.onerror=()=>reject(new Error('Scenery asset unavailable: '+src));
       document.head.appendChild(script);
-    }))).then(()=>{
-      const cover=createTreeCover(worldCoverTrees);
-      const taipei=buildTaipeiVisuals(sceneryLayers,renderedGround);
-      const region=buildRegionalScenery(sceneryLayers,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
-      const plants=buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways);
-      detailedScenery={taipei,region,plants};
-      treeCover=cover;
-      for(const patch of terrainChunks.values()){
-        scene.remove(patch);
-        patch.geometry.dispose();
-      }
-      terrainChunks.clear();
-      previousChunk='';
-    }).catch(error=>{
-      sceneryLayers.clear();
-      console.warn('Continuing with base scenery:',error);
-    });
+    }))).then(()=>{sceneryBuild=buildScenery();}).catch(sceneryUnavailable);
+  }
+  function* buildScenery(){
+    const cover=createTreeCover(worldCoverTrees);
+    yield;
+    const taipei=yield* buildTaipeiVisuals(sceneryLayers,renderedGround);
+    const region=yield* buildRegionalScenery(sceneryLayers,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
+    const plants=yield* buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways);
+    detailedScenery={taipei,region,plants};
+    treeCover=cover;
+    terrainColorRevision++;
+    syncSceneryMode();
+  }
+  function sceneryUnavailable(error){
+    sceneryBuild=null;
+    sceneryLayers.clear();
+    console.warn('Continuing with base scenery:',error);
   }
   touchControls.mode.addEventListener('change',syncSceneryMode);
 
@@ -500,7 +537,7 @@ function initialize(){
 
   let inspectionMode=false;
   let flight=null, cameraMode=0, last=performance.now(), accumulator=0, paused=false;
-  let nextNavDraw=0;
+  let nextNavDraw=0,nextInstrumentDraw=0;
   let savedControls={};
   try{savedControls=JSON.parse(localStorage.getItem('skybound.controls.v2')||'{}')||{};}catch{}
   let settings=upgradeControls(savedControls);
@@ -547,6 +584,13 @@ function initialize(){
   const cockpitEye=new THREE.Vector3(), cockpitAim=new THREE.Vector3();
   const cockpitOrientation=new THREE.Quaternion(), lookRotation=new THREE.Quaternion();
   const cockpitAngles=new THREE.Euler(0,0,0,'YXZ');
+  const visualPosition=new THREE.Vector3(),visualForward=new THREE.Vector3();
+  const previousPose={};
+  let poseFlight=null,chaseHeading=null;
+  function rememberPose(f){
+    previousPose.x=f.x;previousPose.y=f.y;previousPose.z=f.z;
+    previousPose.heading=f.heading;previousPose.pitch=f.pitch;previousPose.bank=f.bank;
+  }
   const cockpitActive=()=>Boolean(flight&&cameraMode===1&&!flight.cabinView);
   const twoSeats=profile=>['passenger','cargo'].includes(profile?.role);
   function resetLook(){
@@ -903,6 +947,7 @@ function initialize(){
     }catch{}
   }
   function changeView(){
+    chaseHeading=null;
     const cockpit=cockpitActive();
     byId('cockpit').hidden=byId('struts').hidden=!cockpit||Boolean(flight?.aircraft.role);
     byId('systems').hidden=!flight?.regional;
@@ -1214,7 +1259,8 @@ function initialize(){
     cockpitView.preset=0;
     resetLook();
     if(flight.regional) showSystems(flight);
-    activeDay=setEnvironment();paused=false;accumulator=0;nextNavDraw=0;keys.clear();trail.length=0;previousTouchdown=null;
+    activeDay=setEnvironment();paused=false;accumulator=0;nextNavDraw=nextInstrumentDraw=0;
+    releaseFlightInputs();trail.length=0;previousTouchdown=null;
     byId('plan').hidden=byId('edition').hidden=true;
     byId('hud').hidden=byId('menu').hidden=false;
     changeView();
@@ -1349,7 +1395,7 @@ function initialize(){
     }
   }
   function showTouchPause(isPaused){
-    const button=touchControls.panel.querySelector('[data-action="KeyP"]');
+    const button=byId('mobilePause');
     button.textContent=isPaused?'繼續':'暫停';
     button.setAttribute('aria-pressed',String(isPaused));
   }
@@ -1369,7 +1415,10 @@ function initialize(){
       changeView();
     }
     if(code==='KeyC'){if(flight.cabinView) flight.cabinView=false;else cameraMode=1-cameraMode;changeView();}
-    if(code==='KeyP'){paused=!paused;touchControls.reset();showTouchPause(paused);}
+    if(code==='KeyP'){
+      paused=!paused;accumulator=0;last=performance.now();
+      releaseFlightInputs();touchControls.reset();showTouchPause(paused);
+    }
     if(code==='KeyF') flight.flaps=(flight.flaps+1)%3;
     if(code==='KeyR'&&!flight.service) start(flight.approach,true);
     if(!flight.regional) return;
@@ -1386,15 +1435,19 @@ function initialize(){
     for(const [code,label] of Object.entries(bindingLabels)){
       const b=document.createElement('button');
       b.textContent=label+' · '+(settings.bindings?.[code]||code);
-      b.onclick=()=>{b.textContent=label+' · 按下新按鍵';};
+      let binding=false;
+      b.onclick=()=>{binding=true;b.textContent=label+' · 按下新按鍵';};
+      b.onblur=()=>{binding=false;b.textContent=label+' · '+(settings.bindings?.[code]||code);};
       b.onkeydown=event=>{
-        if(event.code==='Tab'||event.code==='Escape') return;
+        if(!binding||event.code==='Tab') return;
         event.preventDefault();
+        if(event.code==='Escape'){b.blur();return;}
         const assigned=settings.bindings||{};
         const clash=Object.keys(bindingLabels).some(other=>other!==code&&(assigned[other]||other)===event.code)||throttleKeys().includes(event.code);
         if(clash){b.textContent=label+' · 按鍵已使用';return;}
         settings.bindings={...assigned,[code]:event.code};
-        try{localStorage.setItem('skybound.controls.v2',JSON.stringify(settings));}catch{}
+        keys.clear();
+        persistControls();
         drawBindings();
       };
       bindings.append(b);
@@ -1414,7 +1467,17 @@ function initialize(){
     if(!event.repeat) action(code);
   });
   addEventListener('keyup',event=>{keys.delete(event.code);keys.delete(boundCode(event.code));});
-  addEventListener('blur',()=>{keys.clear();pointer.active=false;cockpitView.drag=null;});
+  function releaseFlightInputs(){
+    keys.clear();pointer.active=false;cockpitView.drag=null;
+    if(flight) flight.bankCommand=0;
+  }
+  addEventListener('blur',releaseFlightInputs);
+  document.addEventListener('visibilitychange',()=>{
+    releaseFlightInputs();
+    accumulator=0;
+    last=performance.now();
+  });
+  touchControls.mode.addEventListener('change',releaseFlightInputs);
   const overControls=target=>target.closest('button,details,input,select,textarea,a,.systems,.right,header,#touchFlight,#tacticalGuide,#tacticalReport');
   addEventListener('contextmenu',event=>{
     if(cockpitActive()&&!overControls(event.target)) event.preventDefault();
@@ -1433,7 +1496,8 @@ function initialize(){
       return;
     }
     if(event.button!==0||event.pointerType==='touch'||!settings.mouse||cockpitView.drag) return;
-    pointer.active=true;pointer.x=0;pointer.y=0;pointer.left=event.clientX;pointer.top=event.clientY;
+    pointer.active=true;pointer.id=event.pointerId;pointer.x=0;pointer.y=0;
+    pointer.left=event.clientX;pointer.top=event.clientY;
   });
   addEventListener('pointermove',event=>{
     const drag=cockpitView.drag;
@@ -1444,14 +1508,17 @@ function initialize(){
       drag.y=event.clientY;
       return;
     }
-    if(!pointer.active) return;
+    if(!pointer.active||pointer.id!==event.pointerId) return;
     pointer.x=clamp((event.clientX-pointer.left)/130,-1,1);
     pointer.y=clamp((pointer.top-event.clientY)/130,-1,1);
   });
-  addEventListener('pointercancel',()=>{pointer.active=false;cockpitView.drag=null;});
+  addEventListener('pointercancel',event=>{
+    if(event.pointerId===pointer.id) pointer.active=false;
+    if(event.pointerId===cockpitView.drag?.id) cockpitView.drag=null;
+  });
   addEventListener('pointerup',event=>{
     if(event.pointerId===cockpitView.drag?.id&&event.button===2) cockpitView.drag=null;
-    if(event.button===0) pointer.active=false;
+    if(event.button===0&&event.pointerId===pointer.id) pointer.active=false;
     if(event.target instanceof HTMLInputElement&&event.target.type==='range'&&event.target.closest('#quickControls')) event.target.blur();
   });
   byId('viewScene').onclick=()=>{
@@ -1488,6 +1555,7 @@ function initialize(){
     setMobilePanel('');
     byId('quickControls').open=true;
   };
+  byId('mobilePause').onclick=()=>{if(flight) action('KeyP');};
   touchControls.mode.addEventListener('change',()=>{
     setMobilePanel('');
     changeView();
@@ -1516,16 +1584,36 @@ function initialize(){
     qualitySelect.value=flightQuality.value;
     qualitySelect.onchange();
   };
+  let resolutionScale=1,basePixelRatio=1,nextResolutionReview=0;
+  let measuredFrameTime=0,measuredFrames=0;
   function resize(){
     const ultra=qualitySelect.value==='ultra';
     const scale={low:.6,balanced:1,high:1.75}[qualitySelect.value]||1;
     const mobile=touchControls.mode.value==='mobile';
-    const ratio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(innerWidth*innerHeight))):
+    basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(innerWidth*innerHeight))):
       Math.min(devicePixelRatio,scale,mobile?1:Infinity);
-    renderer.setPixelRatio(ratio);
+    resolutionScale=1;
+    measuredFrameTime=measuredFrames=0;
+    nextResolutionReview=performance.now()+2200;
+    renderer.setPixelRatio(basePixelRatio);
     renderer.shadowMap.enabled=ultra;
     renderer.setSize(innerWidth,innerHeight);
     camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  }
+  function adjustResolution(now,seconds){
+    if(qualitySelect.value!=='balanced'&&qualitySelect.value!=='high') return;
+    measuredFrameTime+=seconds;
+    measuredFrames++;
+    if(now<nextResolutionReview) return;
+    const average=measuredFrameTime/measuredFrames;
+    const target=average>.035?Math.max(.72,resolutionScale-.14):
+      average<.023?Math.min(1,resolutionScale+.07):resolutionScale;
+    if(target!==resolutionScale){
+      resolutionScale=target;
+      renderer.setPixelRatio(basePixelRatio*target);
+    }
+    measuredFrameTime=measuredFrames=0;
+    nextResolutionReview=now+2200;
   }
   addEventListener('resize',resize);resize();
   touchControls.mode.addEventListener('change',resize);
@@ -1866,10 +1954,48 @@ function initialize(){
   scene.add(cargoLoader,serviceLamp);
   const taxiLamp=new THREE.SpotLight(0xffebc9,0,240,.40,.62,1.35);
   scene.add(taxiLamp,taxiLamp.target);
+  function drawInstruments(f,profile,speeds,knots,live){
+    const fuelLabel=Number.isFinite(f.fuel)?Math.round(f.fuel).toLocaleString()+' kg':'—';
+    const occupants=f.service?f.service.boarded:f.passengers??0;
+    const loadStatus=byId('flightLoad');
+    const loadText='燃油 '+fuelLabel+' · 旅客 '+occupants+(f.service?'/'+f.passengers:'')+' 人';
+    if(loadStatus.textContent!==loadText) loadStatus.textContent=loadText;
+    const values=[knots,Math.round(f.y*3.28084),Math.round(f.vs*196.85),String(Math.round(((f.heading/rad)%360+360)%360)%360).padStart(3,'0')+'°',Math.round(f.power*100)+'%',f.flaps+' / '+Math.round(f.trim/rad)+'°',Math.round(speeds.gs*knotsPerMps),Math.round(speeds.tas*knotsPerMps),speeds.mach.toFixed(2)];
+    values.forEach((value,i)=>{
+      const text=live?String(value):'—';
+      if(statValues[i].textContent!==text) statValues[i].textContent=text;
+    });
+    byId('attitudeReadout').textContent=live?
+      '俯仰 '+Math.round(f.pitch/rad)+'° · 坡度 '+Math.round(f.bank/rad)+'°':'';
+    if(f.regional){
+      for(const b of switches.children) b.update();
+      byId('instrumentType').textContent=live?
+        f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+(f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+(f.hold?.climb?(f.hold.levelOff?' · 自動油門／巡航保持':' · 自動油門／爬升至 35,000 ft'):(f.hold?.nav?' · 自動導航接通':f.hold?' · 保持接通':'')):'航電未供電';
+      if(profile.role&&live){
+        const guide=approachGuidance(f);
+        byId('instrumentType').textContent+=' · VAPP '+profile.approach+(f.boost&&f.power>.89?' · 加力':'');
+        if(guide.valid) byId('instrumentType').textContent+=' · 下滑偏差 '+Math.round(guide.height)+' m · 航向道 '+Math.round(guide.cross)+' m';
+      }
+      if(profile.role==='cargo'){
+        const balance=cargoBalance(f);
+        byId('cargoBalance').textContent='貨重 '+balance.mass.toLocaleString()+' kg · CG '+balance.shift.toFixed(2)+' m'+(f.voyage?' · 燃油 '+Math.round(f.fuel).toLocaleString()+' kg':'')+
+          (balance.problems.length?' · 超限：'+balance.problems.join('、'):'');
+      }
+      byId('cockpit').style.filter=activeDay<.15&&!f.lights?'brightness(.40)':'none';
+    }
+    if(f.contract&&Number.isFinite(f.fuel)){
+      byId('instrumentType').textContent+=' · 燃油 '+Math.round(f.fuel)+' kg'+(f.passengers?' · '+f.passengers+' 名旅客':'');
+    }
+    if(f.mission==='passenger') byId('instrumentType').textContent='旅客 '+f.passengers+' 人 · 燃油 '+Math.round(f.fuel).toLocaleString()+' kg · 餘額 $'+readMoney().toLocaleString();
+    byId('hudHeading').textContent='HDG '+values[3];
+    byId('hudNumbers').textContent=knots+' IAS kt　 '+values[1]+' FT　 VAPP '+profile.approach;
+  }
   function render(now){
     requestAnimationFrame(render);
-    const frameSeconds=Math.min(1,(now-last)/1000);
+    if(document.hidden){last=now;return;}
+    const frameSeconds=clamp((now-last)/1000,0,1);
     const dt=Math.min(.25,frameSeconds);last=now;
+    adjustResolution(now,frameSeconds);
     const profile=flight?.aircraft||selectedAircraft();
     const model=aircraftModel(profile);
     const livery=hangarLiveries[profile.id]||!flight&&byId('liveryPreview').checked;
@@ -1889,6 +2015,11 @@ function initialize(){
     serviceLamp.intensity=0;
     if(flight){
       const f=flight,input=replay?{roll:0}:inputs(f);
+      if(poseFlight!==f){
+        poseFlight=f;
+        rememberPose(f);
+        chaseHeading=null;
+      }
       if(replay){
         if(!replay.paused) replay.time=Math.min(replay.duration,replay.time+dt*replay.rate);
         applyVoyageFrame(f,replay.frames,replay.time);
@@ -1904,6 +2035,7 @@ function initialize(){
         const simDeadline=performance.now()+5;
         for(let ticks=0;!paused&&!document.hidden&&accumulator+1e-10>=simTick&&
             (ticks<12||performance.now()<simDeadline);ticks++){
+          rememberPose(f);
           if(f.tow) stepRunwayTow(f,simTick);
           else stepTrainer(f,smoothControls(f,input,simTick));
           if(f.service) updatePassengerService(f,simTick);
@@ -1932,13 +2064,22 @@ function initialize(){
         if(audioEnabled) flightAudio.effect(48,.11);
         previousTouchdown=f.touchdown;
       }
-      const dir=forward(f.heading),pos=new THREE.Vector3(f.x,f.y,f.z);
+      const continuous=Math.hypot(f.x-previousPose.x,f.y-previousPose.y,f.z-previousPose.z)<30;
+      const blend=replay||paused||f.finished||!continuous?1:clamp(accumulator/simTick,0,1);
+      const heading=previousPose.heading+wrapAngle(f.heading-previousPose.heading)*blend;
+      const pitch=THREE.MathUtils.lerp(previousPose.pitch,f.pitch,blend);
+      const bank=THREE.MathUtils.lerp(previousPose.bank,f.bank,blend);
+      const pos=visualPosition.set(
+        THREE.MathUtils.lerp(previousPose.x,f.x,blend),
+        THREE.MathUtils.lerp(previousPose.y,f.y,blend),
+        THREE.MathUtils.lerp(previousPose.z,f.z,blend));
+      const dir=visualForward.set(Math.sin(heading),0,-Math.cos(heading));
       updateTerrain(f.x,f.z);
       taxiLamp.intensity=f.voyage&&f.ground&&f.battery&&f.lights?470:0;
       taxiLamp.position.copy(pos).addScaledVector(dir,14);
       taxiLamp.target.position.copy(pos).addScaledVector(dir,62);
       taxiLamp.target.position.y=f.y-5;
-      model.position.copy(pos);model.rotation.set(f.pitch,-f.heading,-f.bank,'YXZ');
+      model.position.copy(pos);model.rotation.set(pitch,-heading,-bank,'YXZ');
       const airport=f.landed?f.destination:f.departure;
       if(f.ground&&airport&&Math.hypot(f.x-airport.x,f.z-airport.z)<airport.length*.5+450){
         placeGroundShadow(aircraftShadow,f.x,f.z,airport.elevation,f.heading,
@@ -1952,7 +2093,7 @@ function initialize(){
             .applyQuaternion(model.quaternion).add(pos);
           tug.position.copy(noseHitch).addScaledVector(dir,towbarLength+tugHitchZ);
           tug.position.y=terrainHeight(tug.position.x,tug.position.z);
-          tug.rotation.y=-f.heading;
+          tug.rotation.y=-heading;
           tugHitch.copy(tug.position).addScaledVector(dir,-tugHitchZ);
           tugHitch.y+=tugHitchHeight;
           towSpan.subVectors(noseHitch,tugHitch);
@@ -2036,19 +2177,24 @@ function initialize(){
           }
         }
       }
-      model.userData.surfaces.forEach((part,i)=>part.rotation.x=-f.flaps*.16+input.roll*(i===0?-.22:.22));
+      const aileron=replay||f.tow?0:(f.manualControls?.roll??0);
+      model.userData.surfaces.forEach((part,i)=>part.rotation.x=-f.flaps*.16+aileron*(i===0?-.22:.22));
       if(cameraMode===0){
         camera.up.set(0,1,0);
         if(tug.visible){
+          chaseHeading=null;
           camera.position.copy(tug.position).addScaledVector(dir,5);
           camera.position.x+=Math.cos(f.heading)*15;
           camera.position.z+=Math.sin(f.heading)*15;
           camera.position.y+=5.8;
           camera.lookAt(tug.position.x-dir.x*4,tug.position.y+1.7,tug.position.z-dir.z*4);
         }else{
-          camera.position.copy(pos).addScaledVector(dir,-profile.geometry[0]*(profile.id==='b773'?2.7:5));
-          camera.position.y+=profile.gearHeight*4;
-          camera.lookAt(pos.clone().addScaledVector(dir,12));
+          if(chaseHeading===null||!continuous||replay) chaseHeading=heading;
+          chaseHeading+=wrapAngle(heading-chaseHeading)*(1-Math.exp(-dt*5.5));
+          const distance=profile.geometry[0]*(profile.id==='b773'?2.7:5);
+          camera.position.set(pos.x-Math.sin(chaseHeading)*distance,
+            pos.y+profile.gearHeight*4,pos.z+Math.cos(chaseHeading)*distance);
+          camera.lookAt(pos.x+dir.x*12,pos.y+Math.sin(pitch)*8,pos.z+dir.z*12);
         }
       }else{
         const airliner=twoSeats(profile);
@@ -2087,49 +2233,24 @@ function initialize(){
         camera.position.copy(eye);camera.up.set(0,1,0);
         camera.lookAt(pos.clone().addScaledVector(dir,11).add(new THREE.Vector3(0,.44,0)));
       }
-      const fuelLabel=Number.isFinite(f.fuel)?Math.round(f.fuel).toLocaleString()+' kg':'—';
-      const occupants=f.service?f.service.boarded:f.passengers??0;
-      const loadStatus=byId('flightLoad');
-      const loadText='燃油 '+fuelLabel+' · 旅客 '+occupants+(f.service?'/'+f.passengers:'')+' 人';
-      if(loadStatus.textContent!==loadText) loadStatus.textContent=loadText;
       const speeds=flightSpeeds(f);
       const knots=Math.round(speeds.ias*knotsPerMps), live=!f.regional||f.battery;
-      const values=[knots,Math.round(f.y*3.28084),Math.round(f.vs*196.85),String(Math.round(((f.heading/rad)%360+360)%360)%360).padStart(3,'0')+'°',Math.round(f.power*100)+'%',f.flaps+' / '+Math.round(f.trim/rad)+'°',Math.round(speeds.gs*knotsPerMps),Math.round(speeds.tas*knotsPerMps),speeds.mach.toFixed(2)];
-      values.forEach((value,i)=>statValues[i].textContent=live?value:'—');
+      if(now>=nextInstrumentDraw){
+        nextInstrumentDraw=now+80;
+        drawInstruments(f,profile,speeds,knots,live);
+      }
       const straightAhead=cockpitView.preset!==(twoSeats(profile)?2:1)&&
         Math.abs(cockpitView.yaw)<.18&&Math.abs(cockpitView.pitch)<.16;
-      byId('benchmarkHUD').hidden=Boolean(f.tactical)||!profile.role||!cockpitActive()||!live||!straightAhead;
-      if(!byId('benchmarkHUD').hidden){
-        byId('hudHeading').textContent='HDG '+values[3];
-        byId('hudCross').style.transform='rotate('+(-f.bank/rad)+'deg) translateY('+clamp(f.pitch/rad*2,-40,40)+'px)';
-        byId('hudNumbers').textContent=knots+' IAS kt　 '+values[1]+' FT　 VAPP '+profile.approach;
-      }
-      if(f.regional){
-        for(const b of switches.children) b.update();
-        byId('instrumentType').textContent=live?
-          f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+(f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+(f.hold?.climb?(f.hold.levelOff?' · 自動油門／巡航保持':' · 自動油門／爬升至 35,000 ft'):(f.hold?.nav?' · 自動導航接通':f.hold?' · 保持接通':'')):'航電未供電';
-        if(profile.role&&live){
-          const guide=approachGuidance(f);
-          byId('instrumentType').textContent+=' · VAPP '+profile.approach+(f.boost&&f.power>.89?' · 加力':'');
-          if(guide.valid) byId('instrumentType').textContent+=' · 下滑偏差 '+Math.round(guide.height)+' m · 航向道 '+Math.round(guide.cross)+' m';
-        }
-        if(profile.role==='cargo'){
-          const balance=cargoBalance(f);
-          byId('cargoBalance').textContent='貨重 '+balance.mass.toLocaleString()+' kg · CG '+balance.shift.toFixed(2)+' m'+(f.voyage?' · 燃油 '+Math.round(f.fuel).toLocaleString()+' kg':'')+
-            (balance.problems.length?' · 超限：'+balance.problems.join('、'):'');
-        }
-        byId('cockpit').style.filter=activeDay<.15&&!f.lights?'brightness(.40)':'none';
-      }
-      if(f.contract&&Number.isFinite(f.fuel)){
-        byId('instrumentType').textContent+=' · 燃油 '+Math.round(f.fuel)+' kg'+(f.passengers?' · '+f.passengers+' 名旅客':'');
-      }
-      if(f.mission==='passenger') byId('instrumentType').textContent='旅客 '+f.passengers+' 人 · 燃油 '+Math.round(f.fuel).toLocaleString()+' kg · 餘額 $'+readMoney().toLocaleString();
+      const hud=byId('benchmarkHUD');
+      hud.hidden=Boolean(f.tactical)||!profile.role||!cockpitActive()||!live||!straightAhead;
+      if(!hud.hidden) byId('hudCross').style.transform='rotate('+(-bank/rad)+'deg) translateY('+clamp(pitch/rad*2,-40,40)+'px)';
       if(!f.regional&&!f.ground&&f.waypoint<4&&Math.hypot(legacyRoute[f.waypoint].x-f.x,legacyRoute[f.waypoint].z-f.z)<420) f.waypoint++;
       const target=f.regional?activeTarget(f):legacyRoute[f.waypoint];
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}
       const statusBox=byId('status');
       statusBox.hidden=Boolean(f.tactical&&!paused)||!byId('gateGuide').hidden&&!paused&&!f.towMessage;
-      statusBox.textContent=status(f,knots,target);
+      const statusText=status(f,knots,target);
+      if(statusBox.textContent!==statusText) statusBox.textContent=statusText;
       const readyToTowIn=arrivalTowReady(f);
       byId('towControls').hidden=!f.tow&&!readyToTowIn;
       byId('startGateTow').hidden=!readyToTowIn;
@@ -2219,10 +2340,22 @@ function initialize(){
     sunlight.target.position.set(viewerX,model.position.y,viewerZ);
     sunlight.position.copy(sunlight.target.position).add(sunDirection);
     if(renderer.shadowMap.enabled&&activeDay>.18) aircraftShadow.visible=false;
+    if(sceneryBuild&&(touchControls.mode.value==='desktop'||qualitySelect.value!=='low')){
+      const budget=performance.now()+3;
+      try{
+        do {
+          if(sceneryBuild.next().done){sceneryBuild=null;break;}
+        }while(performance.now()<budget);
+      }catch(error){sceneryUnavailable(error);}
+    }
     if(detailedScenery&&sceneryLayers.visible){
-      detailedScenery.plants.update(camera.position.x,camera.position.z,qualitySelect.value);
-      detailedScenery.region.update(camera.position.x,camera.position.z,qualitySelect.value,dt,activeDay);
-      detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',paused||Boolean(replay),qualitySelect.value);
+      const {x,y,z}=camera.position;
+      const heightAboveGround=y-renderedGround(x,z);
+      const groundTraffic=heightAboveGround<1500;
+      detailedScenery.plants.update(x,z,qualitySelect.value,heightAboveGround<3200);
+      detailedScenery.region.update(x,z,qualitySelect.value,dt,activeDay,groundTraffic);
+      detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',
+        paused||Boolean(replay),qualitySelect.value,groundTraffic);
     }
     airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:byId('inspect').value==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);

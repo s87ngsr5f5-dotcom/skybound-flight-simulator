@@ -1,5 +1,5 @@
 'use strict';
-function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBounds){
+function* buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBounds){
   const tileSize=1600, tiles=new Map();
   const tileKey=(x,z)=>x+':'+z;
   function tileAt(x,z){
@@ -20,6 +20,7 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
     return lat>=taipeiBounds[0]&&lat<=25.11&&lon>=taipeiBounds[1]&&lon<=taipeiBounds[3];
   }
   for(const [width,bridge,coords] of roadData){
+    yield;
     const points=[],lengths=[0],normals=[];
     for(let i=0;i<coords.length;i+=2){
       const point=geoPoint(coords[i],coords[i+1]), prev=points.at(-1);
@@ -44,7 +45,9 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
         riseA:lift(lengths[i-1]),riseB:lift(lengths[i])});
     }
   }
-  for(const [lat,lon,width,depth,height,tone] of cityData){
+  for(let i=0;i<cityData.length;i++){
+    if(i%64===0) yield;
+    const [lat,lon,width,depth,height,tone]=cityData[i];
     const {x,z}=geoPoint(lat,lon);
     if(inAirport(x,z,195+Math.max(width,depth)/2)) continue;
     tileAt(x,z).buildings.push({x,z,width,depth,height,tone});
@@ -143,9 +146,10 @@ function buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBoun
     mesh.geometry.dispose();
     mesh.geometry=geometry;
   }
-  function update(x,z,quality,dt,daylight=1){
+  function update(x,z,quality,dt,daylight=1,traffic=true){
     wall.emissiveIntensity=(1-daylight)*.85;
-    updateTraffic(x,z,dt,quality);
+    carBody.visible=carCabin.visible=traffic;
+    if(traffic) updateTraffic(x,z,dt,quality);
     const col=Math.floor(x/tileSize),row=Math.floor(z/tileSize),key=tileKey(col,row)+':'+quality;
     if(last===key) return;
     last=key;

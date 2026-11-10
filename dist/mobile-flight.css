@@ -31,6 +31,7 @@
 .mobile-mode #skipRunwayTow { min-height: 42px; min-width: 44px; }
 .mobile-mode #mobileToolbar button { font-size: 12px; padding: 4px 8px; }
 .mobile-mode #mobileToolbar button[aria-expanded="true"] { background: #206a76; }
+.mobile-mode #mobilePause[aria-pressed="true"] { background: #206a76; }
 .mobile-mode #flightGuide,
 .mobile-mode #gateGuide {
   position: absolute;
@@ -113,6 +114,7 @@
 .mobile-mode .geo-credit { font-size: 8px; }
 
 @media (max-width: 520px) {
+  .mobile-mode #mobileToolbar button { padding-inline: 6px; }
   .mobile-mode .stats { left: 0; right: 0; bottom: calc(var(--stick-size) + 8px); }
   .mobile-mode #flightGuide,
   .mobile-mode #gateGuide { width: 96%; bottom: calc(var(--stick-size) + 68px); }

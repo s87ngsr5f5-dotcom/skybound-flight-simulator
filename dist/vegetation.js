@@ -16,7 +16,7 @@ function createTreeCover(source){
     return density[row*source.columns+col]/15;
   };
 }
-function buildVegetation(scene,ground,airports,map,cover,highways){
+function* buildVegetation(scene,ground,airports,map,cover,highways){
   // Index mapped obstructions once. A tree only checks features in its own cell.
   const masks=new Map(), maskSize=120;
   const key=(x,z)=>x+':'+z;
@@ -45,19 +45,23 @@ function buildVegetation(scene,ground,airports,map,cover,highways){
     }
   }
   for(const road of map.roads){
+    yield;
     if(!road.tunnel) pathMask(road.p,road.kind==='motorway'?12:9,true);
   }
   for(const [width,,coords] of highways){
+    yield;
     const path=[];
     for(let i=0;i<coords.length;i+=2) path.push([coords[i],coords[i+1]]);
     pathMask(path,width/2+2,true);
   }
   for(const river of map.rivers){
+    yield;
     const width=river.name.includes('基隆')?120:river.name.includes('淡水')?180:
       river.name.includes('新店')?130:river.name.includes('大漢')?160:18;
     pathMask(river.p,width/2+8);
   }
   for(const building of map.buildings){
+    yield;
     const points=building.p.map(([lat,lon])=>geoPoint(lat,lon));
     const xs=points.map(p=>p.x),zs=points.map(p=>p.z);
     const x0=Math.min(...xs)-4,x1=Math.max(...xs)+4,z0=Math.min(...zs)-4,z1=Math.max(...zs)+4;
@@ -126,8 +130,13 @@ function buildVegetation(scene,ground,airports,map,cover,highways){
     const cell=masks.get(key(Math.floor(x/maskSize),Math.floor(z/maskSize)));
     return cell?.some(test=>test(x,z,radius));
   }
-  function update(x,z,quality){
-    const spacing=96;
+  function update(x,z,quality,visible=true){
+    if(!visible){
+      for(const mesh of [trunks,crowns,branches,distant]) mesh.visible=false;
+      last='';
+      return;
+    }
+    const spacing=quality==='ultra'?160:128;
     const col=Math.floor(x/spacing),row=Math.floor(z/spacing),id=key(col,row)+':'+quality;
     if(last===id) return;
     last=id;
