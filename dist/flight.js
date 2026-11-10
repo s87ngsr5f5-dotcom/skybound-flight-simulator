@@ -114,6 +114,11 @@ function initialize(){
       const half=airport.length/2;
       if(Math.abs(x-airport.x)>half+950||Math.abs(z-airport.z)>half+950) continue;
       const {along,cross}=runwayCoordinates(x,z,airport);
+      if(airport.shortField){
+        const blend=shortFieldBlend(airport,along,cross,70);
+        if(blend>0) return natural+(airport.elevation-natural)*blend;
+        continue;
+      }
       // Clear a terrain-grid cell around paved surfaces so coarse triangles
       // cannot bury a flat runway threshold or the edge of the apron.
       const apronLimit=Math.sign(airport.apron)*cross>0?Math.abs(airport.apron)+135:airport.width/2+9;
@@ -142,13 +147,33 @@ function initialize(){
   landTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const terrainMaterial=new THREE.MeshStandardMaterial({map:landTexture,roughness:1,vertexColors:true});
   const taipeiImage={value:landTexture}, taipeiImageReady={value:0};
-  terrainMaterial.onBeforeCompile=shader=>{
+  const atlasImage={value:landTexture},atlasReady={value:0};
+  const atlasBounds={value:new THREE.Vector4(...taiwanSatelliteData.overview)};
+  function terrainPhoto(shader,tile){
     shader.uniforms.taipeiImage=taipeiImage;
     shader.uniforms.taipeiImageReady=taipeiImageReady;
+    shader.uniforms.regionalImage=tile?.image??{value:landTexture};
+    shader.uniforms.regionalImageReady=tile?.ready??{value:0};
+    shader.uniforms.regionalImageOrigin=tile?.origin??{value:new THREE.Vector2()};
+    shader.uniforms.atlasImage=atlasImage;
+    shader.uniforms.atlasReady=atlasReady;
+    shader.uniforms.atlasBounds=atlasBounds;
     shader.vertexShader='varying vec2 terrainXZ;\n'+shader.vertexShader.replace('#include <begin_vertex>',
       '#include <begin_vertex>\n terrainXZ=(modelMatrix * vec4(transformed,1.0)).xz;');
-    shader.fragmentShader='varying vec2 terrainXZ;\nuniform sampler2D taipeiImage;\nuniform float taipeiImageReady;\n'+
+    shader.fragmentShader='varying vec2 terrainXZ;\nuniform sampler2D taipeiImage,regionalImage,atlasImage;\n'+
+      'uniform float taipeiImageReady,regionalImageReady,atlasReady;\nuniform vec2 regionalImageOrigin;\nuniform vec4 atlasBounds;\n'+
       shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+        vec2 atlasUV=(terrainXZ-atlasBounds.xy)/atlasBounds.zw;
+        if(atlasReady>0.5&&all(greaterThanEqual(atlasUV,vec2(0.0)))&&all(lessThanEqual(atlasUV,vec2(1.0)))){
+          vec4 atlas=texture2D(atlasImage,vec2(atlasUV.x,1.0-atlasUV.y));
+          diffuseColor.rgb=mix(diffuseColor.rgb,atlas.rgb*1.12,atlas.a);
+        }
+        if(regionalImageReady>0.5){
+          vec2 tileUV=clamp((terrainXZ-regionalImageOrigin)/11520.0,0.0,1.0);
+          vec4 regional=texture2D(regionalImage,vec2(tileUV.x,1.0-tileUV.y));
+          float visiblePhoto=regional.a*smoothstep(.0006,.002,max(regional.r,max(regional.g,regional.b)));
+          diffuseColor.rgb=mix(diffuseColor.rgb,regional.rgb*1.12,visiblePhoto);
+        }
         vec2 imageUV=(terrainXZ-vec2(-20000.0,-18000.0))/vec2(39000.0,33500.0);
         float imageEdge=min(min(imageUV.x,imageUV.y),1.0-max(imageUV.x,imageUV.y));
         if(taipeiImageReady>0.5 && imageEdge>0.0){
@@ -156,7 +181,20 @@ function initialize(){
           diffuseColor.rgb=mix(diffuseColor.rgb,photo*1.12,smoothstep(0.0,0.035,imageEdge));
         }
       `);
-  };
+  }
+  terrainMaterial.onBeforeCompile=shader=>terrainPhoto(shader);
+  const satelliteCredit=byId('satelliteCredit');
+  if(!renderer.instrumentOnly) loadTaiwanAtlas().then(texture=>{
+    atlasImage.value=texture;
+    atlasReady.value=1;
+    if(!flight) drawPlan();
+  }).catch(()=>{});
+  const taiwanSatellite=renderer.instrumentOnly?null:createTaiwanSatellite(tile=>{
+    const material=terrainMaterial.clone();
+    tile.image.value=landTexture;
+    material.onBeforeCompile=shader=>terrainPhoto(shader,tile);
+    return material;
+  },renderer,()=>{satelliteCredit.hidden=false;});
   const terrainChunks=new Map();
   const span=11520;
   const terrainHeights=new Map();
@@ -165,7 +203,15 @@ function initialize(){
   let mountainLayerRequested=false;
   let taipeiImageRequested='';
   function loadTaipeiImagery(x,z){
-    if(Math.abs(x)>55000||Math.abs(z)>55000) return;
+    if(Math.abs(x)>55000||Math.abs(z)>55000){
+      taipeiImageRequested='';
+      if(taipeiImageReady.value){
+        taipeiImage.value.dispose();
+        taipeiImage.value=landTexture;
+        taipeiImageReady.value=0;
+      }
+      return;
+    }
     const mobile=byId('quality').value==='low'||renderer.capabilities.maxTextureSize<4096;
     const file=mobile?'taipei-sentinel-mobile.webp':'taipei-sentinel.webp';
     if(taipeiImageRequested===file) return;
@@ -177,7 +223,7 @@ function initialize(){
       if(taipeiImageReady.value) taipeiImage.value.dispose();
       taipeiImage.value=texture;
       taipeiImageReady.value=1;
-      byId('satelliteCredit').hidden=false;
+      satelliteCredit.hidden=false;
     });
   }
   function loadMountainTerrain(col,row){
@@ -213,6 +259,7 @@ function initialize(){
     if(renderer.instrumentOnly) return;
     loadTaipeiImagery(x,z);
     const cx=Math.floor(x/span),cz=Math.floor(z/span),id=cx+':'+cz+':'+terrainColorRevision;
+    taiwanSatellite.update(cx,cz,byId('quality').value);
     loadMountainTerrain(cx,cz);
     if(id!==previousChunk){
       previousChunk=id;
@@ -224,7 +271,9 @@ function initialize(){
           visible.add(key);
           const mountain=Boolean(centralMountainTile(col,row));
           const near=Math.max(Math.abs(col-cx),Math.abs(row-cz))<=1;
-          const step=mountain&&near?120:terrainStep(col,row);
+          const island=airports.some(airport=>airport.shortField&&Math.abs(airport.x-(col+.5)*span)<span*.8&&
+            Math.abs(airport.z-(row+.5)*span)<span*.8);
+          const step=(mountain||island)&&near?120:terrainStep(col,row);
           const old=terrainChunks.get(key)?.userData;
           if(old?.colorRevision!==terrainColorRevision||old.step!==step){
             terrainQueue.push({col,row,key,step,mountain,distance:(x/span-col-.5)**2+(z/span-row-.5)**2});
@@ -250,10 +299,10 @@ function initialize(){
         const {col,row,key,step,mountain}=terrainQueue.shift();
         const mesh=new THREE.PlaneGeometry(span,span,span/step,span/step);
         mesh.rotateX(-Math.PI/2);
-        terrainBuild={key,mesh,step,mountain,px:(col+.5)*span,pz:(row+.5)*span,index:0,
+        terrainBuild={key,col,row,mesh,step,mountain,px:(col+.5)*span,pz:(row+.5)*span,index:0,
           colors:new THREE.BufferAttribute(new Float32Array(mesh.attributes.position.count*3),3)};
       }
-      const {key,mesh,step,mountain,px,pz,colors}=terrainBuild,pos=mesh.attributes.position;
+      const {key,col,row,mesh,step,mountain,px,pz,colors}=terrainBuild,pos=mesh.attributes.position;
       const end=Math.min(pos.count,terrainBuild.index+128);
       for(let i=terrainBuild.index;i<end;i++){
         const worldX=px+pos.getX(i),worldZ=pz+Math.round(pos.getZ(i));
@@ -277,7 +326,7 @@ function initialize(){
       if(end===pos.count){
         mesh.setAttribute('color',colors);
         mesh.computeVertexNormals();
-        const patch=new THREE.Mesh(mesh,terrainMaterial);
+        const patch=new THREE.Mesh(mesh,taiwanSatellite.material(col,row)??terrainMaterial);
         patch.receiveShadow=true;
         patch.position.set(px,0,pz);
         patch.userData.colorRevision=terrainColorRevision;
@@ -373,11 +422,12 @@ function initialize(){
   const lampMaterial=new THREE.MeshBasicMaterial({color:0xd7eaff});
   for(const airport of airports){
     const half=airport.length/2, width=airport.width, apron=airport.apron, sideOfApron=Math.sign(apron);
+    const local=airport.shortField, apronZ=local?-airport.parkingAlong:-65;
     const large=['RCTP','RJAA','RCKH'].includes(airport.code);
-    const gates=large?7:['RCSS','RCMQ'].includes(airport.code)?5:3;
-    const gatePitch=large?73:51, apronLength=gates*gatePitch+80;
-    const terminalX=apron+sideOfApron*(large?112:88);
-    const terminalWidth=large?59:40;
+    const gates=local?1:large?7:['RCSS','RCMQ'].includes(airport.code)?5:3;
+    const gatePitch=local?27:large?73:51, apronLength=gates*gatePitch+(local?55:80);
+    const terminalX=apron+sideOfApron*(local?22:large?112:88);
+    const terminalWidth=local?15:large?59:40;
     const gateWall=terminalX-sideOfApron*terminalWidth/2;
     jetwayWalls.set(airport.code,gateWall);
     const group = new THREE.Group();
@@ -386,15 +436,15 @@ function initialize(){
     scene.add(group);
     airportGroups.push({group,airport});
     box(group,concrete,width+15,.08,airport.length+28,0,-.008,0);
-    box(group,asphalt,width,.12,airport.length,0,0,0);
-    box(group,concrete,24,.10,airport.length-180,apron,0,0);
-    box(group,concrete,large?150:113,.11,apronLength,apron+sideOfApron*30,0,-65);
+    box(group,airport.code==='RCLY'?concrete:asphalt,width,.12,airport.length,0,0,0);
+    if(!local) box(group,concrete,24,.10,airport.length-180,apron,0,0);
+    box(group,concrete,local?34:large?150:113,.11,apronLength,apron+(local?0:sideOfApron*30),0,apronZ);
     const lane=material('#dbad49');
-    box(group,lane,.26,.03,airport.length-190,apron,.07,0);
-    for(const z of [half-135,-440,-950]){
+    if(!local) box(group,lane,.26,.03,airport.length-190,apron,.07,0);
+    for(const z of local?[apronZ]:[half-135,-440,-950]){
       box(group,concrete,Math.abs(apron),.10,18,apron/2,0,z);
       box(group,lane,Math.abs(apron)-width/2,.025,.42,apron/2+sideOfApron*width/4,.07,z);
-      const hold=sideOfApron*(width/2+32);
+      const hold=sideOfApron*(width/2+(local?8:32));
       for(let i=0;i<4;i++){
         if(i<2) box(group,lane,.34,.025,14,hold+i*.78*sideOfApron,.081,z);
         else for(let m=-6;m<=6;m+=2) box(group,lane,.34,.025,1.12,hold+i*.78*sideOfApron,.081,z+m);
@@ -404,8 +454,8 @@ function initialize(){
     for(const side of [-1,1]){
       box(group,white,1.05,.035,airport.length-38,side*(width/2-2),.08,0);
       for(const end of [-1,1]){
-        box(group,white,Math.min(8,width*.13),.035,48,side*width*.22,.086,end*(half-315));
-        for(const distance of [200,430,520]){
+        if(!local) box(group,white,Math.min(8,width*.13),.035,48,side*width*.22,.086,end*(half-315));
+        for(const distance of local?[145]:[200,430,520]){
           box(group,white,1.9,.035,21,side*width*.25,.086,end*(half-distance));
           if(distance===200) box(group,white,1.9,.035,21,side*width*.33,.086,end*(half-distance));
         }
@@ -427,13 +477,13 @@ function initialize(){
       const edge=new THREE.MeshBasicMaterial({color:direction===1?0x6dffc0:0xf66c62});
       for(let x=-width/2;x<=width/2;x+=4) box(group,edge,.29,.15,.35,x,.105,direction*(half-10));
     }
-    const buildingLength=gates*gatePitch+25;
-    const height=large?15:10;
-    box(group,roof,terminalWidth,height,buildingLength,terminalX,height/2,-65);
-    box(group,glass,terminalWidth+.12,height*.44,buildingLength-3,terminalX,height*.55,-65);
-    box(group,roof,terminalWidth+5,.86,buildingLength+4,terminalX,height+.35,-65);
+    const buildingLength=gates*gatePitch+(local?13:25);
+    const height=local?5:large?15:10;
+    box(group,roof,terminalWidth,height,buildingLength,terminalX,height/2,apronZ);
+    box(group,glass,terminalWidth+.12,height*.44,buildingLength-3,terminalX,height*.55,apronZ);
+    box(group,roof,terminalWidth+5,.86,buildingLength+4,terminalX,height+.35,apronZ);
     for(let gate=0;gate<gates;gate++){
-      const z=-65+(gate-Math.floor(gates/2))*gatePitch;
+      const z=apronZ+(gate-Math.floor(gates/2))*gatePitch;
       box(group,roof,9,.34,gatePitch*.76,gateWall-sideOfApron*4,height*.69,z);
       for(let offset=-18;offset<=18;offset+=6) box(group,roof,.27,height*.52,.29,gateWall-sideOfApron*.18,height*.53,z+offset);
       box(group,lane,large?29:21,.029,.33,apron+sideOfApron*26,.091,z);
@@ -445,16 +495,16 @@ function initialize(){
         group.add(fixed.root);
       }
     }
-    const towerZ=-65-buildingLength/2-56;
-    const towerHeight=large?38:28;
-    box(group,roof,8,towerHeight,8,terminalX+sideOfApron*15,towerHeight/2,towerZ);
-    box(group,glass,14,6,14,terminalX+sideOfApron*15,towerHeight+3,towerZ);
-    box(group,roof,15.5,.92,15.5,terminalX+sideOfApron*15,towerHeight+6.2,towerZ);
-    const terminalLabel=new THREE.Mesh(new THREE.PlaneGeometry(22,6),new THREE.MeshBasicMaterial({
+    const towerZ=apronZ-buildingLength/2-(local?10:56);
+    const towerHeight=local?8:large?38:28;
+    box(group,roof,8,towerHeight,8,terminalX+sideOfApron*(local?2:15),towerHeight/2,towerZ);
+    box(group,glass,local?9:14,local?2.5:6,local?9:14,terminalX+sideOfApron*(local?2:15),towerHeight+(local?1.25:3),towerZ);
+    if(!local) box(group,roof,15.5,.92,15.5,terminalX+sideOfApron*15,towerHeight+6.2,towerZ);
+    const terminalLabel=new THREE.Mesh(new THREE.PlaneGeometry(local?13:22,local?3:6),new THREE.MeshBasicMaterial({
       map:labelTexture(airport.code,'#ffffff','#15354b'),side:THREE.DoubleSide
     }));
     terminalLabel.rotation.y=-sideOfApron*Math.PI/2;
-    terminalLabel.position.set(gateWall-sideOfApron*.15,height*.78,-65);
+    terminalLabel.position.set(gateWall-sideOfApron*.15,height*.78,apronZ);
     group.add(terminalLabel);
     const byMaterial=new Map();
     for(const child of group.children){
@@ -865,7 +915,9 @@ function initialize(){
       if(!match) throw new Error('航點 '+(i+1)+' 請輸入「緯度,經度」。');
       const lat=Number(match[1]), lon=Number(match[2]);
       const point=geoPoint(lat,lon);
-      if(lat<21.9||lat>25.4||lon<119.1||lon>122.10||point.z>326000) throw new Error('航點 '+(i+1)+' 超出離線區域。');
+      const [left,top,width,height]=taiwanSatelliteData.overview;
+      if(point.x<left||point.x>left+width||point.z<top||point.z>top+height)
+        throw new Error('航點 '+(i+1)+' 超出台灣地景範圍。');
       return {name:'自訂航點 '+(i+1),...point};
     }).concat(auto.slice(-2)):auto;
     return {departure,destination,route};
@@ -1040,6 +1092,12 @@ function initialize(){
       terrainPreviewInk.fillRect(x,y,2,2);
     }
   }
+  function drawTaiwanMap(context,project){
+    const [x,z,width,height]=atlasReady.value?taiwanSatelliteData.overview:[-290*900,-43*900,430*900,440*900];
+    const image=atlasReady.value?atlasImage.value.image:terrainPreview;
+    const [left,top]=project({x,z}),[right,bottom]=project({x:x+width,z:z+height});
+    context.drawImage(image,left,top,right-left,bottom-top);
+  }
   for(const button of planModes) button.onclick=()=>{
     byId('lesson').value=button.dataset.planMode;
     drawPlan();
@@ -1119,18 +1177,20 @@ function initialize(){
       }
       planPreviewAirport=departure;
       const points=isClimb?[departure,...route]:[departure,...route,destination];
-      if(isVoyage||destination.code==='RJAA'){
-        planMap.fillStyle='#12364d';planMap.fillRect(0,0,430,440);
-      }else planMap.drawImage(terrainPreview,0,0);
+      const overseas=isVoyage||destination.code==='RJAA';
+      planMap.fillStyle='#12364d';planMap.fillRect(0,0,430,440);
       const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
       const minZ=Math.min(...points.map(p=>p.z)),maxZ=Math.max(...points.map(p=>p.z));
       const metersPerPixel=Math.max((maxX-minX)/350,(maxZ-minZ)/355,1);
-      const project=isVoyage||destination.code==='RJAA'?
+      const [left,top,mapWidth,mapHeight]=taiwanSatelliteData.overview;
+      const scale=Math.min(400/mapWidth,418/mapHeight);
+      const project=overseas?
         (p=>[215+(p.x-(minX+maxX)/2)/metersPerPixel,220+(p.z-(minZ+maxZ)/2)/metersPerPixel]):
-        (p=>[290+p.x/900,43+p.z/900]);
+        (p=>[215+(p.x-left-mapWidth/2)*scale,220+(p.z-top-mapHeight/2)*scale]);
+      if(!overseas) drawTaiwanMap(planMap,project);
       mapPath(planMap,points,project,'#6ceaff');
       planMap.font='12px sans-serif';planMap.fillStyle='#f4f9fd';
-      for(const r of isVoyage||destination.code==='RJAA'?[departure,destination]:airports){
+      for(const r of overseas?[departure,destination]:taiwanAirports){
         const [x,y]=project(r);
         planMap.fillRect(x-2,y-2,4,4);
         planMap.fillText(r.code,x+7,y+3);
@@ -1911,6 +1971,19 @@ function initialize(){
     drawPlan();
     start(false,false,'taipei');
   };
+  for(const button of document.querySelectorAll('[data-island-departure]')){
+    button.onclick=()=>{
+      const island=button.dataset.islandDeparture;
+      byId('lesson').value='free';
+      byId('aircraft').value='c172s';
+      byId('departure').value=island;
+      byId('destination').value=island==='RCGI'?'RCLY':'RCGI';
+      byId('startType').value='runway';
+      byId('waypoints').value='';
+      drawPlan();
+      start(false);
+    };
+  }
   byId('quickFlights').onclick=event=>{
     const button=event.target.closest('[data-quick]');
     if(!button) return;
@@ -2114,10 +2187,7 @@ function initialize(){
     if(f.ground) {
       radar.fillStyle='#314c41';
       radar.fillRect(0,0,width,height);
-    }else{
-      const [left,top]=project({x:-290*900,z:-43*900});
-      radar.drawImage(terrainPreview,left,top,terrainPreview.width*900*scale,terrainPreview.height*900*scale);
-    }
+    }else drawTaiwanMap(radar,project);
     const nextLegs=f.ground?[]:f.route?.slice((f.waypoint??0)+1)||[];
     radar.lineWidth=2;
     if(trail.length>1) mapPath(radar,trail,project,'#dcb771');

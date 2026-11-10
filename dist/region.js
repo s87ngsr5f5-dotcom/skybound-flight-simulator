@@ -15,6 +15,10 @@ const taiwanAirports=[
   airport('RCFN','臺東',22+45.29233/60,121+6.099/60,38.64,2438,45,41.61,'04','22'),
   airport('RCBS','金門',24+25.675833/60,118+21.534167/60,63.39,3004,45,17.07,'06','24'),
   airport('RCQC','澎湖',23+34.11742/60,119+37.69433/60,18.22,3000,45,22.71,'02','20'),
+  {...airport('RCGI','綠島',22+(40+23.625/60)/60,121+(27+58.30/60)/60,164.18,917,23,8.38,'17','35',-47),
+    shortField:true,parkingAlong:-9},
+  {...airport('RCLY','蘭嶼',22+(1+43/60)/60,121+(32+1.85/60)/60,309.96,1132,30,12.95,'31','13',51),
+    shortField:true,parkingAlong:-261},
 ];
 function runwayCoordinates(x,z,r){
   const dx=x-r.x,dz=z-r.z,s=Math.sin(r.heading),c=Math.cos(r.heading);
@@ -24,7 +28,7 @@ function airportPoint(r,along,cross){
   const s=Math.sin(r.heading),c=Math.cos(r.heading);
   return {x:r.x+along*s+cross*c,z:r.z-along*c+cross*s};
 }
-const parkingPoint=r=>airportPoint(r,65,r.apron);
+const parkingPoint=r=>airportPoint(r,r.parkingAlong??65,r.apron);
 const regionalWaypoints=[
   {name:'東北角外海',...geoPoint(25.023,122.035)},
   {name:'宜蘭外海',...geoPoint(24.759,122.027)},
@@ -37,6 +41,27 @@ function regionalRoute(from,to){
   return finish;
 }
 const regionalGridStep=240;
+function islandGridAt(x,z){
+  if(typeof islandElevationData==='undefined') return;
+  return islandElevationData.find(([left,top,columns,rows])=>
+    x>=left&&z>=top&&x<left+(columns-1)*40&&z<top+(rows-1)*40);
+}
+function islandHeight(x,z,grid){
+  const [left,top,columns]=grid;
+  if(typeof grid[4]==='string'){
+    const raw=atob(grid[4]),samples=new Uint16Array(raw.length/2);
+    for(let i=0;i<samples.length;i++) samples[i]=raw.charCodeAt(i*2)|raw.charCodeAt(i*2+1)<<8;
+    grid[4]=samples;
+  }
+  const u=(x-left)/40,v=(z-top)/40;
+  const col=Math.floor(u),row=Math.floor(v),a=u-col,b=v-row,k=row*columns+col,h=grid[4];
+  return (h[k]*(1-a)+h[k+1]*a)*(1-b)+(h[k+columns]*(1-a)+h[k+columns+1]*a)*b;
+}
+function shortFieldBlend(r,along,cross,padding=0){
+  const runwayEdge=Math.max(Math.abs(along)-r.length/2-18,Math.abs(cross)-r.width/2-14);
+  const apronEdge=Math.max(Math.abs(along-r.parkingAlong)-48,Math.abs(cross-r.apron/2)-Math.abs(r.apron)/2-20);
+  return 1-Math.max(0,Math.min(1,(Math.min(runwayEdge,apronEdge)-padding)/66));
+}
 let centralMountainTiles;
 function registerCentralMountains(tiles){centralMountainTiles=tiles;}
 function centralMountainTile(col,row){return centralMountainTiles?.[col+':'+row];}
@@ -83,11 +108,14 @@ function regionalHeight(x,z){
   }
   if(typeof naritaHeight==='function'&&x>1500000) height=naritaHeight(x,z);
   if(centralMountainTiles&&height>350) height=detailedMountainHeight(x,z,height);
+  const island=islandGridAt(x,z);
+  if(island) height=islandHeight(x,z,island);
   for(const r of typeof naritaAirport==='undefined'?taiwanAirports:allAirports){
     const reach=r.length/2+550;
     if(Math.abs(x-r.x)>reach||Math.abs(z-r.z)>reach) continue;
     const {along,cross}=runwayCoordinates(x,z,r);
-    const blend=Math.max(0,1-Math.max((Math.abs(along)-r.length/2-60)/270,(Math.abs(cross)-265)/165));
+    const blend=r.shortField?shortFieldBlend(r,along,cross):
+      Math.max(0,1-Math.max((Math.abs(along)-r.length/2-60)/270,(Math.abs(cross)-265)/165));
     if(blend>0) return height+(r.elevation-height)*Math.min(1,blend);
   }
   return height;

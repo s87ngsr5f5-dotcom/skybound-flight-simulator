@@ -25,6 +25,7 @@ jobs:
       - run: node verify-heavy-cargo.cjs
       - run: node verify-fighter-controls.cjs
       - run: node verify-tactical-lock.cjs
+      - run: node verify-island-fields.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

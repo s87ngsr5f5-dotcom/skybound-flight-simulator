@@ -140,12 +140,16 @@ function requestRunwayTow(f){
   const frame=runwayCoordinates(f.x,f.z,airport);
   const threshold=-airport.length/2+135;
   const pavedAlong=limit(frame.along,-airport.length/2+100,airport.length/2-100);
-  f.tow={index:0,points:[
+  const points=airport.shortField?[
+    airportPoint(airport,airport.parkingAlong,0),
+    airportPoint(airport,threshold-40,0)
+  ]:[
     airportPoint(airport,pavedAlong,airport.apron),
     airportPoint(airport,threshold,airport.apron),
     airportPoint(airport,threshold,0),
     airportPoint(airport,threshold+48,0)
-  ]};
+  ];
+  f.tow={index:0,points};
   f.parkingBrake=true;
   f.phase='taxi';
   f.hold=null;
@@ -361,8 +365,9 @@ function makeRegionalFlight(departure,destination,aircraft,start,wind,waypoints)
   const position=cold?parkingPoint(departure):airportPoint(departure,air?1700:-departure.length/2+95,0);
   const heading=cold?wrapAngle(departure.heading+Math.PI):departure.heading;
   const speed=air?aircraft.approach*.66:0;
-  const first=airportPoint(departure,-departure.length/2+135,departure.apron);
-  const holding=airportPoint(departure,-departure.length/2+135,0);
+  const threshold=-departure.length/2+95;
+  const first=airportPoint(departure,departure.parkingAlong??threshold+40,departure.shortField?0:departure.apron);
+  const holding=airportPoint(departure,departure.shortField?threshold:threshold+40,0);
   return {
     ...position,heading,pitch:0,bank:0,pitchRate:0,bankRate:0,yawRate:0,
     y:air?950:departure.elevation+aircraft.gearHeight,
@@ -372,7 +377,9 @@ function makeRegionalFlight(departure,destination,aircraft,start,wind,waypoints)
     aircraft,departure,destination,start,regional:true,
     battery:!cold,engines:Array(aircraft.geometry[4]).fill(!cold),
     lights:false,parkingBrake:cold,gear:!air||!aircraft.retract,reverse:false,spoilers:false,
-    route:waypoints,waypoint:0,pallets:[0,0,0],noseDoor:false,boost:aircraft.role==='fighter',bridge:false,awaitingService:false,taxi:[{name:'滑行至跑道端',...first},{name:'轉入跑道',...holding}],
+    route:waypoints,waypoint:0,pallets:[0,0,0],noseDoor:false,boost:aircraft.role==='fighter',bridge:false,awaitingService:false,
+    taxi:[{name:departure.shortField?'從機坪滑入跑道':'滑行至跑道端',...first},
+      {name:departure.shortField?'沿跑道滑至起飛端':'轉入跑道',...holding}],
     taxiIndex:0,arrivalTaxi:null,phase:cold?'cold':air?'cruise':'takeoff',recorded:false,finished:false
   };
 }
@@ -454,7 +461,7 @@ function updateRegionalFlight(f,save=recordFlight){
       return;
     }
     if(!f.arrivalTaxi){
-      const end=f.touchdown.along<40?440:Math.min(f.destination.length/2-90,950);
+      const end=f.destination.parkingAlong??(f.touchdown.along<40?440:Math.min(f.destination.length/2-90,950));
       f.arrivalTaxi=[
         {name:'滑行至跑道出口',...airportPoint(f.destination,end,0)},
         {name:'滑出跑道',...airportPoint(f.destination,end,f.destination.apron)},
@@ -565,7 +572,7 @@ function navigationControls(f,target){
     altitude=Math.max(altitude,terrainClearance);
   }
   if(approach){
-    const alongDistance=final?Math.max(0,distance+350):hold.interceptPassed?
+    const alongDistance=final?Math.max(0,distance+(f.aircraft.jet?350:125)):hold.interceptPassed?
       Math.max(5200,distance):finalDistance+remaining;
     const glide=runway.elevation+f.aircraft.gearHeight+alongDistance*.0524;
     altitude=final?glide:Math.max(Math.min(hold.altitude,glide),terrainClearance);
@@ -585,14 +592,15 @@ function navigationControls(f,target){
     f.spoilers=true;
     hold.speedBrake=true;
   }
-  const flare=final&&distance<0&&height<12;
+  const flare=final&&distance<0&&height<(f.aircraft.jet?12:3.6);
   const desiredVS=flare?-.75:limit(feedForward+(altitude-f.y)*(final?.29:.095),final?-8:-13,6);
   const lift=flightMass(f)*(9.80665+limit((desiredVS-f.vy)*1.2,-4,4))/(q*f.aircraft.wingArea*Math.max(.72,Math.cos(f.bank)));
   const fastQ=.5*atmosphere(f.y,f.temperatureOffset).density*tas**2;
   const attitude=f.fastCruise&&fastQ>14000?fastLevelPitch(f,fastQ,tas,desiredVS):
     Math.atan2(f.vy,tas)+(lift-.27-f.aircraft.flapLift[f.flaps])/5.05-.036;
   // Route navigation commands full power. Speed control takes over for landing.
-  const approachPower=flare?0:limit(.23+f.flaps*.065+(targetIAS-ias)*.016,.12,1);
+  const approachPower=flare?0:limit(f.aircraft.jet?.23+f.flaps*.065+(targetIAS-ias)*.016:
+    .40+f.flaps*.105+(targetIAS-ias)*.025,.12,1);
   const throttle=approach?limit((approachPower-f.power)*2.6,-.8,.8):1;
   return {roll:limit(wrapAngle(heading-f.heading)*(final?3:2.4)-f.bank*.45,final?-.31:-.65,final?.31:.65),
     pitch:limit((attitude-.015-f.trim-f.flaps*.008)/.24,-.80,.82),

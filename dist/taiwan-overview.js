@@ -1,7 +1,7 @@
 'use strict';
 
 function createTaiwanOverview(){
-  const center=geoPoint(23.66,120.94);
+  const center=geoPoint(24.1,120.10);
   const scene=new THREE.Scene();
   scene.background=new THREE.Color(0x205774);
   const camera=new THREE.OrthographicCamera(-1,1,1,-1,1,750000);
@@ -10,8 +10,8 @@ function createTaiwanOverview(){
   camera.lookAt(center.x,0,center.z);
 
   // Both horizontal axes are in the simulation's projected metres.
-  const left=-247200,top=-36000,width=307200,height=398400,step=2400;
-  const geometry=new THREE.PlaneGeometry(width,height,width/step,height/step);
+  const [left,top,width,height]=taiwanSatelliteData.overview,step=1920;
+  const geometry=new THREE.PlaneGeometry(width,height,Math.ceil(width/step),Math.ceil(height/step));
   geometry.rotateX(-Math.PI/2);
   geometry.translate(left+width/2,0,top+height/2);
   const points=geometry.attributes.position;
@@ -32,6 +32,25 @@ function createTaiwanOverview(){
   }
   geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
   const material=new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false});
+  const overviewImage={value:null},imageReady={value:0};
+  material.onBeforeCompile=shader=>{
+    shader.uniforms.overviewImage=overviewImage;
+    shader.uniforms.imageReady=imageReady;
+    shader.vertexShader='varying vec2 overviewUV;\n'+shader.vertexShader.replace(
+      '#include <begin_vertex>','#include <begin_vertex>\n overviewUV=uv;');
+    shader.fragmentShader='varying vec2 overviewUV;\nuniform sampler2D overviewImage;\nuniform float imageReady;\n'+
+      shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+        if(imageReady>0.5){
+          vec4 image=texture2D(overviewImage,overviewUV);
+          diffuseColor.rgb=mix(diffuseColor.rgb,image.rgb,image.a);
+        }
+      `);
+  };
+  loadTaiwanAtlas().then(texture=>{
+    overviewImage.value=texture;
+    imageReady.value=1;
+    document.getElementById('satelliteCredit').hidden=false;
+  }).catch(()=>{});
   const overviewTerrain=new THREE.Mesh(geometry,material);
   scene.add(overviewTerrain);
   const distantTerrain=overviewTerrain.clone();
@@ -41,7 +60,7 @@ function createTaiwanOverview(){
   marker.rotation.x=-Math.PI/2;
   scene.add(marker);
   function resize(w,h){
-    const aspect=w/h,halfHeight=Math.max(223000,151000/aspect);
+    const aspect=w/h,halfHeight=Math.max(265000,218000/aspect);
     camera.left=-halfHeight*aspect;
     camera.right=halfHeight*aspect;
     camera.top=halfHeight;
