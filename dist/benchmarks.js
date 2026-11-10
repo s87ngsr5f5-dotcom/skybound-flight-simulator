@@ -37,14 +37,25 @@ const benchmarkFleet=[
     mass:260000,wingArea:436.8,inertia:[28500000,54000000,73000000],cgOffset:.07,gearHeight:4.1,stallAngle:.28,
     rotation:149,approach:151,geometry:[36.93,3.10,32.4,-.95,2,10.5],thrust:965000,jet:true,
     passengers:360,missionFuel:45000,nacelleRadius:1.88,mainAxles:3,rakedTip:true,cruiseMach:.84,maxMach:.89,cleanDrag:.022,fuelIdle:.32,fuelPower:2.6},
+  {id:'b744',name:'Boeing 747-400',type:'四發客機 · 加長上層客艙',role:'passenger',
+    mass:250000,wingArea:541.2,inertia:[36000000,66000000,95000000],cgOffset:.067,gearHeight:4.62,stallAngle:.29,
+    rotation:151,approach:152,geometry:[35.335,3.25,32.22,-.91,4,11.55],
+    thrust:1040000,nacelleRadius:1.34,jet:true,upperDeck:'long',passengers:416,missionFuel:58000,
+    cruiseMach:.85,maxMach:.92,cleanDrag:.023,fuelIdle:.41,fuelPower:3.75,seatColumns:[3,3],centerSeats:4,trimColor:0x294c88},
   {id:'b763f',name:'Boeing 767-300F',type:'雙發側門貨機',role:'cargo',
     mass:139000,wingArea:283.3,inertia:[12500000,27000000,33700000],cgOffset:.075,gearHeight:3.5,stallAngle:.29,
     rotation:142,approach:152,geometry:[27.47,2.515,23.785,-.76,2,9.1],thrust:560000,jet:true,
     cargoLimit:52700,cargoSlotLimit:21000,sideCargo:true,nacelleRadius:1.27,
     cruiseMach:.80,maxMach:.86,cleanDrag:.023,trimColor:0x87523b},
-  {id:'sf748',name:'SF-748 Atlas',reference:'747-8F',type:'四發廣體貨機',role:'cargo',
+  {id:'sf748',name:'Boeing 747-8F · Atlas',reference:'747-8F',type:'四發廣體貨機 · 機鼻貨門',role:'cargo',
     mass:286000,wingArea:554,inertia:[35000000,68000000,91000000],cgOffset:.11,gearHeight:4.6,stallAngle:.29,
-    rotation:142,approach:148,geometry:[38.15,3.25,34.2,-1.1,4,13],thrust:1180000,jet:true,cruiseMach:.85,maxMach:.90,cleanDrag:.022,cargoLimit:95000}
+    rotation:142,approach:148,geometry:[38.15,3.25,34.2,-1.1,4,13],thrust:1180000,jet:true,
+    upperDeck:'short',rakedTip:true,nacelleRadius:1.53,cruiseMach:.85,maxMach:.90,cleanDrag:.022,cargoLimit:95000},
+  {id:'an124',name:'Antonov An-124-100 Ruslan',type:'上單翼四發重型運輸機 · 前艙坡道',role:'cargo',
+    mass:255000,wingArea:628,inertia:[46500000,78000000,107000000],cgOffset:.066,gearHeight:4.48,stallAngle:.31,
+    rotation:149,approach:148,geometry:[34.55,3.56,36.65,2.87,4,10.15],
+    thrust:915000,nacelleRadius:1.43,jet:true,antonov:true,noWinglet:true,
+    cruiseMach:.72,maxMach:.78,cleanDrag:.029,fuelIdle:.45,fuelPower:4.1,cargoLimit:120000,cargoSlotLimit:44000}
 ].map(profile=>({...profile,glass:true,retract:true,reverse:profile.role!=='fighter',flapLift:[0,.25,.49],
   flapDrag:[0,.035,.085],brakeForce:profile.mass*4.8,rollingResistance:profile.mass*.15}));
 fleet.push(...benchmarkFleet);

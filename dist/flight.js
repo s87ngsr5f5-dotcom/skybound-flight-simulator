@@ -1559,13 +1559,15 @@ function initialize(){
   hangarAircraft.replaceChildren(...Array.from(byId('aircraft').options,option=>new Option(option.text,option.value)));
   hangarView.replaceChildren(...Array.from(byId('inspect').options)
     .filter(option=>!option.value.startsWith('tour-')).map(option=>new Option(option.text,option.value)));
+  hangarView.add(new Option('貨門與坡道展示','cargoDoor'));
   const displayedAircraft=()=>fleet.find(a=>a.id===hangarAircraft.value);
   function updateHangarInfo(){
     const plane=displayedAircraft();
     byId('hangarInfo').textContent=plane.type+' · 機長 '+(plane.geometry[0]*2).toFixed(1)+
       ' m · 翼展 '+(plane.geometry[2]*2).toFixed(1)+' m';
     for(const option of hangarView.options){
-      option.disabled=option.value==='cabin'&&plane.role==='fighter';
+      option.disabled=(option.value==='cabin'&&plane.role==='fighter')||
+        (option.value==='cargoDoor'&&plane.role!=='cargo');
     }
     if(hangarView.selectedOptions[0]?.disabled) hangarView.value='orbit';
   }
@@ -1582,11 +1584,14 @@ function initialize(){
     byId('plan').hidden=true;byId('exitInspection').hidden=false;
     byId('exitInspection').textContent=inHangar?'返回飛行計畫':'結束巡覽';
     byId('hangarControls').hidden=!inHangar;
+    if(inHangar) resize();
   }
   function closeInspection(){
+    const wasHangar=hangarMode;
     inspectionMode=hangarMode=false;
     document.body.classList.remove('hangar-active');
     byId('plan').hidden=false;byId('exitInspection').hidden=byId('hangarControls').hidden=true;
+    if(wasHangar) resize();
   }
   byId('openHangar').onclick=()=>openInspection(true);
   byId('viewScene').onclick=()=>{
@@ -1664,6 +1669,7 @@ function initialize(){
     const mobile=touchControls.mode.value==='mobile';
     basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(innerWidth*innerHeight))):
       Math.min(devicePixelRatio,scale,mobile?1:Infinity);
+    if(hangarMode) basePixelRatio=Math.max(basePixelRatio,Math.min(devicePixelRatio,1));
     resolutionScale=1;
     measuredFrameTime=measuredFrames=0;
     nextResolutionReview=performance.now()+2200;
@@ -2077,6 +2083,16 @@ function initialize(){
     byId('hudHeading').textContent='HDG '+values[3];
     byId('hudNumbers').textContent=knots+' IAS kt　 '+values[1]+' FT　 VAPP '+profile.approach;
   }
+  function animateCargoDoors(data,noseOpen,sideOpen,dt){
+    const blend=Math.min(1,dt*2.8);
+    data.sideDoor.rotation.z+=(Number(sideOpen)*-1.33-data.sideDoor.rotation.z)*blend;
+    data.noseDoor.rotation.x+=(Number(noseOpen)*1.37-data.noseDoor.rotation.x)*blend;
+    if(data.cargoRamp){
+      const extension=clamp((data.noseDoor.rotation.x-.31)/.98,0,1);
+      data.cargoRamp.visible=extension>.025;
+      data.cargoRamp.rotation.x=THREE.MathUtils.lerp(1.45,-.19,extension);
+    }
+  }
   function render(now){
     requestAnimationFrame(render);
     if(document.hidden){last=now;return;}
@@ -2213,7 +2229,8 @@ function initialize(){
       if(profile.role){
         const data=model.userData;
         data.flaps.forEach(part=>part.rotation.x=-f.flaps*.21);
-        data.wheels.forEach(wheel=>wheel.rotateY(paused?0:Math.hypot(f.vx,f.vz)*dt/.57));
+        const wheelTravel=paused?0:Math.hypot(f.vx,f.vz)*dt;
+        data.wheels.forEach(wheel=>wheel.rotateY(wheelTravel/wheel.userData.radius));
         if(f.voyage){
           data.gear.position.y=f.ground?Math.max(0,.13-Math.hypot(f.vx,f.vz)*.001):0;
         }
@@ -2227,8 +2244,7 @@ function initialize(){
             serviceLamp.intensity=f.lights?750:170;
           }
         }
-        if(data.sideDoor) data.sideDoor.rotation.z+=(Number(f.sideDoor)*-1.33-data.sideDoor.rotation.z)*Math.min(1,dt*2.8);
-        data.noseDoor.rotation.x+=(Number(f.noseDoor)*1.37-data.noseDoor.rotation.x)*Math.min(1,dt*2.8);
+        animateCargoDoors(data,Boolean(f.noseDoor),Boolean(f.sideDoor),dt);
         data.cabin.position.copy(pos);data.cabin.quaternion.copy(model.quaternion);
         data.cabin.visible=cameraMode===1||Boolean(f.cabinView);
         data.palletMeshes.forEach((pallet,index)=>{
@@ -2303,7 +2319,8 @@ function initialize(){
         cockpitAim.set(0,0,-1).applyQuaternion(cockpitOrientation).add(camera.position);
         camera.lookAt(cockpitAim);
       }
-      if((f.voyage||profile.sideCargo)&&cameraMode===0&&cargoLoader.visible){
+      const watchingCargo=cargoLoader.visible||(profile.antonov&&f.noseDoor&&f.ground&&!f.cabinView);
+      if(cameraMode===0&&watchingCargo){
         const door=new THREE.Vector3(f.sideDoor?-model.userData.radius:0,2,
           f.sideDoor?model.userData.sideDoor.position.z:-model.userData.half*.78);
         const eye=door.clone().add(new THREE.Vector3(-24,9,f.sideDoor?7:-20));
@@ -2366,6 +2383,8 @@ function initialize(){
       if(profile.role){
         const data=model.userData;
         const h=data.half;
+        const showCargo=hangarMode&&inspection==='cargoDoor';
+        animateCargoDoors(data,showCargo&&!profile.sideCargo,showCargo&&Boolean(profile.sideCargo),dt);
         const station={nose:[0,3,-2.9],side:[2.8,3,0],tail:[0,3,2.9],belly:[.3,-9,2.6]}[inspection];
         if(inspection==='orbit'){
           if(hangarMode){
@@ -2374,6 +2393,11 @@ function initialize(){
             camera.position.set(p.x+Math.sin(angle)*h*2.32,model.position.y+h*.59,p.z+Math.cos(angle)*h*2.32);
           }else camera.position.set(p.x-h*1.62,model.position.y+h*.64,p.z+h*1.42);
           camera.lookAt(model.position);
+        }else if(showCargo){
+          model.rotation.set(0,0,0);
+          const doorZ=p.z+(profile.sideCargo?data.sideDoor.position.z:-h*.82);
+          camera.position.set(p.x-25,model.position.y+9,doorZ-(profile.sideCargo?6:19));
+          camera.lookAt(p.x,model.position.y-1,doorZ);
         }else{
           model.rotation.set(0,0,0);
           if(inspection==='belly'){
@@ -2461,7 +2485,7 @@ function initialize(){
     const panelView=cockpitActive()&&cockpitView.preset===(twoSeats(profile)?2:1);
     let viewFov=cockpitActive()?clamp((panelView?53:69)+cockpitView.zoom,34,86):
       !flight&&['panel','night'].includes(previewInspection)?82:64;
-    if(hangarMode&&model.visible){
+    if(hangarMode&&model.visible&&previewInspection!=='cargoDoor'){
       const [half,,span]=profile.geometry;
       const halfWidth=['nose','tail'].includes(previewInspection)?span:Math.max(half,span);
       const distance=camera.position.distanceTo(model.position);

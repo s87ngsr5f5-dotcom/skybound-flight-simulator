@@ -3,6 +3,9 @@ function buildBenchmarkAirframe(profile,scene){
   const group=new THREE.Group(), gear=new THREE.Group(), cabin=new THREE.Group();
   const [half,radius,span,wingY,engineCount,sweep]=profile.geometry;
   const fighter=profile.role==='fighter', freight=profile.role==='cargo';
+  const antonov=Boolean(profile.antonov), upperDeck=profile.upperDeck;
+  const noseLoader=freight&&!profile.sideCargo;
+  const fuselageHeight=antonov?1.12:noseLoader?1.06:1.18;
   const detailed=profile.role==='passenger'&&engineCount===2;
   const color=fighter?0x778798:freight?0xd9e2e4:0xf2f5f7;
   const surface=new THREE.MeshStandardMaterial({color,roughness:detailed?.39:.57,metalness:fighter?.19:.08});
@@ -37,9 +40,16 @@ function buildBenchmarkAirframe(profile,scene){
     return mesh(parent,geo,material);
   }
   const noseDoor=new THREE.Group(), sideDoor=new THREE.Group();
+  let cargoRamp=null;
   group.add(gear,noseDoor,sideDoor);
-  const body=[[-half,.018],[-half*.91,radius*.46],[-half*.77,radius*.89],
-    [-half*.63,radius],[half*.52,radius],[half*.70,radius*.85],[half*.91,radius*.37],[half,.04]];
+  const body=[[-half,.018],[-half*.91,radius*(antonov?.66:upperDeck?.55:.46)],[-half*.77,radius*(antonov?.97:.89)],
+    [-half*.63,radius],[half*(antonov?.56:.52),radius],[half*.70,radius*.85],[half*.91,radius*.37],[half,.04]];
+  function bodyRadius(z){
+    const next=body.findIndex(station=>station[0]>=z);
+    const a=body[Math.max(0,next-1)],b=body[Math.max(1,next)];
+    const t=Math.max(0,Math.min(1,(z-a[0])/(b[0]-a[0])));
+    return a[1]+(b[1]-a[1])*t*t*(3-2*t);
+  }
   if(fighter){
     const radome=surface.clone();
     radome.color.setHex(0x54616b);
@@ -53,6 +63,14 @@ function buildBenchmarkAirframe(profile,scene){
     canopyBase.scale.set(canopyWidth+.025,.12,canopyLength+.075);
     const canopy=mesh(group,new THREE.SphereGeometry(1,40,18,0,Math.PI*2,0,Math.PI/2),glazing,0,canopyY,canopyZ);
     canopy.scale.set(canopyWidth,radius*.43,canopyLength);
+    const seam=[];
+    for(let i=0;i<=40;i++){
+      const t=i*Math.PI/20;
+      seam.push(new THREE.Vector3(Math.cos(t)*(canopyWidth+.018),canopyY+.014,canopyZ+Math.sin(t)*(canopyLength+.018)));
+    }
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(seam),new THREE.LineBasicMaterial({color:0x3d4c56})));
+    const probe=mesh(group,new THREE.CylinderGeometry(.014,.032,.30,10),metal,0,0,-half-.13);
+    probe.rotation.x=Math.PI/2;
     if(profile.id==='sf16'){
       for(const side of [-1,1]){
         const strake=foil(group,[[side*.45,-half*.55],[side*1.44,-half*.13],
@@ -81,19 +99,32 @@ function buildBenchmarkAirframe(profile,scene){
     mesh(group,new THREE.CircleGeometry(.46,24),dark,0,0,half+.013);
     }
   }else{
-    let hump=null;
-    if(freight&&!profile.sideCargo){
-      hull(group,body.slice(2),surface,.96);
+    let upperSkin=null;
+    if(noseLoader){
+      hull(group,body.slice(2),surface,fuselageHeight);
       noseDoor.position.set(0,radius*.60,-half*.77);
-      const nose=hull(noseDoor,body.slice(0,3).map(([z,r])=>[z+half*.77,r]),surface,.96);
+      const nose=hull(noseDoor,body.slice(0,3).map(([z,r])=>[z+half*.77,r]),surface,fuselageHeight);
       nose.position.y=-radius*.60;
-      sideDoor.position.set(-radius*.99,radius*.64,half*.31);
-      block(sideDoor,metal,.12,2.58,3.45,0,-1.29,0);
-      block(sideDoor,paint,.15,2.36,3.26,-.08,-1.29,0);
-      hump=mesh(group,new THREE.SphereGeometry(1,48,24),surface,0,radius*.66,-half*.58);
-      hump.scale.set(radius*.72,radius*.61,half*.29);
+      if(!antonov){
+        sideDoor.position.set(-radius*.99,radius*.64,half*.31);
+        block(sideDoor,metal,.12,2.58,3.45,0,-1.29,0);
+        block(sideDoor,paint,.15,2.36,3.26,-.08,-1.29,0);
+      }
+      const openingZ=-half*.77+.045;
+      block(group,dark,radius*1.39,radius*1.13,.11,0,-radius*.14,openingZ);
+      if(antonov){
+        cargoRamp=new THREE.Group();
+        cargoRamp.position.set(0,-radius*.62,openingZ-.13);
+        const width=radius*1.43,length=12.7;
+        block(cargoRamp,metal,width,.23,length,0,-.10,-length/2);
+        for(const side of [-1,1]) block(cargoRamp,paint,.12,.15,length,side*(width/2-.11),.06,-length/2);
+        for(let i=1;i<=16;i++) block(cargoRamp,dark,width-.20,.035,.074,0,.039,-i*length/17);
+        cargoRamp.visible=false;
+        cargoRamp.rotation.x=1.45;
+        group.add(cargoRamp);
+      }
     }else{
-      hull(group,body,surface,1.18);
+      hull(group,body,surface,fuselageHeight);
       const lower=hull(group,body.map(([z,r])=>[z,r*.91]),paint,1.06);
       lower.position.y=-radius*.31;
       if(profile.sideCargo){
@@ -102,21 +133,45 @@ function buildBenchmarkAirframe(profile,scene){
         block(sideDoor,paint,.14,2.38,3.25,-.06,-1.29,0);
       }
     }
+    if(upperDeck){
+      const long=upperDeck==='long';
+      const front=-half*.896,back=-half*(long?.11:.35);
+      upperSkin=(z,angle,offset=0)=>{
+        const t=(z-front)/(back-front);
+        const section=THREE.MathUtils.smoothstep(t,0,.26)*(1-THREE.MathUtils.smoothstep(t,long?.66:.54,1));
+        return [Math.sin(angle)*(radius*.73*section+offset),
+          bodyRadius(z)*fuselageHeight-.65+Math.cos(angle)*(radius*.77*section+offset),z];
+      };
+      const coordinates=[],faces=[],rings=40,slices=48;
+      for(let row=0;row<=rings;row++){
+        const z=front+(back-front)*row/rings;
+        for(let index=0;index<=slices;index++){
+          coordinates.push(...upperSkin(z,index*Math.PI*2/slices));
+          if(row&&index){
+            const a=row*(slices+1)+index,b=a-slices-1;
+            faces.push(a-1,b,b-1,a-1,a,b);
+          }
+        }
+      }
+      const upperGeometry=new THREE.BufferGeometry();
+      upperGeometry.setAttribute('position',new THREE.Float32BufferAttribute(coordinates,3));
+      upperGeometry.setIndex(faces);
+      upperGeometry.computeVertexNormals();
+      mesh(group,upperGeometry,surface).name='747 raised upper deck';
+    }
+    if(antonov){
+      for(const side of [-1,1]){
+        const fairing=mesh(group,new THREE.SphereGeometry(1,40,22),surface,side*radius*.80,-radius*.53,half*.085);
+        fairing.scale.set(radius*.35,radius*.32,half*.42);
+      }
+    }
     {
       function skinPoint(z,angle,offset,onUpperDeck=false){
-        if(onUpperDeck&&hump){
-          const position=(z-hump.position.z)/hump.scale.z;
-          const section=Math.sqrt(Math.max(0,1-position*position));
-          return [Math.sin(angle)*(hump.scale.x*section+offset),
-            hump.position.y+Math.cos(angle)*(hump.scale.y*section+offset),z];
-        }
-        const next=body.findIndex(station=>station[0]>=z);
-        const a=body[Math.max(0,next-1)],b=body[Math.max(1,next)];
-        const t=Math.max(0,Math.min(1,(z-a[0])/(b[0]-a[0])));
-        const r=a[1]+(b[1]-a[1])*t*t*(3-2*t)+offset;
-        return [r*Math.sin(angle),r*1.18*Math.cos(angle),z];
+        if(onUpperDeck&&upperSkin) return upperSkin(z,angle,offset);
+        const r=bodyRadius(z)+offset;
+        return [r*Math.sin(angle),r*fuselageHeight*Math.cos(angle),z];
       }
-      function skinPanel(corners,mat,offset){
+      function skinPanel(corners,mat,offset,onUpperDeck=true){
         const vertices=[], indices=[];
         const steps=6;
         for(let i=0;i<=steps;i++){
@@ -125,7 +180,7 @@ function buildBenchmarkAirframe(profile,scene){
             const u=j/steps;
             const lo=corners[0].map((n,k)=>n+(corners[1][k]-n)*u);
             const hi=corners[3].map((n,k)=>n+(corners[2][k]-n)*u);
-            vertices.push(...skinPoint(lo[0]+(hi[0]-lo[0])*t,lo[1]+(hi[1]-lo[1])*t,offset,true));
+            vertices.push(...skinPoint(lo[0]+(hi[0]-lo[0])*t,lo[1]+(hi[1]-lo[1])*t,offset,onUpperDeck));
             if(i&&j){
               const a=i*(steps+1)+j,b=a-steps-1;
               indices.push(a,b,a-1,b,b-1,a-1);
@@ -140,6 +195,13 @@ function buildBenchmarkAirframe(profile,scene){
       }
       const windowFrame=new THREE.MeshStandardMaterial({color:0x35434b,roughness:.41,side:THREE.DoubleSide});
       const windshield=glazing.clone();windshield.side=THREE.DoubleSide;
+      if(noseLoader){
+        const stripe=paint.clone();stripe.side=THREE.DoubleSide;
+        for(const side of [-1,1]) for(const [start,end] of [[-.70,-.47],[-.47,.43],[.43,.72]]){
+          const a=half*start,b=half*end;
+          skinPanel([[a,side*1.68],[b,side*1.68],[b,side*1.78],[a,side*1.78]],stripe,.039,false);
+        }
+      }
       const seam=new THREE.LineBasicMaterial({color:0x8c989d,transparent:true,opacity:.82});
       const doorZ=[-.65,-.29,.34,.58].map(v=>v*half);
       const windowShape=new THREE.Shape();
@@ -155,16 +217,17 @@ function buildBenchmarkAirframe(profile,scene){
       }
       for(const side of [-1,1]){
         for(const [left,right] of [[.08,.44],[.49,.80],[.85,1.12]]){
-          const z0=half*(hump?-.827:-.909)+(left-.08)*half*.068;
+          const z0=half*(upperSkin?-.81:antonov?-.768:-.909)+(left-.08)*half*.055;
           const z1=z0+Math.min(1.24,half*.044);
           const outline=[[z0,left*side],[z1,(left-.055)*side],[z1+half*.008,right*side],[z0+half*.014,right*side]];
           skinPanel(outline,windowFrame,.032);
           const center=outline.reduce((mean,p)=>[mean[0]+p[0]/4,mean[1]+p[1]/4],[0,0]);
           skinPanel(outline.map(p=>p.map((value,k)=>center[k]+(value-center[k])*.86)),windshield,.053);
         }
-        if(freight) continue;
-        const rows=engineCount===4?[1.44,.91]:[1.38];
-        const windows=new THREE.InstancedMesh(windowGeo,windshield,windowPositions.length*rows.length);
+        const rows=freight?[]:engineCount===4&&!upperSkin?[1.44,.91]:[1.38];
+        const upperWindows=upperSkin?Array.from({length:upperDeck==='long'?19:4},(_,i)=>-half*.70+i*.70):[];
+        if(freight&&!upperWindows.length) continue;
+        const windows=new THREE.InstancedMesh(windowGeo,windshield,windowPositions.length*rows.length+upperWindows.length);
         const transform=new THREE.Object3D();
         let index=0;
         for(const angle of rows){
@@ -175,7 +238,14 @@ function buildBenchmarkAirframe(profile,scene){
             windows.setMatrixAt(index++,transform.matrix);
           }
         }
+        for(const z of upperWindows){
+          transform.position.set(...skinPoint(z,side*1.34,.038,true));
+          transform.rotation.set(-side*.23,side*Math.PI/2,0,'YXZ');
+          transform.updateMatrix();
+          windows.setMatrixAt(index++,transform.matrix);
+        }
         group.add(windows);
+        if(freight) continue;
         for(const z of doorZ){
           const corners=[[-.48,1.19],[.48,1.19],[.48,1.19+1.72/(radius*1.18)],[-.48,1.19+1.72/(radius*1.18)],[-.48,1.19]];
           const points=[];
@@ -189,12 +259,33 @@ function buildBenchmarkAirframe(profile,scene){
           group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),seam));
         }
       }
-      if(!hump){
+      if(!upperSkin&&!noseLoader){
         const radome=[];
         for(let i=0;i<=48;i++) radome.push(new THREE.Vector3(...skinPoint(-half*.928,i*Math.PI/24,.024)));
         group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(radome),seam));
       }
-      if(freight) windowGeo.dispose();
+      if(freight&&!upperSkin) windowGeo.dispose();
+      const panels=[];
+      const bandPositions=noseLoader?[-.77,.25,.56,.75]:[-.76,-.41,.12,.54,.73];
+      for(const ratio of bandPositions){
+        for(let i=0;i<40;i++){
+          for(const index of [i,i+1]) panels.push(...skinPoint(half*ratio,index*Math.PI/20,.019));
+        }
+      }
+      for(const side of [-1,1]){
+        for(const ratio of [-.54,-.24,.20,.45]){
+          const z=half*ratio;
+          const corners=[[z-.40,1.88],[z+.40,1.88],[z+.40,1.88+.46/radius],[z-.40,1.88+.46/radius]];
+          for(let i=0;i<4;i++) for(const [u,angle] of [corners[i],corners[(i+1)%4]]){
+            panels.push(...skinPoint(u,angle*side,.036));
+          }
+        }
+      }
+      const panelGeometry=new THREE.BufferGeometry();
+      panelGeometry.setAttribute('position',new THREE.Float32BufferAttribute(panels,3));
+      const panelLines=new THREE.LineSegments(panelGeometry,new THREE.LineBasicMaterial({color:0x77838b,transparent:true,opacity:.35}));
+      panelLines.name='Fuselage service panels';
+      group.add(panelLines);
     }
   }
   function foil(parent,points,material,depth=.13){
@@ -217,7 +308,7 @@ function buildBenchmarkAirframe(profile,scene){
       for(let j=0;j<=slices;j++){
         const angle=j/slices*Math.PI*2,t=(1-Math.cos(angle))/2;
         const thick=5*.10*c*(.2969*Math.sqrt(t)-.126*t-.3516*t*t+.2843*t*t*t-.1036*t*t*t*t);
-        const y=(j<=slices/2?1:-1)*thick+.014*c*Math.sin(t*Math.PI)+v*v*.65;
+        const y=(j<=slices/2?1:-1)*thick+.014*c*Math.sin(t*Math.PI)+v*v*(antonov?-1.15:.65);
         wingVertices.push(side*span*v,wingY+y,lead+c*t);
       }
     }
@@ -228,8 +319,14 @@ function buildBenchmarkAirframe(profile,scene){
     const wingGeo=new THREE.BufferGeometry();wingGeo.setAttribute('position',new THREE.Float32BufferAttribute(wingVertices,3));wingGeo.setIndex(wingIndices);wingGeo.computeVertexNormals();
     const wingMat=surface.clone();wingMat.side=THREE.DoubleSide;mesh(group,wingGeo,wingMat);
     if(!profile.noWinglet&&!profile.rakedTip){
-      const tipFence=block(group,paint,.11,fighter?.28:1.2,.73,side*span,wingY+.42,tip+.3);
-      tipFence.rotation.z=-side*.17;
+      if(upperDeck==='long'){
+        const tipFin=foil(group,[[0,0],[1.67,.78],[1.60,1.77],[0,2.33]],surface,.11);
+        tipFin.position.set(side*(span-.23),wingY+.58,tip+.16);
+        tipFin.rotation.z=Math.PI/2-side*.30;
+      }else{
+        const tipFence=block(group,paint,.11,fighter?.28:1.2,.73,side*span,wingY+.42,tip+.3);
+        tipFence.rotation.z=-side*.17;
+      }
       if(profile.splitWinglet){
         const lower=block(group,paint,.10,.72,.55,side*(span-.16),wingY+.06,tip+.39);
         lower.rotation.z=side*.45;
@@ -260,10 +357,17 @@ function buildBenchmarkAirframe(profile,scene){
         const spinner=mesh(fanGroup,new THREE.ConeGeometry(size*.20,size*.42,24),metal,0,0,-2.76);
         spinner.rotation.x=-Math.PI/2;
         const exhaust=mesh(engine,new THREE.CircleGeometry(size*.60,32),dark,0,0,1.81);
-        for(let v=0;v<20;v++){
-          const blade=block(fanGroup,metal,size*.07,size*.70,.08,Math.sin(v*Math.PI/10)*size*.48,Math.cos(v*Math.PI/10)*size*.48,-2.71);
-          blade.rotation.z=-v*Math.PI/10-.42;
+        const blades=new THREE.InstancedMesh(new THREE.BoxGeometry(size*.069,size*.70,.075),metal,24);
+        const blade=new THREE.Object3D();
+        for(let v=0;v<blades.count;v++){
+          const angle=v*Math.PI*2/blades.count;
+          blade.position.set(Math.sin(angle)*size*.48,Math.cos(angle)*size*.48,-2.71);
+          blade.rotation.z=-angle-.42;
+          blade.updateMatrix();
+          blades.setMatrixAt(v,blade.matrix);
         }
+        fanGroup.add(blades);
+        mesh(engine,new THREE.TorusGeometry(size*.967,.0105,6,44),metal,0,0,-.43);
         if(detailed||freight||engineCount===4){
           hull(engine,[[-2.73,size*.91],[-2.55,size*.84],[-2.20,size*.82]],metal);
           hull(engine,[[1.15,size*.72],[1.78,size*.66],[2.18,size*.49],[2.36,size*.43]],metal);
@@ -278,17 +382,36 @@ function buildBenchmarkAirframe(profile,scene){
     }
   }
   const fin=new THREE.Shape();
-  fin.moveTo(0,0);fin.lineTo(half*.34,0);fin.lineTo(half*.34,half*(fighter?.41:.36));fin.lineTo(half*.22,half*(fighter?.45:.36));fin.closePath();
+  const tailHeight=half*(fighter?.41:antonov?.40:.36);
+  fin.moveTo(0,0);fin.lineTo(half*.34,0);fin.lineTo(half*.34,tailHeight);
+  fin.lineTo(half*.22,tailHeight*(fighter?1.10:1));fin.closePath();
   const vertical=mesh(group,new THREE.ExtrudeGeometry(fin,{depth:.17,bevelEnabled:false}),paint,0,radius*.61,half*.51);
   vertical.rotation.y=-Math.PI/2;
+  const rudderSeam=new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(half*.279,tailHeight*.03,.185),new THREE.Vector3(half*.290,tailHeight*.88,.185)
+  ]),new THREE.LineBasicMaterial({color:0x465462,transparent:true,opacity:.58}));
+  vertical.add(rudderSeam);
   block(group,metal,.11,.48,.32,0,radius,half*.12);
   block(group,metal,.09,.29,.23,0,-radius*.87,half*.16);
 
   const wheels=[];
-  const bogies=fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:engineCount===2?[[0,-half*.71,1],[-span*.128,2,profile.mainAxles??2],[span*.128,2,profile.mainAxles??2]]:
-    [[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2],[-radius*.82,7.8,3],[radius*.82,7.8,3]];
+  const bodyAxles=upperDeck?2:3;
+  const bogies=antonov?[[0,-half*.65,2],...[-1,1].flatMap(side=>
+    Array.from({length:5},(_,i)=>[side*radius*.98,-3.8+i*2.18,1]))]:
+    fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:
+    engineCount===2?[[0,-half*.71,1],[-span*.128,2,profile.mainAxles??2],[span*.128,2,profile.mainAxles??2]]:
+    [[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2],[-radius*.82,7.8,bodyAxles],[radius*.82,7.8,bodyAxles]];
+  const tireShapes=new Map();
   for(const [x,z,axles] of bogies){
-    const size=fighter?.32:radius>2.9?.64:.55;
+    const size=fighter?.32:antonov?.61:radius>2.9?.64:.55;
+    const width=fighter?.21:.34;
+    if(!tireShapes.has(size)){
+      const shoulder=[
+        [.53,-.50],[.82,-.50],[.93,-.44],[.99,-.31],[1,-.17],[1,.17],[.99,.31],
+        [.93,.44],[.82,.50],[.53,.50]
+      ].map(([r,y])=>new THREE.Vector2(r*size,y*width));
+      tireShapes.set(size,new THREE.LatheGeometry(shoulder,28));
+    }
     const strut=size*(x===0?.27:.36),height=profile.gearHeight;
     mesh(gear,new THREE.CylinderGeometry(strut,strut*1.16,height*.59,12),metal,x,-height*.32,z);
     mesh(gear,new THREE.CylinderGeometry(strut*.64,strut*.64,height*.40,12),metal,x,-height*.69,z);
@@ -299,10 +422,11 @@ function buildBenchmarkAirframe(profile,scene){
     door.rotation.z=x<0?-.13:.13;
     for(let a=0;a<axles;a++){
       for(const offset of fighter?[0]:[-.29,.29]){
-        const wheel=mesh(gear,new THREE.CylinderGeometry(size,size,fighter?.21:.34,40),rubber,x+offset,-profile.gearHeight+size,z+(a-(axles-1)/2)*1.12);
+        const wheel=mesh(gear,tireShapes.get(size),rubber,x+offset,-profile.gearHeight+size,z+(a-(axles-1)/2)*1.12);
+        wheel.userData.radius=size;
         wheel.rotation.z=Math.PI/2;wheels.push(wheel);
         for(const sign of [-1,1]){
-          const hub=mesh(wheel,new THREE.CylinderGeometry(size*.52,size*.52,.025,16),metal,0,sign*(fighter?.115:.18),0);
+          const hub=mesh(wheel,new THREE.CylinderGeometry(size*.56,size*.56,.029,20),metal,0,sign*width*.48,0);
           const cap=mesh(wheel,new THREE.CylinderGeometry(size*.21,size*.21,.04,12),dark,0,sign*(fighter?.13:.20),0);
         }
       }
@@ -343,7 +467,7 @@ function buildBenchmarkAirframe(profile,scene){
   }
   cabin.visible=false;
   scene.add(group,cabin);
-  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,wheels,cabin,palletMeshes,passengerCabin,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
+  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
   return group;
 }
 

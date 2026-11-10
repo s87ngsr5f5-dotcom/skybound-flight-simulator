@@ -4,7 +4,20 @@ for(const file of ['elevation','physics','regional-elevation','region','fleet','
 }
 const {smoothControls}=require('./dist/controls.js');
 const from=taiwanAirports.find(a=>a.code==='RCTP'), to=taiwanAirports.find(a=>a.code==='RCKH');
-for(const [id,wind,distance,height] of [['a223',0,5500,350],['a320neo',5.144,7500,440],['b773',0,9000,530],['a223',0,0,1100]]){
+for(const id of ['b744','sf748','an124']){
+ const plane=fleet.find(a=>a.id===id),f=makeRegionalFlight(from,to,plane,'runway',0,regionalRoute(from,to));
+ assert.equal(f.engines.length,4);
+ const start=runwayCoordinates(f.x,f.z,from).along;
+ for(let i=0;i<120*105&&f.ground;i++){
+  const pitch=flightSpeeds(f).ias*knotsPerMps>=plane.rotation?.62:0;
+  stepTrainer(f,smoothControls(f,{rudder:0,roll:0,pitch,throttle:1,trim:0},simTick));
+ }
+ const distance=runwayCoordinates(f.x,f.z,from).along-start;
+ assert(f.airborne&&distance<from.length-280,JSON.stringify({id,distance,speed:f.speed,y:f.y}));
+ console.log({id,takeoffDistance:Math.round(distance)});
+}
+for(const [id,wind,distance,height] of [['a223',0,5500,350],['a320neo',5.144,7500,440],['b773',0,9000,530],
+ ['b744',0,9000,530],['sf748',0,9000,530],['an124',0,9000,530],['a223',0,0,1100]]){
  const plane=fleet.find(a=>a.id===id),route=regionalRoute(from,to);
  const f=makeRegionalFlight(from,to,plane,'air',wind,route);
  f.fuel=10000;

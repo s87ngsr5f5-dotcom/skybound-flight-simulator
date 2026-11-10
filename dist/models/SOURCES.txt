@@ -12,3 +12,12 @@ and conversion notices are included in each unmodified GLB and in the source arc
 Corresponding source: skytrails-source.zip. License: SKYTRAILS-COPYING.txt.
 The game positions these low-poly traffic exteriors at runtime and uses its
 own cockpit and landing gear. The C172P exterior represents the SB-172 family.
+
+Boeing 747-400 / 747-8F and Antonov An-124-100
+Original in-game geometry and livery. Reference dimensions and configuration:
+https://www.boeing.com/content/dam/boeing/v2/airports/acaps/747-400_Rev_F.pdf
+https://www.boeing.com/commercial/airports/plan-manuals
+https://www.antonov.com/en/history/an-124-ruslan
+https://antonov-airlines.aero/methods/optg120
+Model references are not redistributed. Handling, cockpit panels, and loading
+animations use simplified simulator implementations.
