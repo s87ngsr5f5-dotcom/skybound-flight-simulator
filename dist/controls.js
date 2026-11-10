@@ -28,7 +28,8 @@ function manualAxes(raw,controls){
 function smoothControls(f,input,dt){
   const previous=f.manualControls??={pitch:0,roll:0,rudder:0};
   const heavy=(f.aircraft?.mass||1040)>20000;
-  const ramp=(heavy?.62:.25)/Math.max(.2,input.response||.55);
+  const fighter=f.aircraft?.role==='fighter'&&!f.ground&&!f.hold&&!f.gear&&!f.flaps;
+  const ramp=(fighter?.19:heavy?.62:.25)/Math.max(.2,input.response||.55);
   const filtered={...input};
   for(const name of ['pitch','roll','rudder']){
     const target=input[name]||0;

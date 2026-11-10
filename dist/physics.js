@@ -183,17 +183,26 @@ function stepTrainer(f, input, dt=simTick){
   const right=engines.slice(engines.length/2).filter(Boolean).length;
   const asymmetricYaw=engines.length>1?.26*f.power*(left-right)/engines.length:0;
   const g=9.80665;
-  const pitchTarget=limit(.015+f.trim+input.pitch*.24*(input.maneuver??1)+(f.flaps*.008),-.36,.38);
+  const fighterAirborne=aircraft.role==='fighter'&&!f.ground;
+  const fighterManual=fighterAirborne&&!f.hold&&!f.gear&&!f.flaps;
+  const maneuver=input.maneuver??1;
+  // Feed in part of the additional lift needed for a steep turn.
+  const turnLift=fighterManual?limit(mass*g/(Math.max(q,1)*aircraft.wingArea*liftSlope)*
+    (1/Math.max(.32,Math.cos(f.bank))-1),0,.15)*(1-Math.abs(input.pitch)):0;
+  const pitchTarget=limit(.015+f.trim+input.pitch*(fighterManual?.50:.24*maneuver)+f.flaps*.008+turnLift,
+    fighterManual?-.48:-.36,fighterManual?.54:.38);
+  const bankTarget=input.roll*(fighterManual?1.25:.57*maneuver);
   const response=limit(q/420,.22,1.8);
-  const pitchMoment=(pitchTarget-f.pitch)*14500*response*aircraft.inertia[0]/1650-f.pitchRate*7800*aircraft.inertia[0]/1650+lift*(aircraft.cgOffset+(payload?.shift||0)*.18);
-  const bankMoment=(input.roll*.57*(input.maneuver??1)-f.bank)*14000*response*aircraft.inertia[1]/2450-f.bankRate*5300*aircraft.inertia[1]/2450;
-  const targetYaw=f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40): Math.tan(f.bank)*g/Math.max(20,speed)+input.rudder*.25+beta*.35;
+  const pitchMoment=(pitchTarget-f.pitch)*14500*response*(fighterManual?1.4:1)*aircraft.inertia[0]/1650-f.pitchRate*(fighterManual?9200:7800)*aircraft.inertia[0]/1650+lift*(aircraft.cgOffset+(payload?.shift||0)*.18);
+  const bankMoment=(bankTarget-f.bank)*14000*response*(fighterManual?2.2:1)*aircraft.inertia[1]/2450-f.bankRate*(fighterManual?9500:5300)*aircraft.inertia[1]/2450;
+  const targetYaw=f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40): Math.tan(f.bank)*g/Math.max(20,speed)+input.rudder*(fighterManual?.37:.25)+beta*.35;
   const yawMoment=(targetYaw+asymmetricYaw-f.yawRate)*8800*aircraft.inertia[2]/2850;
   f.pitchRate+=pitchMoment/aircraft.inertia[0]*dt;
   f.bankRate+=bankMoment/aircraft.inertia[1]*dt;
   f.yawRate+=yawMoment/aircraft.inertia[2]*dt;
   f.pitch=limit(f.pitch+f.pitchRate*dt,-.62,.66);
-  f.bank=limit(f.bank+f.bankRate*dt,-.86,.86);
+  const bankLimit=fighterAirborne?1.28:.86;
+  f.bank=limit(f.bank+f.bankRate*dt,-bankLimit,bankLimit);
   f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/6,0,1):1));
   if(f.ground){
     f.bank=f.bankRate=0;
