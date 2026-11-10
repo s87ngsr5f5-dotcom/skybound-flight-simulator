@@ -85,8 +85,32 @@ body:not(.mobile-mode) #flightNext.cargo-action {
   pointer-events: auto;
   text-align: right;
 }
-#flightTimeControls label { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
-#flightTimeControls select { min-height: 40px; padding: 5px; }
+#flightTimeControls label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding-left: 7px;
+  background: #0a2135e8;
+}
+#flightTimeControls label::after {
+  content: '▾';
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 11px;
+}
+#flightTimeControls select {
+  min-height: 40px;
+  padding: 5px 19px 5px 7px;
+  appearance: none;
+  color-scheme: dark;
+  background: #193a53;
+  color: #fff;
+}
 #flightRateStatus:not(:empty) { display: block; margin-top: 4px; padding: 3px 5px; background: #0a2135e8; }
 .mobile-mode #flightTimeControls { top: 0; bottom: auto; font-size: 11px; }
 .mobile-mode #flightTimeControls select { min-height: 42px; font-size: 12px; }
