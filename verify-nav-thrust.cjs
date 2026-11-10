@@ -20,9 +20,24 @@ for(let i=0;i<120*4000&&f.hold&&!f.ended;i++){
  if(i===120*180){
   const {ias,mach}=flightSpeeds(f);
   console.log('777 cruise 180s',{ias:ias*knotsPerMps,mach,power:f.power,stage:f.hold.stage,y:f.y});
-  assert(f.power>.18&&ias*knotsPerMps>250);
+  assert.equal(f.hold.stage,'route');
+  assert.equal(f.power,1);
+  assert(ias*knotsPerMps>250);
  }
 }
 console.log({mins,touchdown:f.touchdown,landed:f.landed,parked:f.parkingBrake,frame:runwayCoordinates(f.x,f.z,to),ias:flightSpeeds(f).ias*knotsPerMps,flaps:f.flaps, message:f.navMessage,elapsed:f.elapsed,y:f.y});
-assert(mins.route>=.18&&mins.descent>=.12&&mins.final>=.12);
+assert(mins.descent>=.12&&mins.descent<.95&&mins.final>=.12&&mins.final<.95);
 assert(f.landed&&f.parkingBrake);
+
+const climb=makeClimbLesson(from,plane,0);
+const entrySpeed=108;
+Object.assign(climb,{y:950,vx:Math.sin(climb.heading)*entrySpeed,vz:-Math.cos(climb.heading)*entrySpeed,
+ vy:4,ground:false,gear:false,flaps:0,airborne:true,power:.42,
+ hold:{heading:climb.heading,altitude:35000*.3048,climb:true,mach:cruiseMachTarget(climb)}});
+for(let i=0;i<120*1000&&!climb.ended;i++){
+ stepTrainer(climb,{roll:0,rudder:0,trim:0,...climbCruiseControls(climb)});
+ if(i===120*3) assert.equal(climb.power,1);
+}
+assert(climb.hold.levelOff&&!climb.ended&&Math.abs(climb.y-climb.hold.altitude)<160);
+assert.equal(climb.power,1);
+console.log('777 climb and level-off',{altitude:climb.y,power:climb.power});

@@ -29,5 +29,6 @@ for(const [aircraft,mode,fast] of trials){
  const {tas,gs,mach}=flightSpeeds(f),nmi=Math.hypot(f.x-start.x,f.z-start.z)/1852;
  console.log({aircraft:aircraft.id,mode,tas:tas*knotsPerMps,gs:gs*knotsPerMps,mach,nmi});
  assert(Math.abs(gs*knotsPerMps-tas*knotsPerMps)<1);
+ assert.equal(f.power,1,aircraft.id+' '+mode+' full cruise throttle');
  assert(fast?Math.abs(tas*knotsPerMps-1000)<20&&nmi>58:tas*knotsPerMps<500&&nmi>29);
 }

@@ -581,15 +581,9 @@ function navigationControls(f,target){
   const desiredVS=flare?-.75:limit(feedForward+(altitude-f.y)*(final?.29:.095),final?-8:-13,6);
   const lift=flightMass(f)*(9.80665+limit((desiredVS-f.vy)*1.2,-4,4))/(q*f.aircraft.wingArea*Math.max(.72,Math.cos(f.bank)));
   const attitude=Math.atan2(f.vy,tas)+(lift-.27-f.aircraft.flapLift[f.flaps])/5.05-.036;
-  // Keep usable thrust until the flare. Speed corrections should not put
-  // the throttle at zero during normal cruise, descent or final approach.
-  const minimumPower=approach?.12:.18;
-  const power=flare?0:limit(.29+f.flaps*.065+(approach?-.06:0)+(targetIAS-ias)*.016,minimumPower,1);
-  let throttle=limit((power-f.power)*2.6,-.8,.8);
-  if(!approach&&f.y>7000&&(f.aircraft.cruiseMach||f.fastCruise)){
-    throttle=limit((cruiseMachTarget(f)-speeds.mach)*8,-.30,.65);
-    throttle=Math.max(throttle,(minimumPower-f.power)*2.6);
-  }
+  // Route navigation commands full power. Speed control takes over for landing.
+  const approachPower=flare?0:limit(.23+f.flaps*.065+(targetIAS-ias)*.016,.12,1);
+  const throttle=approach?limit((approachPower-f.power)*2.6,-.8,.8):1;
   return {roll:limit(wrapAngle(heading-f.heading)*(final?3:2.4)-f.bank*.45,final?-.31:-.65,final?.31:.65),
     pitch:limit((attitude-.015-f.trim-f.flaps*.008)/.24,-.80,.82),
     throttle};

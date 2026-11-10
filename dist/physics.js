@@ -45,7 +45,7 @@ function fastCruiseActive(f){
 }
 function cruiseControls(f){
   const air=atmosphere(f.y,f.temperatureOffset);
-  const {tas,mach}=flightSpeeds(f);
+  const {tas}=flightSpeeds(f);
   const aircraft=f.aircraft,hold=f.hold;
   const q=.5*air.density*Math.max(tas*tas,1);
   const levelCl=flightMass(f)*9.80665/(q*aircraft.wingArea);
@@ -53,17 +53,16 @@ function cruiseControls(f){
     const desiredVS=limit((hold.altitude-f.y)*.08,-8,8);
     const cl=levelCl*(1+limit((desiredVS-f.vy)*.65,-3,3)/9.80665);
     const pitch=Math.atan2(f.vy,Math.max(tas,1))+(cl-.27)/5.05-.036;
-    const power=limit((aircraft.cleanDrag??.031)/.064+(hold.mach-mach)*3,.12,1);
     return {
       pitch:limit((pitch-.015-f.trim)/.24,-.8,.8),
-      throttle:limit((power-f.power)*3,-.8,.8)
+      throttle:1
     };
   }
   const levelPitch=(levelCl-.27)/5.05-.036;
   const desiredVS=limit((hold.altitude-f.y)*.07,-9,9);
   return {
     pitch:limit((levelPitch-.015-f.trim)/.24+(desiredVS-f.vy)*.042,-.8,.8),
-    throttle:limit((hold.mach-mach)*15,-.7,.7)
+    throttle:1
   };
 }
 function climbCruiseControls(f){
@@ -85,8 +84,7 @@ function climbCruiseControls(f){
   const liftPitch=(flightMass(f)*9.80665/(q*aircraft.wingArea)-.27)/5.05-.036;
   const path=Math.atan2(f.vy,Math.max(tas,1));
   const pitch=liftPitch+path+(desiredVS-f.vy)*.022;
-  const throttle=speedError>12 ? limit((12-speedError)*.10,-1,0) : 1;
-  return {pitch:limit((pitch-.015-f.trim)/.24,-.7,.65),throttle};
+  return {pitch:limit((pitch-.015-f.trim)/.24,-.7,.65),throttle:1};
 }
 function flightMass(f){
   const aircraft=f.aircraft||trainer;
@@ -160,12 +158,16 @@ function stepTrainer(f, input, dt=simTick){
   const waveReference=fastCruise?cruiseMachTarget(f):aircraft.cruiseMach;
   const waveDrag=waveReference ? .55*Math.pow(Math.max(0,mach-waveReference+.012),2):0;
   const drag=q*aircraft.wingArea*(cleanDrag+waveDrag+.052*cl*cl+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta));
+  // The lever can stay at full power while the cruise Mach envelope limits thrust.
+  const cruiseProtection=waveReference&&!f.gear&&!f.flaps?
+    cruiseBlend*limit((mach-waveReference+.03)*24,0,.85):0;
+  const enginePower=f.power*(1-cruiseProtection);
   const engines=f.engines||[true];
   let running=engines.filter(Boolean).length/engines.length;
   if(Number.isFinite(f.fuel)){
     const idle=aircraft.fuelIdle??(aircraft.jet?.30:.002);
     const powerFlow=aircraft.fuelPower??(aircraft.jet?3.3:.009);
-    f.fuelFlow=running*(idle+f.power*powerFlow);
+    f.fuelFlow=running*(idle+enginePower*powerFlow);
     f.fuel=Math.max(0,f.fuel-dt*f.fuelFlow);
     if(f.fuel===0) f.fuelFlow=0;
     if(f.fuel===0) running=0;
@@ -178,7 +180,7 @@ function stepTrainer(f, input, dt=simTick){
   const available=fastCruise?fastThrust:aircraft.thrust?
     (aircraft.thrust+(f.boost&&f.power>.89?aircraft.boostThrust||0:0))*Math.pow(rho/1.225,.75)/(1+Math.pow(speed/inletSpeed,2)):
     Math.min(2700*aircraft.power/119000,aircraft.power*.78/Math.max(18,forwardSpeed));
-  const thrust=f.power*running*(f.propLow?.82:1)*available;
+  const thrust=enginePower*running*(f.propLow?.82:1)*available;
   const left=engines.slice(0,engines.length/2).filter(Boolean).length;
   const right=engines.slice(engines.length/2).filter(Boolean).length;
   const asymmetricYaw=engines.length>1?.26*f.power*(left-right)/engines.length:0;

@@ -1642,7 +1642,7 @@ function initialize(){
     let {roll,pitch}=manual;
     let assistedBrake=false,assistedRudder;
     let throttle=clamp((axis(up,down)+Number(Boolean(buttons[5]?.pressed))-Number(Boolean(buttons[4]?.pressed)))*.48+touch.throttle,-.48,.48);
-    if(f.hold?.nav&&(!f.battery||(f.ground&&!f.landed)||f.ended)) stopNavigation(f);
+    if(f.hold&&(!f.battery||f.ended||(f.ground&&!(f.hold.nav&&f.landed)))) stopNavigation(f);
     if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
       f.hold=null;
     }
@@ -1658,6 +1658,7 @@ function initialize(){
           roll=clamp(wrapAngle(f.hold.heading-f.heading)*2,-.45,.45);
           const desiredVS=clamp((f.hold.altitude-f.y)*.14,-5,5);
           pitch=clamp(.36+(desiredVS-f.vy)*.11,-.7,.85);
+          throttle=1;
           if(f.hold.mach) ({pitch,throttle}=f.hold.climb?climbCruiseControls(f):cruiseControls(f));
           if(f.hold.climb&&manualThrottle) throttle=manualThrottle;
         }
@@ -1973,8 +1974,15 @@ function initialize(){
       '俯仰 '+Math.round(f.pitch/rad)+'° · 坡度 '+Math.round(f.bank/rad)+'°':'';
     if(f.regional){
       for(const b of switches.children) b.update();
+      const hold=f.hold;
+      const autoStatus=hold?.nav&&['descent','final','rollout'].includes(hold.stage)?'自動導航接通 · 進場控速':
+        hold?.climb&&!hold.levelOff?'自動爬升至 35,000 ft · 全油門':
+        hold?.climb?'自動油門／巡航保持 · 全油門':
+        hold?.nav?'自動導航接通 · 全油門':hold?'航向／高度保持 · 全油門':'';
       byId('instrumentType').textContent=live?
-        f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+(f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+(f.hold?.climb?(f.hold.levelOff?' · 自動油門／巡航保持':' · 自動油門／爬升至 35,000 ft'):(f.hold?.nav?' · 自動導航接通':f.hold?' · 保持接通':'')):'航電未供電';
+        f.aircraft.type+' · '+f.engines.map((running,i)=>'ENG '+(i+1)+' '+(running?Math.round(f.power*100)+'%':'OFF')).join(' / ')+
+        (f.aircraft.reverse?' · 扭矩 '+(f.engines[0]?Math.round(f.power*100):0)+'%':'')+
+        (autoStatus?' · '+autoStatus:''):'航電未供電';
       if(profile.role&&live){
         const guide=approachGuidance(f);
         byId('instrumentType').textContent+=' · VAPP '+profile.approach+(f.boost&&f.power>.89?' · 加力':'');
