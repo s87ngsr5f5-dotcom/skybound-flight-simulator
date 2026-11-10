@@ -74,6 +74,23 @@ function makeFlightAudio(){
     source.connect(gain).connect(context.destination);
     source.start(now);source.stop(now+.34);
   }
-  return {start,update,effect};
+  function radarTone(phase){
+    if(context?.state!=='running') return;
+    const beep=(frequency,delay)=>{
+      const source=context.createOscillator(),gain=context.createGain();
+      const at=context.currentTime+delay;
+      source.type='sine';
+      source.frequency.value=frequency;
+      gain.gain.setValueAtTime(.0001,at);
+      gain.gain.exponentialRampToValueAtTime(.10,at+.009);
+      gain.gain.exponentialRampToValueAtTime(.0001,at+.105);
+      source.connect(gain).connect(context.destination);
+      source.start(at);source.stop(at+.11);
+    };
+    if(phase==='lock'){
+      beep(1200,0);beep(1480,.14);
+    }else beep(phase==='acquire'?940:660,0);
+  }
+  return {start,update,effect,radarTone};
 }
 

@@ -12,7 +12,13 @@ function tacticalPoint(origin,heading,forward,side=0,y=origin.y){
     z:origin.z-Math.cos(heading)*forward+Math.sin(heading)*side};
 }
 function tacticalRack(f,index){
-  return tacticalPoint(f,f.heading,-1.4,(index%2?1:-1)*(2.9+Math.floor(index/2)),f.y-.65);
+  const side=(index%2?1:-1)*(2.15+Math.floor(index/2)*.96);
+  const bank=f.bank||0,pitch=f.pitch||0;
+  const x=side*Math.cos(bank)-.72*Math.sin(bank);
+  const y=-side*Math.sin(bank)-.72*Math.cos(bank);
+  const z=1.10+Math.floor(index/2)*.53;
+  return tacticalPoint(f,f.heading,-z*Math.cos(pitch)-y*Math.sin(pitch),x,
+    f.y+y*Math.cos(pitch)-z*Math.sin(pitch));
 }
 function tacticalRoute(airport,kind){
   const runway=kind==='intercept';
@@ -41,9 +47,9 @@ function makeTacticalFlight(airport,aircraft,kind,wind,guided,advanced){
   f.lesson='tactical';
   f.fuel=f.fuelStart=2700;
   f.tactical={id:crypto.randomUUID(),kind,targets,exit,heading,origin,guided,advanced,elapsed:0,
-    radar:false,automatic:true,mode:sea?'sea':'air',selected:null,lock:0,armed:false,ammo:6,health:100,
+    radar:false,automatic:true,aimAssist:false,mode:sea?'sea':'air',selected:null,lock:0,armed:false,ammo:6,health:100,
     missiles:[],effects:[],events:[],frames:[],shots:0,hits:0,air:0,sea:0,neutral:0,
-    enemyShot:10,enemyWarning:0,returning:false,notice:'',nextFrame:0,result:null};
+    enemyShot:guided&&!advanced?24:10,enemyWarning:0,returning:false,notice:'',nextFrame:0,result:null};
   return f;
 }
 function tacticalContacts(f){
@@ -55,6 +61,38 @@ function selectTacticalTarget(s,id){
   if(s.lock>=1) tacticalEvent(s,'鎖定中斷');
   s.selected=id;
   s.lock=0;
+  if(id===null) s.aimAssist=false;
+}
+function tacticalTarget(f){
+  return tacticalContacts(f).find(t=>t.id===f.tactical.selected);
+}
+function tacticalAim(f,target){
+  const dx=target.x-f.x,dz=target.z-f.z;
+  return {
+    bearing:wrapAngle(Math.atan2(dx,-dz)-f.heading),
+    elevation:Math.atan2(target.y-f.y,Math.hypot(dx,dz)),
+    distance:tacticalDistance(f,target)
+  };
+}
+function tacticalFireBlock(f,target=tacticalTarget(f)){
+  const s=f.tactical;
+  if(f.ground) return '起飛後才能發射';
+  if(!s.radar) return '先開啟雷達';
+  if(!s.armed) return '先啟用武器';
+  if(!s.ammo) return '彈藥用盡';
+  if(s.lock<1||!target) return '尚未鎖定 · 對準目標框';
+  return '';
+}
+function tacticalAssistControls(f){
+  const target=tacticalTarget(f);
+  if(!target||f.ground||f.finished) return null;
+  const {bearing,elevation}=tacticalAim(f,target);
+  const desiredPitch=limit(elevation,-.10,.22);
+  return {
+    roll:limit(bearing*1.25-f.bank*.24,-.67,.67),
+    rudder:limit(bearing*.66,-.32,.32),
+    pitch:limit((desiredPitch-.015-f.trim)/.50,-.25,.42)
+  };
 }
 function tacticalEvent(s,label){
   s.events.push({time:s.elapsed,label});
@@ -62,9 +100,10 @@ function tacticalEvent(s,label){
 function tacticalFire(f){
   const s=f.tactical;
   if(f.finished) return false;
-  const target=tacticalContacts(f).find(t=>t.id===s.selected);
-  if(f.ground||!s.armed||!s.ammo||s.lock<1||!target){
-    s.notice=f.ground?'起飛後才能發射':!s.armed?'武器尚未啟用':!s.ammo?'彈藥用盡':'尚未鎖定';
+  const target=tacticalTarget(f);
+  const blocked=tacticalFireBlock(f,target);
+  if(blocked){
+    s.notice=blocked;
     return false;
   }
   s.ammo--;s.shots++;
@@ -149,9 +188,10 @@ function stepTactical(f,dt){
     }
   }
   const target=contacts.find(t=>t.id===s.selected);
-  const bearing=target?Math.atan2(target.x-f.x,f.z-target.z):0;
-  const lockable=!f.ground&&target&&tacticalDistance(f,target)<8200&&Math.abs(wrapAngle(bearing-f.heading))<.66&&
-    Math.abs(Math.atan2(target.y-f.y,Math.hypot(target.x-f.x,target.z-f.z))-f.pitch)<.44;
+  const aim=target&&tacticalAim(f,target);
+  const training=s.guided&&!s.advanced;
+  const lockable=!f.ground&&aim&&aim.distance<8200&&Math.abs(aim.bearing)<(training?.79:.66)&&
+    Math.abs(aim.elevation-f.pitch)<(training?.52:.44);
   if(lockable){
     const wasLocked=s.lock>=1;
     s.lock=Math.min(1,s.lock+dt/1.1);
@@ -209,8 +249,8 @@ function stepTactical(f,dt){
     const desiredHeading=Math.atan2(aim.x-m.x,m.z-aim.z);
     const desiredPitch=Math.atan2(aim.y-m.y,Math.hypot(aim.x-m.x,aim.z-m.z));
     const turn=(m.owner==='enemy'?.52:2.4)*dt;
-    m.heading+=clamp(wrapAngle(desiredHeading-m.heading),-turn,turn);
-    m.pitch=(m.pitch||0)+clamp(desiredPitch-(m.pitch||0),-turn,turn);
+    m.heading+=limit(wrapAngle(desiredHeading-m.heading),-turn,turn);
+    m.pitch=(m.pitch||0)+limit(desiredPitch-(m.pitch||0),-turn,turn);
     const horizontal=Math.cos(m.pitch)*speed*dt;
     m.x+=Math.sin(m.heading)*horizontal;
     m.z-=Math.cos(m.heading)*horizontal;

@@ -1646,7 +1646,7 @@ function initialize(){
     if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
       f.hold=null;
     }
-    if(f.ground||!settings.keepBank||f.hold) f.bankCommand=0;
+    if(f.ground||!settings.keepBank||f.hold||f.tactical?.aimAssist) f.bankCommand=0;
     else if(Math.abs(roll)>.04) f.bankCommand=roll;
     else roll=f.bankCommand||0;
     if(f.hold){
@@ -1663,6 +1663,13 @@ function initialize(){
           if(f.hold.climb&&manualThrottle) throttle=manualThrottle;
         }
       }
+    }
+    if(f.tactical?.aimAssist){
+      const assist=tacticalAssistControls(f);
+      if(!assist||Math.abs(manual.pitch)+Math.abs(manual.roll)+Math.abs(manual.rudder)>.15){
+        f.tactical.aimAssist=false;
+        f.tactical.notice='手動接管';
+      }else ({roll,pitch,rudder:assistedRudder}=assist);
     }
     return {response:settings.sensitivity,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
       rudder:assistedRudder??clamp(manual.rudder+(f.ground?roll:0),-1,1),
@@ -2406,7 +2413,9 @@ function initialize(){
     paused:()=>paused,
     retry:()=>start(false,true),
     menu,
+    activateAudio:()=>{if(audioEnabled) flightAudio.start();},
     sound:frequency=>{if(audioEnabled) flightAudio.effect(frequency,.18);},
+    radarSound:phase=>{if(audioEnabled) flightAudio.radarTone(phase);},
     replayPlane:([x,y,z,heading,pitch,bank],inside)=>{
       const model=aircraftModel(flight.aircraft);
       model.visible=!inside;

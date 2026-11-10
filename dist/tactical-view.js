@@ -15,6 +15,7 @@ function createTacticalView(scene,camera,callbacks){
   root.add(flash);
   const unitPool=[], missilePool=[], effectPool=[], racks=[];
   let active=null, replay=null, follow=false, lastDraw=0, reportId=null;
+  let radarState='',nextRadarTone=0;
   function mesh(parent,geometry,mat,x=0,y=0,z=0){
     const item=new THREE.Mesh(geometry,mat);
     item.position.set(x,y,z);parent.add(item);return item;
@@ -83,6 +84,7 @@ function createTacticalView(scene,camera,callbacks){
     unitPool.length=0;
     f.tactical.targets.forEach(t=>unitPool.push(makeUnit(t)));
     reportId=null;lastDraw=0;
+    radarState='';nextRadarTone=0;
   }
   function select(id){
     if(active?.finished) return;
@@ -95,6 +97,7 @@ function createTacticalView(scene,camera,callbacks){
     if(f.finished) return;
     if(name==='radar'){
       s.radar=!s.radar;if(!s.radar) selectTacticalTarget(s,null);
+      if(s.radar) callbacks.activateAudio();
     }else if(name==='mode'){
       s.mode=s.mode==='sea'?'air':'sea';selectTacticalTarget(s,null);
     }else if(name==='auto') s.automatic=!s.automatic;
@@ -102,8 +105,13 @@ function createTacticalView(scene,camera,callbacks){
       const contacts=tacticalContacts(f);
       if(contacts.length) select(contacts[(contacts.findIndex(t=>t.id===s.selected)+1)%contacts.length].id);
     }else if(name==='arm') s.armed=!s.armed;
+    else if(name==='aim'){
+      s.aimAssist=!s.aimAssist&&Boolean(tacticalTarget(f))&&!f.ground;
+      s.notice=s.aimAssist?'輔助對準已啟用 · 可隨時手動接管':'已切回手動';
+    }
     else if(name==='fire'){if(!callbacks.paused()&&tacticalFire(f)) callbacks.sound(145);}
     else if(name==='return'){
+      s.aimAssist=false;
       s.returning=true;
       f.route=regionalRoute(f.departure,f.destination);
       f.waypoint=0;
@@ -175,11 +183,12 @@ function createTacticalView(scene,camera,callbacks){
   }
   function drawUI(f,s,now){
     if(s.result){showReport(f,s);return;}
-    const target=tacticalContacts(f).find(t=>t.id===s.selected);
+    const target=tacticalTarget(f);
     marker.hidden=!target;
     if(target){
+      camera.updateMatrixWorld();
       vector.set(target.x,target.y,target.z).project(camera);
-      const inside=vector.z<1&&Math.abs(vector.x)<.92&&Math.abs(vector.y)<.83;
+      const inside=vector.z>=-1&&vector.z<1&&Math.abs(vector.x)<.92&&Math.abs(vector.y)<.83;
       const behind=vector.z>1?-1:1;
       marker.style.left=(50+clamp(vector.x*behind,-.9,.9)*48)+'%';
       marker.style.top=(50-clamp(vector.y*behind,-.78,.78)*50)+'%';
@@ -192,6 +201,12 @@ function createTacticalView(scene,camera,callbacks){
     byId('tacticalHDG').textContent=String(Math.round((f.heading*180/Math.PI+360)%360)%360).padStart(3,'0')+'° HDG';
     byId('tacticalALT').textContent=Math.round(f.y*3.28084)+' ft · '+Math.round(f.vy*196.85)+' ft/min';
     drawRadar(f,s);
+    const radarPhase=!s.radar?'':s.lock>=1?'lock':s.lock>0?'acquire':'scan';
+    if(radarPhase!==radarState){radarState=radarPhase;nextRadarTone=0;}
+    if(radarPhase&&!callbacks.paused()&&now>=nextRadarTone){
+      callbacks.radarSound(radarPhase);
+      nextRadarTone=now+(radarPhase==='lock'?1250:radarPhase==='acquire'?290:900);
+    }
     const state=s.radar?(s.lock>=1?'已鎖定':s.lock>0?'鎖定中 '+Math.floor(s.lock*100)+'%':target?'已追蹤':'搜尋中'):'雷達關閉';
     const bearing=target?Math.round((Math.atan2(target.x-f.x,f.z-target.z)*180/Math.PI+360)%360)%360:0;
     byId('tacticalContact').textContent=state+(target?' · '+target.name+' · '+bearing+'° · '+(tacticalDistance(f,target)/1000).toFixed(1)+
@@ -207,10 +222,32 @@ function createTacticalView(scene,camera,callbacks){
     const next=s.returning?activeTarget(f):s.exit;
     const nav=next?' · '+Math.round((Math.atan2(next.x-f.x,f.z-next.z)*180/Math.PI+360)%360)%360+'°／'+
       (Math.hypot(next.x-f.x,next.z-f.z)/1000).toFixed(1)+' km':'';
-    const prompt=warning?'警告 · '+(direction<-.18?'左側':direction>.18?'右側':'前方')+'有敵方雷達或飛彈':
-      s.returning?'依導航返場並停妥'+nav:complete?(s.kind==='radar'||s.kind==='sea'?'飛過訓練區出口'+nav:'目標完成，可返場或撤離'):
-      s.guided?(f.ground?'從跑道起飛':!s.radar?'開啟雷達':'已鎖定'===state?s.armed?'按發射或 M':'啟用武器':'轉向目標框，保持穩定'):'依簡報完成任務';
-    byId('tacticalCaption').textContent=prompt+(s.notice?' · '+s.notice:'');
+    const aim=target?tacticalAim(f,target):null;
+    const degrees=180/Math.PI;
+    const steering=aim?[
+      Math.abs(aim.bearing)>.12?(aim.bearing>0?'向右 ':'向左 ')+Math.round(Math.abs(aim.bearing)*degrees)+'°':'',
+      Math.abs(aim.elevation-f.pitch)>.12?(aim.elevation>f.pitch?'拉升 ':'壓低 ')+Math.round(Math.abs(aim.elevation-f.pitch)*degrees)+'°':''
+    ].filter(Boolean).join(' · '):'';
+    const blocked=tacticalFireBlock(f,target);
+    const prompt=s.returning?'依導航返場並停妥'+nav:
+      complete?(s.kind==='radar'||s.kind==='sea'?'飛過訓練區出口'+nav:'目標完成，可返場或撤離'):
+      f.ground?'從跑道起飛':!s.radar?'開啟雷達搜尋訓練目標':
+      !s.armed?'啟用武器':!s.ammo?'彈藥用盡':
+      !blocked?'已鎖定，可發射':s.missiles.some(m=>m.owner==='player')?'飛彈追蹤中':
+      aim&&aim.distance>=8200?'接近至 8.2 km 內再鎖定':
+      steering|| (target?'保持機鼻朝向目標':'搜尋中 · 查看雷達');
+    const warningText=warning?' · 警告：'+(direction<-.18?'左側':direction>.18?'右側':'前方')+'有敵方威脅':'';
+    byId('tacticalCaption').textContent=prompt+warningText+(target&&target.team!=='hostile'?' · 非指定目標':'')+
+      (s.notice?' · '+s.notice:'');
+    byId('tacticalRadarQuick').hidden=s.radar||complete;
+    byId('tacticalArmQuick').hidden=!s.radar||s.armed||complete;
+    const assist=byId('tacticalAimQuick');
+    assist.hidden=!s.radar||!target||f.ground||complete;
+    assist.setAttribute('aria-pressed',String(s.aimAssist));
+    assist.textContent=s.aimAssist?'手動接管':'輔助對準';
+    byId('tacticalFire').disabled=Boolean(blocked)||callbacks.paused();
+    byId('tacticalFire').hidden=complete;
+    byId('tacticalFire').title=blocked;
     byId('tacticalFollow').hidden=!s.missiles.some(m=>m.owner==='player');
     for(const [commandName,on] of [['radar',s.radar],['auto',s.automatic],['arm',s.armed]]){
       panel.querySelector('[data-tactical="'+commandName+'"]').setAttribute('aria-pressed',String(on));
@@ -239,7 +276,7 @@ function createTacticalView(scene,camera,callbacks){
     for(let i=0;i<6;i++){
       const rack=racks[i]??(racks[i]=makeMissile());
       rack.visible=i>=shots;
-      const point=tacticalRack({x:plane[0],y:plane[1],z:plane[2],heading:plane[3]},i);
+      const point=tacticalRack({x:plane[0],y:plane[1],z:plane[2],heading:plane[3],pitch:plane[4],bank:plane[5]},i);
       rack.position.set(point.x,point.y,point.z);
       rack.rotation.set(plane[4],-plane[3],-plane[5],'YXZ');
     }

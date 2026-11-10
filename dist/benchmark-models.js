@@ -6,7 +6,7 @@ function buildBenchmarkAirframe(profile,scene){
   const detailed=profile.role==='passenger'&&engineCount===2;
   const color=fighter?0x778798:freight?0xd9e2e4:0xf2f5f7;
   const surface=new THREE.MeshStandardMaterial({color,roughness:detailed?.39:.57,metalness:fighter?.19:.08});
-  const stockColor=profile.trimColor??(freight?0x173d5d:0x146a80);
+  const stockColor=profile.trimColor??(fighter?0x556571:freight?0x173d5d:0x146a80);
   const paint=new THREE.MeshStandardMaterial({color:stockColor,roughness:.48});
   const rubber=new THREE.MeshStandardMaterial({color:0x151a1e,roughness:.94});
   const metal=new THREE.MeshStandardMaterial({color:0x667886,roughness:.33,metalness:.59});
@@ -41,11 +41,28 @@ function buildBenchmarkAirframe(profile,scene){
   const body=[[-half,.018],[-half*.91,radius*.46],[-half*.77,radius*.89],
     [-half*.63,radius],[half*.52,radius],[half*.70,radius*.85],[half*.91,radius*.37],[half,.04]];
   if(fighter){
-    hull(group,[[-half,.02],[-half*.73,radius*.39],[-half*.30,radius*.82],
-      [half*.20,radius],[half*.72,radius*.78],[half,radius*.64]],surface,.86);
-    const canopy=mesh(group,new THREE.SphereGeometry(1,36,20),glazing,0,.69,-half*.33);
-    canopy.scale.set(.67,.57,1.86);
-    block(group,metal,.12,.14,1.8,0,1.15,-half*.28);
+    const radome=surface.clone();
+    radome.color.setHex(0x54616b);
+    hull(group,[[-half,.014],[-half*.91,radius*.17],[-half*.73,radius*.39]],radome,.86);
+    hull(group,[[-half*.73,radius*.39],[-half*.30,radius*.82],[half*.20,radius],
+      [half*.72,radius*.78],[half,radius*.64]],surface,.86);
+    const canopyZ=-half*(profile.sideIntakes?.40:.37),canopyY=radius*.57;
+    const canopyLength=half*(profile.sideIntakes?.17:.185);
+    const canopyWidth=radius*(profile.sideIntakes?.62:.58);
+    const canopyBase=mesh(group,new THREE.SphereGeometry(1,32,14),paint,0,canopyY-.035,canopyZ);
+    canopyBase.scale.set(canopyWidth+.025,.12,canopyLength+.075);
+    const canopy=mesh(group,new THREE.SphereGeometry(1,40,18,0,Math.PI*2,0,Math.PI/2),glazing,0,canopyY,canopyZ);
+    canopy.scale.set(canopyWidth,radius*.43,canopyLength);
+    if(profile.id==='sf16'){
+      for(const side of [-1,1]){
+        const strake=foil(group,[[side*.45,-half*.55],[side*1.44,-half*.13],
+          [side*1.26,half*.09],[side*.55,half*.12]],surface,.078);
+        strake.position.y=-.10;
+        const ventral=foil(group,[[0,half*.52],[-.50,half*.82],[-.45,half*.91],[0,half*.92]],paint,.05);
+        ventral.rotation.z=Math.PI/2-side*.23;
+        ventral.position.set(side*.49,-.50,0);
+      }
+    }
     if(profile.sideIntakes){
       for(const side of [-1,1]){
         const nacelle=hull(group,[[-half*.32,.33],[-half*.21,.44],[half*.65,.39],[half*.92,.30]],surface,.8);

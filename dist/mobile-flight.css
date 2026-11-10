@@ -111,6 +111,9 @@
 .mobile-mode [data-mobile-panel]:not([data-mobile-panel=""]) #gateGuide,
 .mobile-mode [data-mobile-panel]:not([data-mobile-panel=""]) #flightGuide { visibility: hidden; }
 .mobile-mode #tacticalPanel { top: 0; }
+.mobile-mode #tacticalGuide button { min-height: 40px; }
+#tacticalFire:not(:disabled) { background: #317d58; color: #fff; }
+#tacticalAimQuick[aria-pressed="true"] { background: #206a76; }
 .mobile-mode .geo-credit { font-size: 8px; }
 
 @media (max-width: 520px) {
