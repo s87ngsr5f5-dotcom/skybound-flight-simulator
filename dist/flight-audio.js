@@ -1,12 +1,13 @@
 'use strict';
 function makeFlightAudio(){
-  let context, fan, core, roar, air, stall, roarFilter, windFilter;
+  let context, master, noiseBuffer, fan, core, roar, air, stall, roarFilter, windFilter;
+  let level=.85, speaking=false;
   function layer(source,filter){
     const gain=context.createGain();
     gain.gain.value=0;
     if(filter) source.connect(filter).connect(gain);
     else source.connect(gain);
-    gain.connect(context.destination);
+    gain.connect(master);
     source.start();
     return gain.gain;
   }
@@ -20,11 +21,15 @@ function makeFlightAudio(){
       const Audio=window.AudioContext||window.webkitAudioContext;
       if(!Audio) return false;
       try{context=new Audio();}catch{return false;}
+      master=context.createGain();
+      master.gain.value=level;
+      master.connect(context.destination);
       fan=tone('triangle');
       core=tone('sine');
       stall=tone('triangle');
       stall.frequency.value=830;
       const buffer=context.createBuffer(1,context.sampleRate*2,context.sampleRate);
+      noiseBuffer=buffer;
       const sample=buffer.getChannelData(0);
       for(let i=0;i<sample.length;i++) sample[i]=Math.random()*2-1;
       function noise(filter,offset){
@@ -46,6 +51,7 @@ function makeFlightAudio(){
     return true;
   }
   function update(f,cockpit,enabled){
+    if(!enabled) stopSpeech();
     if(!context) return;
     const engines=f?.engines??[];
     const running=engines.length?engines.filter(Boolean).length/engines.length:0;
@@ -75,7 +81,7 @@ function makeFlightAudio(){
     source.frequency.exponentialRampToValueAtTime(frequency*.53,now+.27);
     gain.gain.setValueAtTime(volume,now);
     gain.gain.exponentialRampToValueAtTime(.0001,now+.33);
-    source.connect(gain).connect(context.destination);
+    source.connect(gain).connect(master);
     source.start(now);source.stop(now+.34);
   }
   function radarTone(phase){
@@ -88,13 +94,48 @@ function makeFlightAudio(){
       gain.gain.setValueAtTime(.0001,at);
       gain.gain.exponentialRampToValueAtTime(.10,at+.009);
       gain.gain.exponentialRampToValueAtTime(.0001,at+.105);
-      source.connect(gain).connect(context.destination);
+      source.connect(gain).connect(master);
       source.start(at);source.stop(at+.11);
     };
     if(phase==='lock'){
       beep(1200,0);beep(1480,.14);
     }else beep(phase==='acquire'?940:660,0);
   }
-  return {start,update,effect,radarTone};
+  function volume(value){
+    level=value;
+    if(master) master.gain.setTargetAtTime(value,context.currentTime,.03);
+    if(!value) stopSpeech();
+  }
+  function gateChime(){
+    effect(680,.095);
+    effect(1019,.075);
+  }
+  function touchdown(sink){
+    if(context?.state!=='running') return;
+    const source=context.createBufferSource(),filter=context.createBiquadFilter(),gain=context.createGain();
+    const time=context.currentTime;
+    source.buffer=noiseBuffer;
+    filter.type='bandpass';
+    filter.frequency.setValueAtTime(730,time);
+    filter.frequency.exponentialRampToValueAtTime(220,time+.26);
+    gain.gain.setValueAtTime(Math.min(.24,.095+Math.abs(sink)*.027),time);
+    gain.gain.exponentialRampToValueAtTime(.001,time+.30);
+    source.connect(filter).connect(gain).connect(master);
+    source.start(time);source.stop(time+.31);
+  }
+  function callout(message,urgent=false){
+    if(!window.speechSynthesis||!window.SpeechSynthesisUtterance||!level) return;
+    if(speaking&&!urgent) return;
+    if(speaking) stopSpeech();
+    const phrase=new SpeechSynthesisUtterance(message);
+    phrase.lang='en-US';phrase.rate=1.12;phrase.volume=level;
+    phrase.onend=phrase.onerror=()=>{speaking=false;};
+    speaking=true;
+    window.speechSynthesis.speak(phrase);
+  }
+  function stopSpeech(){
+    if(speaking){speaking=false;window.speechSynthesis.cancel();}
+  }
+  return {start,update,effect,radarTone,volume,gateChime,touchdown,callout,stopSpeech};
 }
 

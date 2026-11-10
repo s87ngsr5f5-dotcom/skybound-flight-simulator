@@ -73,7 +73,7 @@ function buildBenchmarkAirframe(profile,scene){
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(seam),new THREE.LineBasicMaterial({color:0x3d4c56})));
     const probe=mesh(group,new THREE.CylinderGeometry(.014,.032,.30,10),metal,0,0,-half-.13);
     probe.rotation.x=Math.PI/2;
-    if(profile.id==='sf16'){
+    if(profile.id==='sf16'||profile.f16Family){
       for(const side of [-1,1]){
         const strake=foil(group,[[side*.45,-half*.55],[side*1.44,-half*.13],
           [side*1.26,half*.09],[side*.55,half*.12]],surface,.078);
@@ -85,12 +85,23 @@ function buildBenchmarkAirframe(profile,scene){
     }
     if(profile.sideIntakes){
       for(const side of [-1,1]){
-        const nacelle=hull(group,[[-half*.32,.33],[-half*.21,.44],[half*.65,.39],[half*.92,.30]],surface,.8);
-        nacelle.position.set(side*.60,-.22,0);
-        const opening=mesh(group,new THREE.CircleGeometry(.30,22),dark,side*.60,-.22,-half*.32-.01);
+        const intakeZ=-half*(profile.delta?.42:.32),intakeSide=side*(profile.wideIntakes?.78:.60);
+        const nacelle=hull(group,[[intakeZ,.33],[intakeZ+.72,.44],[half*.65,.39],[half*.92,.30]],surface,.8);
+        nacelle.position.set(intakeSide,-.22,0);
+        const opening=mesh(group,new THREE.CircleGeometry(.30,22),dark,intakeSide,-.22,intakeZ-.01);
         opening.rotation.y=Math.PI;opening.scale.y=.82;
-        hull(group,[[half*.84,.34],[half*.96,.32],[half*1.01,.28]],metal).position.set(side*.38,-.12,0);
-        mesh(group,new THREE.CircleGeometry(.24,24),dark,side*.38,-.12,half*1.01+.02);
+        if(profile.delta){
+          const spike=mesh(group,new THREE.ConeGeometry(.21,.6,18),metal,intakeSide-side*.10,-.22,intakeZ-.14);
+          spike.rotation.x=-Math.PI/2;
+        }else{
+          const exhaust=side*(profile.wideIntakes?.46:.38);
+          hull(group,[[half*.84,.34],[half*.96,.32],[half*1.01,.28]],metal).position.set(exhaust,-.12,0);
+          mesh(group,new THREE.CircleGeometry(.24,24),dark,exhaust,-.12,half*1.01+.02);
+        }
+      }
+      if(profile.delta){
+        hull(group,[[half-.75,.59],[half-.23,.60],[half,.51]],metal,.92);
+        mesh(group,new THREE.CircleGeometry(.45,32),dark,0,0,half+.014);
       }
     }else{
     const intake=hull(group,[[-2.3,.62],[-2.05,.67],[1.35,.59],[1.77,.12]],surface,.65);
@@ -300,8 +311,8 @@ function buildBenchmarkAirframe(profile,scene){
   }
   const surfaces=[], flaps=[], lamps=[], fans=[];
   for(const side of [-1,1]){
-    const chord=fighter?(profile.sideIntakes?2.85:4.4):half*.51;
-    const root=-half*(fighter?.29:.24);
+    const chord=profile.delta?6.3:fighter?(profile.wideIntakes?3.65:profile.sideIntakes?2.85:4.4):half*.51;
+    const root=-half*(profile.delta?.39:fighter?.29:.24);
     const tip=root+sweep;
     const wingVertices=[],wingIndices=[],sections=20,slices=32;
     for(let k=0;k<=sections;k++){
@@ -334,9 +345,9 @@ function buildBenchmarkAirframe(profile,scene){
         lower.rotation.z=side*.45;
       }
     }
-    foil(group,[[0,half*.57],[side*span*.33,half*.72],[side*span*.33,half*.83],[0,half*.83]],surface).position.y=radius*.08;
+    if(!profile.delta) foil(group,[[0,half*.57],[side*span*.33,half*.72],[side*span*.33,half*.83],[0,half*.83]],surface).position.y=radius*.08;
     const aileron=new THREE.Group();
-    aileron.position.set(side*span*.66,wingY,tip+chord*.23);
+    aileron.position.set(side*span*.66,wingY,profile.delta?root+sweep*.66+chord*.43:tip+chord*.23);
     block(aileron,paint,span*.29,.15,chord*.13,0,0,chord*.065);
     group.add(aileron);surfaces.push(aileron);
     const flap=new THREE.Group();

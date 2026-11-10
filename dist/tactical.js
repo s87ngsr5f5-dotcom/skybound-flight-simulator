@@ -49,6 +49,7 @@ function makeTacticalFlight(airport,aircraft,kind,wind,guided,advanced){
   f.tactical={id:crypto.randomUUID(),kind,targets,exit,heading,origin,guided,advanced,elapsed:0,
     radar:false,automatic:true,aimAssist:false,mode:sea?'sea':'air',selected:null,lock:0,armed:false,ammo:6,health:100,
     missiles:[],effects:[],events:[],frames:[],shots:0,hits:0,air:0,sea:0,neutral:0,
+    gunBursts:0,gunHits:0,nextGun:0,
     enemyShot:guided&&!advanced?24:10,enemyWarning:0,returning:false,notice:'',nextFrame:0,result:null};
   return f;
 }
@@ -73,6 +74,26 @@ function tacticalAim(f,target){
     elevation:Math.atan2(target.y-f.y,Math.hypot(dx,dz)),
     distance:tacticalDistance(f,target)
   };
+}
+function tacticalGunLead(f,target=tacticalTarget(f)){
+  if(!target||target.domain!=='air'||target.team!=='hostile'||tacticalDistance(f,target)>2300) return null;
+  const lead=tacticalDistance(f,target)/850;
+  return {x:target.x+(target.vx||0)*lead,y:target.y+(target.vy||0)*lead,z:target.z+(target.vz||0)*lead};
+}
+function tacticalGun(f){
+  const s=f.tactical;
+  if(f.finished||f.ground||!s.armed||s.gunBursts>=18||s.elapsed<s.nextGun) return false;
+  s.gunBursts++;s.nextGun=s.elapsed+.6;
+  const target=tacticalTarget(f), point=tacticalGunLead(f,target);
+  const aim=point&&tacticalAim(f,point);
+  if(aim&&Math.abs(aim.bearing)<.028&&Math.abs(aim.elevation-f.pitch)<.028){
+    target.alive=false;s.air++;s.gunHits++;
+    s.effects.push({x:target.x,y:target.y,z:target.z,age:0,water:false});
+    s.notice='機砲命中 · '+target.name;
+  }else s.notice='機砲未命中 · 對準金色前置圈';
+  tacticalEvent(s,s.notice);
+  tacticalFrame(f);
+  return true;
 }
 function tacticalFireBlock(f,target=tacticalTarget(f)){
   const s=f.tactical;
@@ -131,7 +152,7 @@ function tacticalFinish(f,outcome,reason,returned=false){
   f.finished=true;
   const base=outcome==='成功'?tacticalScenarios[s.kind].base:0;
   const bonus=s.neutral?0:(s.air+s.sea)*700, landing=returned?650:0;
-  const fuel=Math.round(Math.max(0,f.fuelStart-f.fuel)*.8), ammo=s.shots*110, repair=(100-s.health)*18;
+  const fuel=Math.round(Math.max(0,f.fuelStart-f.fuel)*.8), ammo=s.shots*110+s.gunBursts*12, repair=(100-s.health)*18;
   const receipt={base,bonus,landing,fuel,ammo,repair,net:Math.max(0,base+bonus+landing-fuel-ammo-repair)};
   const career=readCareer();
   let saved=Boolean(career.receipts[s.id]);
@@ -175,9 +196,10 @@ function stepTactical(f,dt){
     const maneuver=t.domain==='air'&&t.team==='hostile'&&(combat||s.kind==='intercept');
     t.heading=s.heading+(maneuver?Math.sin(phase)*.6:t.domain==='sea'?Math.PI/2:0);
     const speed=t.domain==='sea'?12:combat&&t.team==='hostile'?105:85;
-    t.x+=Math.sin(t.heading)*speed*dt;
-    t.z-=Math.cos(t.heading)*speed*dt;
-    if(maneuver) t.y+=Math.cos(phase)*16*dt;
+    t.vx=Math.sin(t.heading)*speed;
+    t.vz=-Math.cos(t.heading)*speed;
+    t.vy=maneuver?Math.cos(phase)*16:0;
+    t.x+=t.vx*dt;t.y+=t.vy*dt;t.z+=t.vz*dt;
   }
   const contacts=tacticalContacts(f);
   if(!contacts.some(t=>t.id===s.selected)){

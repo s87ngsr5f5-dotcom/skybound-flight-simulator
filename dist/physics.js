@@ -10,6 +10,9 @@ const runway10 = Object.freeze({
 });
 const simTick = 1/120;
 const knotsPerMps = 3600/1852;
+const fastCruiseKmh = 2000;
+const displayKmh = mps => Math.round(mps*3.6);
+const knotsToKmh = knots => Math.round(knots*1.852);
 function atmosphere(height,temperatureOffset=0){
   const altitude=limit(height,0,20000);
   const standardTemperature=288.15-.0065*Math.min(altitude,11000);
@@ -37,7 +40,7 @@ function flightSpeeds(f){
   return {tas,ias,mach,gs:Math.hypot(f.vx,f.vz)};
 }
 function cruiseMachTarget(f){
-  return f.fastCruise?1000/(knotsPerMps*atmosphere(35000*.3048).sound):(f.aircraft.cruiseMach??.85);
+  return f.fastCruise?(fastCruiseKmh+6)/(3.6*atmosphere(35000*.3048).sound):(f.aircraft.cruiseMach??.85);
 }
 function fastCruiseActive(f){
   return f.fastCruise&&!f.ground&&f.y>7000&&!f.gear&&!f.flaps&&
@@ -197,7 +200,8 @@ function stepTrainer(f, input, dt=simTick){
   f.commandPitch=pitchTarget;
   f.commandBank=bankTarget;
   const response=limit(q/420,.22,1.8);
-  const pitchMoment=(pitchTarget-f.pitch)*14500*response*(fighterManual?1.4:1)*aircraft.inertia[0]/1650-f.pitchRate*(fighterManual?9200:7800)*aircraft.inertia[0]/1650+lift*(aircraft.cgOffset+(payload?.shift||0)*.18);
+  const pitchDamping=(fighterManual?9200:7800)+(input.yokeDamping?2100:0);
+  const pitchMoment=(pitchTarget-f.pitch)*14500*response*(fighterManual?1.4:1)*aircraft.inertia[0]/1650-f.pitchRate*pitchDamping*aircraft.inertia[0]/1650+lift*(aircraft.cgOffset+(payload?.shift||0)*.18);
   const bankMoment=(bankTarget-f.bank)*14000*response*(fighterManual?2.2:1)*aircraft.inertia[1]/2450-f.bankRate*(fighterManual?9500:5300)*aircraft.inertia[1]/2450;
   const targetYaw=f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40): Math.tan(f.bank)*g/Math.max(20,speed)+input.rudder*(fighterManual?.37:.25)+beta*.35;
   const yawMoment=(targetYaw+asymmetricYaw-f.yawRate)*8800*aircraft.inertia[2]/2850;

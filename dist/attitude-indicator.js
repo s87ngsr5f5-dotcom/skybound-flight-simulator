@@ -23,7 +23,7 @@ class FlightAttitudeIndicator {
     this.mode=mode;
     this.canvas.width=this.canvas.height=Math.round(size*dpr);
     const radius=size*.46;
-    this.font='600 '+Math.max(9,Math.round(radius*.12))+'px system-ui';
+    this.font='700 '+Math.max(10,Math.round(radius*.12))+'px system-ui';
     const ink=this.ink;
     this.sky=ink.createLinearGradient(0,-radius*2,0,0);
     this.sky.addColorStop(0,'#123969');
@@ -55,18 +55,18 @@ class FlightAttitudeIndicator {
     ink.fillStyle=ink.strokeStyle=color;
     ink.font=this.font;
     ink.textBaseline='middle';
-    ink.lineWidth=1.4;
-    ink.beginPath();ink.moveTo(-span,0);ink.lineTo(span,0);ink.stroke();
+    ink.beginPath();ink.moveTo(-span,0);ink.lineTo(span,0);this.stroke(color,1.6);
     for(let deg=-80;deg<=80;deg+=5){
       if(deg===0||Math.abs(deg-pitch*degrees)>32) continue;
       const major=deg%10===0,w=r*(major?.30:.17),y=-deg*scale,gap=r*.095;
       ink.setLineDash(deg<0?pitchDash:solidPitchLine);
       ink.beginPath();ink.moveTo(-w,y);ink.lineTo(-gap,y);
-      ink.moveTo(gap,y);ink.lineTo(w,y);ink.stroke();
+      ink.moveTo(gap,y);ink.lineTo(w,y);this.stroke(color,major?1.6:1.3);
       if(major){
         const label=this.ladder[deg/10+8];
-        ink.textAlign='right';ink.fillText(label,-w-4,y);
-        ink.textAlign='left';ink.fillText(label,w+4,y);
+        ink.lineWidth=2.7;ink.strokeStyle='#071421';
+        ink.textAlign='right';ink.strokeText(label,-w-4,y);ink.fillText(label,-w-4,y);
+        ink.textAlign='left';ink.strokeText(label,w+4,y);ink.fillText(label,w+4,y);
       }
     }
     ink.restore();
@@ -108,11 +108,10 @@ class FlightAttitudeIndicator {
         const x=attitudeLimit(Math.atan2(right*Math.cos(bank)-up*Math.sin(bank),forward)*degrees*scale,r*.62);
         const y=attitudeLimit(-Math.atan2(up*Math.cos(bank)+right*Math.sin(bank),forward)*degrees*scale,r*.62);
         const mark=Math.max(3,r*.061);
-        ink.strokeStyle='#7effa0';
         ink.beginPath();ink.arc(x,y,mark,0,Math.PI*2);
         ink.moveTo(x-2*mark,y);ink.lineTo(x-mark,y);
         ink.moveTo(x+mark,y);ink.lineTo(x+2*mark,y);
-        ink.moveTo(x,y-mark);ink.lineTo(x,y-2*mark);ink.stroke();
+        ink.moveTo(x,y-mark);ink.lineTo(x,y-2*mark);this.stroke('#7effa0',1.6);
       }
     }
 
@@ -140,5 +139,15 @@ class FlightAttitudeIndicator {
       ink.strokeStyle='#829fb2';ink.lineWidth=1.5;
       ink.beginPath();ink.arc(half,half,r,0,Math.PI*2);ink.stroke();
     }
+  }
+
+  stroke(color,width){
+    const ink=this.ink;
+    ink.strokeStyle='#071421';
+    ink.lineWidth=width+2.2;
+    ink.stroke();
+    ink.strokeStyle=color;
+    ink.lineWidth=width;
+    ink.stroke();
   }
 }

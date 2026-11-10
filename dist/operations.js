@@ -425,7 +425,7 @@ function updateClimbLesson(f,save){
   if(lesson.stable<60) return;
   f.finished=true;
   f.recorded=save(f,'巡航練習完成 · Mach '+speeds.mach.toFixed(3)+' · GS '+
-    Math.round(speeds.gs*knotsPerMps)+' kt · 耗油 '+Math.round(f.fuelStart-f.fuel)+' kg');
+    displayKmh(speeds.gs)+' km/h · 耗油 '+Math.round(f.fuelStart-f.fuel)+' kg');
 }
 function startEngine(f,index){
   if(f.engines[index]){

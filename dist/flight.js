@@ -12,16 +12,29 @@ let renderer;
 const mobileRenderer=touchControls.mode.value==='mobile';
 const rendererOptions=[
   {antialias:!mobileRenderer},
+  {antialias:false,powerPreference:'default'},
   {antialias:false,powerPreference:'low-power',precision:'mediump'}
 ];
-for(const options of rendererOptions){
+const requestedInstruments=new URLSearchParams(location.search).get('mode')==='2d';
+for(const options of requestedInstruments?[]:rendererOptions){
   // Three creates a new canvas for each attempt, including after context failure.
   try{renderer=new THREE.WebGLRenderer(options);break;}catch{}
 }
 if(!renderer){
-  byId('startupMessage').textContent = '3D 引擎無法啟動。請用支援 WebGL 的瀏覽器開啟。';
+  byId('startupMessage').textContent = '可使用 2D 座艙練習起降與導航。';
   byId('retryStartup').hidden=false;
-  byId('fly').disabled = byId('approach').disabled = true;
+  const start2D=byId('start2D');
+  start2D.hidden=false;
+  start2D.onclick=()=>{
+    renderer=createInstrumentRenderer();
+    if(!renderer){
+      byId('startupMessage').textContent='瀏覽器無法建立 2D 畫布。請重新載入。';
+      return;
+    }
+    start2D.hidden=true;
+    document.body.classList.add('instrument-flight');
+    initialize();
+  };
 }
 if(renderer) initialize();
 function initialize(){
@@ -29,6 +42,37 @@ function initialize(){
   scene.background = new THREE.Color('#9ccbea');
   scene.fog = new THREE.FogExp2('#a4c9dd',0.000026);
   const camera = new THREE.PerspectiveCamera(64,1,.6,155000);
+  let taiwanOverview, overviewActive=false;
+  const overviewToggle=byId('taiwanOverview'),overviewScale=byId('overviewScale');
+  function setOverview(active){
+    overviewActive=active;
+    overviewToggle.setAttribute('aria-pressed',String(active));
+    overviewToggle.textContent=active?'回飛行視角':'全台俯瞰';
+    overviewScale.hidden=!active;
+    document.body.classList.toggle('overview-active',active);
+  }
+  overviewToggle.onclick=()=>{
+    if(!overviewToggle.hidden&&taiwanOverview) setOverview(!overviewActive);
+  };
+  function updateTaiwanOverview(f){
+    const visible=!renderer.instrumentOnly&&Boolean(f)&&!f.ground&&f.y>=9000&&!f.tactical&&!replay;
+    const farView=!renderer.instrumentOnly&&f?.y>2200&&
+      f.x>-300000&&f.x<100000&&f.z>-90000&&f.z<450000;
+    if((farView||visible)&&!taiwanOverview){
+      taiwanOverview=createTaiwanOverview();
+      scene.add(taiwanOverview.distantTerrain);
+      resizeOverview();
+    }
+    if(taiwanOverview) taiwanOverview.distantTerrain.visible=Boolean(farView);
+    overviewToggle.hidden=!visible;
+    if(!visible&&overviewActive) setOverview(false);
+    if(overviewActive) byId('overviewAltitude').textContent=Math.round(f.y).toLocaleString();
+    const far=farView?430000:155000;
+    if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix();}
+  }
+  function resizeOverview(){
+    if(taiwanOverview) byId('scaleBar').style.width=taiwanOverview.resize(innerWidth,innerHeight)+'px';
+  }
   renderer.domElement.className = 'world';
   document.body.prepend(renderer.domElement);
   const ambient=new THREE.HemisphereLight(0xe1efff,0x777054,2.15);
@@ -116,6 +160,7 @@ function initialize(){
     return terrainVertex(x,z);
   }
   function updateTerrain(x,z){
+    if(renderer.instrumentOnly) return;
     const cx=Math.floor(x/span),cz=Math.floor(z/span),id=cx+':'+cz+':'+terrainColorRevision;
     if(id!==previousChunk){
       previousChunk=id;
@@ -424,6 +469,7 @@ function initialize(){
   scene.add(sceneryLayers);
   let detailedScenery,sceneryBuild,loadingScenery=false;
   function syncSceneryMode(){
+    if(renderer.instrumentOnly) return;
     const detailed=touchControls.mode.value==='desktop'||byId('quality').value!=='low';
     sceneryLayers.visible=detailed&&Boolean(detailedScenery);
     if(!detailed||loadingScenery) return;
@@ -610,7 +656,7 @@ function initialize(){
     previousPose.x=f.x;previousPose.y=f.y;previousPose.z=f.z;
     previousPose.heading=f.heading;previousPose.pitch=f.pitch;previousPose.bank=f.bank;
   }
-  const cockpitActive=()=>Boolean(flight&&cameraMode===1&&!flight.cabinView);
+  const cockpitActive=()=>Boolean(flight&&(renderer.instrumentOnly||cameraMode===1)&&!flight.cabinView);
   const twoSeats=profile=>['passenger','cargo'].includes(profile?.role);
   function resetLook(){
     Object.assign(cockpitView,{yaw:0,pitch:0,zoom:0,drag:null});
@@ -621,7 +667,7 @@ function initialize(){
     resetLook();
     changeView();
   }
-  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH']);
+  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH','KeyK']);
   const radar=byId('radar').getContext('2d');
   const planMap=byId('planMap').getContext('2d');
   const flightRate=byId('flightRate'),flightRateStatus=byId('flightRateStatus');
@@ -676,6 +722,20 @@ function initialize(){
   const flightAudio=makeFlightAudio();
   let audioEnabled=true, previousTouchdown=null;
   try{audioEnabled=localStorage.getItem('skybound-audio')!=='off';}catch{}
+  const volume=byId('flightVolume'),volumeValue=byId('volumeValue');
+  try{volume.value=localStorage.getItem('skybound-volume')??'85';}catch{}
+  function syncVolume(){
+    flightAudio.volume(Number(volume.value)/100);
+    volumeValue.textContent=volume.value+'%';
+  }
+  volume.oninput=()=>{
+    syncVolume();
+    try{localStorage.setItem('skybound-volume',volume.value);}catch{}
+  };
+  syncVolume();
+  const unlockAudio=()=>{if(audioEnabled) flightAudio.start();};
+  addEventListener('keydown',unlockAudio,{once:true});
+  addEventListener('pointerdown',unlockAudio,{once:true});
   const soundButtons=[byId('sound'),byId('mobileSound')];
   function updateAudioButtons(){
     for(const button of soundButtons){
@@ -692,7 +752,7 @@ function initialize(){
     };
   }
   updateAudioButtons();
-  const statLabels=['IAS kt','高度 FT','升降 FT/M','航向','功率','襟翼／配平','地速 GS kt','真空速 TAS kt','Mach'];
+  const statLabels=['IAS km/h','高度 m','升降 FT/M','航向','功率','襟翼／配平','地速 GS km/h','真空速 TAS km/h','Mach'];
   byId('stats').insertAdjacentHTML('afterbegin',statLabels.map(label=>'<div class="stat"><small>'+label+'</small><b></b></div>').join(''));
   const statValues=Array.from(byId('stats').querySelectorAll('b'));
   const labelAirport=r=>r.code+' '+r.name+' · '+r.designator;
@@ -809,7 +869,7 @@ function initialize(){
     lastBriefPlane=briefKey;
     const fuel=Number(field.value);
     const weight=aircraft.mass+fuel-brief.capacity;
-    byId('passengerBrief').textContent=from.name+' → '+to.name+' · '+brief.distance.toFixed(0)+' NM · 班表 '+brief.schedule+
+    byId('passengerBrief').textContent=from.name+' → '+to.name+' · '+(brief.distance*1.852).toFixed(0)+' km · 班表 '+brief.schedule+
       ' 分鐘 · '+byId('weather').selectedOptions[0].text+' · '+brief.passengers+' 人／'+brief.passengers+' 座 · 行李 '+
       (brief.passengers*15).toLocaleString()+' kg · 基本報酬 '+brief.base.toLocaleString()+' 金幣';
     byId('fuelPreview').textContent='預估航程耗油 '+brief.estimated+' kg · 備降及備用 '+brief.reserve+
@@ -824,7 +884,7 @@ function initialize(){
     byId('lesson').value='airline';
     byId('airlineRoute').value='RCKH';
     drawPlan();
-    byId('fly').focus();
+    start(false);
   };
   byId('resumeAirline').onclick=()=>{
     const saved=passengerCheckpoints().find(f=>f.service.id===byId('savedAirline').value);
@@ -899,7 +959,10 @@ function initialize(){
     if(isCircuit) byId('aircraft').value='a223';
     const isTactical=lesson==='tactical';
     byId('tacticalSetup').hidden=!isTactical;
-    if(isTactical) byId('aircraft').value='sf16';
+    if(isTactical&&selectedAircraft().role!=='fighter') byId('aircraft').value='sf16';
+    for(const option of byId('aircraft').options){
+      option.disabled=isTactical&&fleet.find(plane=>plane.id===option.value)?.role!=='fighter';
+    }
     const isVoyage=lesson==='naritaCargo';
     if(isVoyage) byId('aircraft').value='sf748';
     const isClimb=lesson==='climbLesson';
@@ -910,7 +973,7 @@ function initialize(){
     const contract=regionalContracts[lesson];
     if(contract) byId('aircraft').value='a223';
     if(lesson==='airline'&&selectedAircraft().role!=='passenger') byId('aircraft').value='a223';
-    byId('aircraft').disabled=isTactical||isVoyage||isClimb||isCircuit||rangeLesson||Boolean(contract);
+    byId('aircraft').disabled=isVoyage||isClimb||isCircuit||rangeLesson||Boolean(contract);
     const custom=['free','cold','taxi','benchmark'].includes(lesson);
     byId('planRouteFields').hidden=!custom;
     byId('waypoints').closest('label').hidden=!custom;
@@ -968,8 +1031,11 @@ function initialize(){
       if(isVoyage||destination.code==='RJAA'){
         planMap.fillStyle='#12364d';planMap.fillRect(0,0,430,440);
       }else planMap.drawImage(terrainPreview,0,0);
+      const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
+      const minZ=Math.min(...points.map(p=>p.z)),maxZ=Math.max(...points.map(p=>p.z));
+      const metersPerPixel=Math.max((maxX-minX)/350,(maxZ-minZ)/355,1);
       const project=isVoyage||destination.code==='RJAA'?
-        (p=>[48+(p.x-departure.x)/6200,389+(p.z-departure.z)/3550]):
+        (p=>[215+(p.x-(minX+maxX)/2)/metersPerPixel,220+(p.z-(minZ+maxZ)/2)/metersPerPixel]):
         (p=>[290+p.x/900,43+p.z/900]);
       mapPath(planMap,points,project,'#6ceaff');
       planMap.font='12px sans-serif';planMap.fillStyle='#f4f9fd';
@@ -1231,7 +1297,7 @@ function initialize(){
     }
     if(f.aircraft.jet){
       entries.push(['擾流板',()=>f.spoilers,()=>f.spoilers=!f.spoilers]);
-      entries.push(['高速遊戲 · 1,000 kt TAS',()=>Boolean(f.fastCruise),()=>{
+      entries.push(['高速遊戲 · 2,000 km/h TAS',()=>Boolean(f.fastCruise),()=>{
         f.fastCruise=!f.fastCruise;
         if(f.hold?.mach) f.hold.mach=cruiseMachTarget(f);
       }]);
@@ -1282,7 +1348,7 @@ function initialize(){
         b.setAttribute('aria-pressed',String(Boolean(get())));
         if(label==='爬升／巡航 35,000 ft'){
           b.disabled=!get()&&!climbReady(f);
-          b.title='離地至少 500 呎，收起落架、襟翼與擾流板，並加速至抬輪速度以上 15 節';
+          b.title='離地至少 500 呎，收起落架、襟翼與擾流板，並加速至抬輪速度以上 28 km/h';
         }
       };
       b.onclick=()=>{
@@ -1294,7 +1360,7 @@ function initialize(){
       b.update();switches.append(b);
     }
     const items=['電瓶開啟',f.engines.length===2?'兩具引擎啟動':'啟動引擎',f.aircraft.reverse?'確認扭矩及螺旋槳轉速':'確認油門及儀表',
-      '滑行前鬆開停機煞車','起飛前襟翼確認','進場 '+f.aircraft.approach+' KTS'+(f.aircraft.retract?'，放下起落架':''),'停妥後拉停機煞車'];
+      '滑行前鬆開停機煞車','起飛前襟翼確認','進場 '+knotsToKmh(f.aircraft.approach)+' km/h'+(f.aircraft.retract?'，放下起落架':''),'停妥後拉停機煞車'];
     byId('checklist').replaceChildren(...items.map(label=>{
       const row=document.createElement('label'),box=document.createElement('input');
       box.type='checkbox';row.append(box,' '+label);return row;
@@ -1307,6 +1373,12 @@ function initialize(){
       updateAudioButtons();
     }
     byId('gateGuide').hidden=true;
+    setOverview(false);
+    byId('landingCard').hidden=true;
+    shownLanding=null;
+    gateProgress=null;
+    previousCalloutHeight=null;
+    sinkWarning=false;
     setMobilePanel('');
     tacticalView.start(flight);
     if(touchControls.mode.value==='mobile') byId('tacticalPanel').open=false;
@@ -1322,7 +1394,7 @@ function initialize(){
     byId('hud').hidden=byId('menu').hidden=false;
     changeView();
   }
-  function start(approach,restart=false){
+  function start(approach,restart=false,preset=restart?flight?.quickPreset:null){
     try{
       const lesson=byId('lesson').value;
       const selection=regionalContracts[lesson]?regionalContractPlan(lesson):
@@ -1335,7 +1407,6 @@ function initialize(){
       replay=null;replayControls.hidden=true;
       if(lesson==='tactical'){
         if(approach) throw new Error('請按「開始飛行」載入戰術任務。');
-        byId('aircraft').value='sf16';
         flight=makeTacticalFlight(airports.find(a=>a.code==='RCMQ'),selectedAircraft(),tacticalSelection,wind,
           byId('tacticalGuided').value==='guided',byId('tacticalDifficulty').value==='advanced');
       }else if(lesson==='range'){
@@ -1413,10 +1484,13 @@ function initialize(){
           Object.assign(flight,{passengers:chosen.passengers??320,fuel,fuelStart:fuel});
         }
         if(flight.approach){
-          const p=airportPoint(destination,-3700,0);
-          const speed=flight.aircraft.approach/1.94384;
-          Object.assign(flight,{...p,heading:destination.heading,y:destination.elevation+123,
-            vx:Math.sin(destination.heading)*speed,vz:-Math.cos(destination.heading)*speed,vy:-1.5,
+          const distance=preset==='landing'?9100:3700-destination.length/2;
+          const p=airportPoint(destination,-destination.length/2-distance,0);
+          const speed=flight.aircraft.approach/knotsPerMps;
+          Object.assign(flight,{...p,heading:destination.heading,
+            y:destination.elevation+(preset==='landing'?15+distance*Math.tan(Math.PI/60):123),
+            vx:Math.sin(destination.heading)*speed,vz:-Math.cos(destination.heading)*speed,
+            vy:preset==='landing'?-speed*Math.tan(Math.PI/60):-1.5,
             speed,ground:false,airborne:true,flaps:2,gear:true,power:.23,parkingBrake:false,
             battery:true,phase:'approach',waypoint:route.length-1});
           flight.engines.fill(true);
@@ -1427,6 +1501,7 @@ function initialize(){
         flight.fuel=aircraft.missionFuel??(aircraft.role==='fighter'?2700:aircraft.jet?18000:Math.round(aircraft.mass*.10));
         flight.fuelStart=flight.fuel;
       }
+      flight.quickPreset=preset;
       flight.fastCruise=byId('speedProfile').value==='fast';
       beginFlight();
       if(savesMission){
@@ -1436,6 +1511,8 @@ function initialize(){
     }catch(error){byId('message').textContent=error.message;}
   }
   function menu(){
+    flightAudio.stopSpeech();
+    setOverview(false);
     tacticalView.clear();
     touchControls.reset();
     saveCurrentMission(flight);
@@ -1467,6 +1544,7 @@ function initialize(){
       if(flight.tactical) tacticalView.command('fire');
       else rangeShot(flight);
     }
+    if(code==='KeyK'&&!paused&&flight.tactical) tacticalView.command('gun');
     if(code==='KeyV') flight.bankCommand=0;
     if(code==='KeyN') cycleCockpitView();
     if(code==='Home'&&cockpitActive()){
@@ -1474,7 +1552,11 @@ function initialize(){
       resetLook();
       changeView();
     }
-    if(code==='KeyC'){if(flight.cabinView) flight.cabinView=false;else cameraMode=1-cameraMode;changeView();}
+    if(code==='KeyC'){
+      pointer.active=false;pointer.x=pointer.y=0;
+      if(flight.cabinView) flight.cabinView=false;else cameraMode=1-cameraMode;
+      changeView();
+    }
     if(code==='KeyP'){
       paused=!paused;accumulator=0;last=performance.now();
       releaseFlightInputs();touchControls.reset();showTouchPause(paused);
@@ -1553,6 +1635,12 @@ function initialize(){
   },{passive:false});
   addEventListener('pointerdown',event=>{
     if(!flight||overControls(event.target)) return;
+    if(event.button===1&&settings.mouse){
+      event.preventDefault();
+      pointer.x=pointer.y=0;
+      pointer.left=event.clientX;pointer.top=event.clientY;
+      return;
+    }
     if(event.button===2&&cockpitActive()){
       event.preventDefault();
       pointer.active=false;
@@ -1680,6 +1768,28 @@ function initialize(){
   byId('cockpitPreset').onclick=cycleCockpitView;
   byId('resetLook').onclick=()=>action('Home');
   byId('fly').onclick=()=>{byId('fly').blur();start(false);};
+  byId('quickFlights').onclick=event=>{
+    const button=event.target.closest('[data-quick]');
+    if(!button) return;
+    const preset=button.dataset.quick;
+    byId('lesson').value=preset==='duel'?'tactical':preset==='sunset'?'circuit':'free';
+    if(preset!=='duel'||selectedAircraft().role!=='fighter') byId('aircraft').value=preset==='duel'?'f16v':'a223';
+    byId('departure').value='RCSS';
+    byId('destination').value='RCTP';
+    byId('startType').value='runway';
+    byId('time').value=preset==='sunset'?'17:45':'12:00';
+    byId('weather').value='0';
+    byId('waypoints').value='';
+    if(preset==='duel'){
+      tacticalSelection='duel';
+      byId('tacticalGuided').value='guided';
+      byId('tacticalDifficulty').value='normal';
+      for(const card of byId('tacticalCards').children) card.setAttribute('aria-pressed',String(card.dataset.scenario==='duel'));
+    }
+    drawPlan();
+    start(preset==='landing',false,preset);
+    button.blur();
+  };
   byId('quickFastCruise').onclick=()=>{
     byId('lesson').value='cruiseTrial';
     byId('speedProfile').value='fast';
@@ -1749,6 +1859,7 @@ function initialize(){
     renderer.shadowMap.enabled=ultra;
     renderer.setSize(innerWidth,innerHeight);
     camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+    resizeOverview();
   }
   function adjustResolution(now,seconds){
     if(qualitySelect.value!=='balanced'&&qualitySelect.value!=='high') return;
@@ -1782,8 +1893,8 @@ function initialize(){
     const [up,down]=throttleKeys();
     const touch=touchControls.input;
     const touchGain=.28+settings.sensitivity*.72;
-    const rawRoll=axis('ArrowRight','ArrowLeft')+padAxis(pad?.axes[0])+(pointer.active?pointer.x:0)+gamepadAxis(touch.roll,.10)*touchGain;
-    const rawPitch=axis('ArrowUp','ArrowDown')-padAxis(pad?.axes[1])+(pointer.active?pointer.y:0)+gamepadAxis(touch.pitch,.10)*touchGain;
+    const rawRoll=axis('ArrowRight','ArrowLeft')+padAxis(pad?.axes[0])+(pointer.active?padAxis(pointer.x):0)+gamepadAxis(touch.roll,.10)*touchGain;
+    const rawPitch=axis('ArrowUp','ArrowDown')-padAxis(pad?.axes[1])+(pointer.active?padAxis(pointer.y):0)+gamepadAxis(touch.pitch,.10)*touchGain;
     const manual=manualAxes({pitch:rawPitch,roll:rawRoll,
       rudder:axis('KeyE','KeyQ')+padAxis(pad?.axes[2])},settings);
     let {roll,pitch}=manual;
@@ -1817,7 +1928,7 @@ function initialize(){
         f.tactical.notice='手動接管';
       }else ({roll,pitch,rudder:assistedRudder}=assist);
     }
-    return {response:settings.sensitivity,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
+    return {response:settings.sensitivity,yokeDamping:settings.mouse&&!f.hold&&!f.tactical?.aimAssist&&Math.abs(manual.pitch)<.07,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
       rudder:assistedRudder??clamp(manual.rudder+(f.ground?roll:0),-1,1),
       throttle,
       trim:axis('KeyX','KeyZ')*.22,brake:touch.brake||keys.has('Space')||Boolean(buttons[0]?.pressed)};
@@ -1830,8 +1941,8 @@ function initialize(){
     const distance=Math.hypot(target.x-f.x,target.z-f.z);
     const speeds=flightSpeeds(f);
     const closing=distance>0?((target.x-f.x)*f.vx+(target.z-f.z)*f.vz)/distance:0;
-    byId('speedDetails').textContent='TAS '+Math.round(speeds.tas*knotsPerMps)+' kt · GS '+Math.round(speeds.gs*knotsPerMps)+
-      ' kt · Mach '+speeds.mach.toFixed(2)+(closing>5&&!f.ground?' · 航點 ETA '+(distance/closing/60).toFixed(1)+' 分':'');
+    byId('speedDetails').textContent='TAS '+displayKmh(speeds.tas)+' km/h · GS '+displayKmh(speeds.gs)+
+      ' km/h · Mach '+speeds.mach.toFixed(2)+(closing>5&&!f.ground?' · 航點 ETA '+(distance/closing/60).toFixed(1)+' 分':'');
     const scale=f.ground?.13:Math.min(.018,58/Math.max(1000,distance));
     const project=p=>[77+(p.x-f.x)*scale,50+(p.z-f.z)*scale];
     radar.setLineDash([3,2]);mapPath(radar,[f,target],project,'#65ceff');radar.setLineDash([]);
@@ -1839,7 +1950,7 @@ function initialize(){
     radar.save();radar.translate(77,50);radar.rotate(f.heading);
     radar.fillStyle='#ffcf5e';radar.beginPath();radar.moveTo(0,-7);radar.lineTo(5,6);radar.lineTo(-5,6);radar.closePath();radar.fill();radar.restore();
     const bearing=(Math.atan2(target.x-f.x,f.z-target.z)/rad+360)%360;
-    byId('nav').textContent=(target.name||'RCSS 10')+' · '+Math.round(bearing)+'° / '+(f.ground?Math.round(distance)+' m':(distance/1852).toFixed(1)+' NM');
+    byId('nav').textContent=(target.name||'RCSS 10')+' · '+Math.round(bearing)+'° / '+(f.ground?Math.round(distance)+' m':(distance/1000).toFixed(1)+' km');
     const geo=latLon(f.x,f.z);
     byId('coords').textContent=geo.lat.toFixed(4)+'°N · '+geo.lon.toFixed(4)+'°E';
   }
@@ -1847,15 +1958,65 @@ function initialize(){
     if(f.start!=='runway'||!['free','circuit'].includes(f.lesson)||f.approach||f.landed) return '';
     if(!f.airborne){
       if(f.parkingBrake) return '起飛 1/4 · 鬆開停機煞車';
+      if(knots<f.aircraft.rotation&&f.pitch>8*rad) return '起飛警告 · 速度未達抬輪門檻，先放低機鼻';
+      if(knots>f.aircraft.rotation+45) return '起飛警告 · 滑跑速度過高，確認可安全起飛或收油煞停';
       if(f.power<.55&&knots<10) return '起飛 1/4 · '+(mobile?'將油門滑桿推到 100%':'按住 W 加油門');
-      if(knots<f.aircraft.rotation) return '起飛 2/4 · 保持跑道中線 · '+knots+' / '+f.aircraft.rotation+' IAS kt';
+      if(knots<f.aircraft.rotation) return '起飛 2/4 · 保持跑道中線 · '+knotsToKmh(knots)+' / '+knotsToKmh(f.aircraft.rotation)+' km/h IAS';
       const rotate=mobile?(settings.invert?'輕推搖桿向下':'輕推搖桿向上'):(settings.invert?'輕按 ↓':'輕按 ↑');
       return '起飛 3/4 · '+rotate+'，緩慢抬起機鼻';
     }
     if(f.y-f.departure.elevation<110&&f.phase!=='approach'){
+      if(f.pitch>20*rad&&f.vy<5) return '起飛警告 · 仰角過高，放低機鼻以維持空速';
       return '起飛 4/4 · 保持正爬升'+(f.gear&&f.aircraft.retract?'，確認離地後收起落架':'');
     }
     return '';
+  }
+  const yoke=byId('mouseYoke'), yokeLine=byId('mouseYokeLine'), yokeDot=byId('mouseYokeDot');
+  const mouseDeadzone=byId('mouseDeadzone');
+  function drawMouseYoke(){
+    const hidden=!pointer.active||!settings.mouse||paused||Boolean(replay);
+    yoke.toggleAttribute('hidden',hidden);
+    if(hidden) return;
+    mouseDeadzone.setAttribute('r',String(92*settings.deadzone));
+    const x=String(105+pointer.x*92),y=String(105-pointer.y*92);
+    yokeLine.setAttribute('x2',x);yokeLine.setAttribute('y2',y);
+    yokeDot.setAttribute('cx',x);yokeDot.setAttribute('cy',y);
+  }
+  const landingCard=byId('landingCard'), landingGrade=byId('landingGrade'), landingDetails=byId('landingDetails');
+  let shownLanding=null, previousCalloutHeight=null, sinkWarning=false;
+  const calloutHeights=[500,200,100,50,30,10];
+  const calloutNames=['Five hundred','Two hundred','One hundred','Fifty','Thirty','Ten'];
+  byId('closeLanding').onclick=()=>{landingCard.hidden=true;};
+  byId('retryLanding').onclick=()=>start(true,true);
+  function drawLandingCard(f,speeds){
+    const touchdown=f.touchdown;
+    if(!f.approach||f.voyage||replay||!touchdown||shownLanding===touchdown||(!f.ended&&speeds.gs>40/knotsPerMps)) return;
+    shownLanding=touchdown;
+    const descent=Math.round(-touchdown.verticalSpeed*196.85), offset=Math.abs(touchdown.cross);
+    // The ground model has rigid contact. Report an estimate for 45 cm of gear travel.
+    const impact=1+touchdown.verticalSpeed**2/(2*.45*9.80665);
+    const grade=descent<180&&offset<5?'S 級 · ★★★':descent<240&&offset<5?'A 級 · ★★★':
+      descent<460&&offset<14?'B 級 · ★★':'C 級 · ★';
+    landingGrade.textContent=f.ended?'降落失敗':grade;
+    landingDetails.textContent='接地 '+descent+' ft/min · 中線偏差 '+offset.toFixed(1)+' m · 接地推算 '+impact.toFixed(2)+' G';
+    landingCard.hidden=false;
+  }
+  function approachCallouts(f){
+    if(!audioEnabled||paused||replay||f.ground||f.ended||f.tactical||f.phase!=='approach'){
+      previousCalloutHeight=null;sinkWarning=false;
+      return;
+    }
+    const airport=f.destination;
+    if(!airport||f.y-airport.elevation>250||Math.hypot(f.x-airport.x,f.z-airport.z)>15000) return;
+    const height=(f.y-terrainHeight(f.x,f.z)-f.aircraft.gearHeight)*3.28084;
+    const unsafe=height>12&&height<350&&f.vy*196.85<-1200;
+    if(unsafe&&!sinkWarning) flightAudio.callout(height<130?'Pull up':'Sink rate',true);
+    else if(!unsafe&&f.vy<0&&previousCalloutHeight!==null){
+      const index=calloutHeights.findIndex(value=>previousCalloutHeight>value&&height<=value);
+      if(index>=0) flightAudio.callout(calloutNames[index]);
+    }
+    sinkWarning=unsafe;
+    previousCalloutHeight=height;
   }
   function status(f,knots,target){
     const mobile=touchControls.mode.value==='mobile';
@@ -1896,14 +2057,14 @@ function initialize(){
       if(f.finished){
         if(f.climbLesson.failed) return '巡航練習失敗'+retry;
         const {gs,mach}=flightSpeeds(f);
-        return '巡航練習完成 · Mach '+mach.toFixed(3)+' · GS '+Math.round(gs*knotsPerMps)+' kt · '+
+        return '巡航練習完成 · Mach '+mach.toFixed(3)+' · GS '+displayKmh(gs)+' km/h · '+
           (f.recorded?'已儲存紀錄':'未能儲存')+retry;
       }
-      if(f.ground) return knots<f.aircraft.rotation?'桃園 05L · 增加油門，達到 '+f.aircraft.rotation+' IAS kt 再抬頭':'抬頭離地 · 正爬升後收起落架';
+      if(f.ground) return knots<f.aircraft.rotation?'桃園 05L · 增加油門，達到 '+knotsToKmh(f.aircraft.rotation)+' km/h IAS 再抬頭':'抬頭離地 · 正爬升後收起落架';
       if(f.stall) return '失速 · 放低機鼻';
       if(f.hold?.climb||f.climbLesson.stable>0) return '自動油門 · 目標 35,000 ft · Mach '+cruiseMachTarget(f).toFixed(2)+' · 穩定 '+Math.floor(f.climbLesson.stable)+'/60 秒 · 剩油 '+Math.round(f.fuel)+' kg';
       if(f.gear||f.flaps||f.spoilers) return '保持正爬升 · 收起落架、襟翼及擾流板';
-      return climbReady(f)?'接通「爬升／巡航 35,000 ft」':'保持正爬升 · 離地約 500 呎且至少 164 IAS kt 後接通爬升';
+      return climbReady(f)?'接通「爬升／巡航 35,000 ft」':'保持正爬升 · 離地約 500 呎且至少 304 km/h IAS 後接通爬升';
     }
     if(f.finished&&f.service) return '載客航班已結算 · 請查看地勤面板';
     if(f.finished) return (f.ended?'落地失敗':f.mission?'任務完成'+(f.rewardPaid?' · 獎金 $'+f.reward.toLocaleString():''):'已落地並停妥')+' · '+(f.recorded?'已儲存紀錄':'未能儲存')+retry;
@@ -1919,10 +2080,10 @@ function initialize(){
       const d=Math.hypot(f.range.x-f.x,f.range.z-f.z);
       return (f.range.message||'對準橘色地面靶，距離 250–2600 m '+(mobile?'點「訓練射擊」':'按 M'))+' · '+Math.round(d)+' m · '+f.range.rounds+' 發';
     }
-    if(f.cruiseTrial) return (f.fastCruise?'高速遊戲 · 1,000 kt TAS':'寫實巡航')+' · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
+    if(f.cruiseTrial) return (f.fastCruise?'高速遊戲 · 2,000 km/h TAS':'寫實巡航')+' · '+Math.floor(f.elapsed/60)+' 分 '+Math.floor(f.elapsed%60)+' 秒 · 剩油 '+Math.round(f.fuel)+' kg';
     if(!f.regional){
       if(f.landed) return '已接地 · 收油並煞車'+retry;
-      if(f.ground) return knots>=51?(mobile?'向上拖搖桿拉升':'按 ↑ 拉升'):(mobile?'調高油門':'按住 W')+' 加速至約 51 KTS';
+      if(f.ground) return knots>=51?(mobile?'向上拖搖桿拉升':'按 ↑ 拉升'):(mobile?'調高油門':'按住 W')+' 加速至約 94 km/h';
       return f.stall?'失速 · 放低機鼻':'松山起落航線 · 依地圖飛行';
     }
     if(f.service){
@@ -1943,9 +2104,9 @@ function initialize(){
       return target.name+' · '+(mobile?'停妥後點「停機煞車」':'停妥按 B');
     }
     if(f.ground) return knots>=f.aircraft.rotation?(mobile?'向上拖動搖桿抬頭':'按 ↑ 拉升'):
-      '對正跑道 · '+(mobile?'調高油門，加速至 ':'加速至 ')+f.aircraft.rotation+' KTS';
+      '對正跑道 · '+(mobile?'調高油門，加速至 ':'加速至 ')+knotsToKmh(f.aircraft.rotation)+' km/h';
     if(f.stall) return '失速 · 放低機鼻';
-    return f.phase==='approach'?'最後進場 · 目標 '+f.aircraft.approach+' KTS':target.name+' · 依導航轉向';
+    return f.phase==='approach'?'最後進場 · 目標 '+knotsToKmh(f.aircraft.approach)+' km/h':target.name+' · 依導航轉向';
   }
   const flightNext=byId('flightNext');
   const touchQuick=byId('touchQuick');
@@ -2180,7 +2341,7 @@ function initialize(){
     const loadStatus=byId('flightLoad');
     const loadText='燃油 '+fuelLabel+' · 旅客 '+occupants+(f.service?'/'+f.passengers:'')+' 人';
     if(loadStatus.textContent!==loadText) loadStatus.textContent=loadText;
-    const values=[knots,Math.round(f.y*3.28084),Math.round(f.vs*196.85),String(Math.round(((f.heading/rad)%360+360)%360)%360).padStart(3,'0')+'°',Math.round(f.power*100)+'%',f.flaps+' / '+Math.round(f.trim/rad)+'°',Math.round(speeds.gs*knotsPerMps),Math.round(speeds.tas*knotsPerMps),speeds.mach.toFixed(2)];
+    const values=[displayKmh(speeds.ias),Math.round(f.y),Math.round(f.vs*196.85),String(Math.round(((f.heading/rad)%360+360)%360)%360).padStart(3,'0')+'°',Math.round(f.power*100)+'%',f.flaps+' / '+Math.round(f.trim/rad)+'°',displayKmh(speeds.gs),displayKmh(speeds.tas),speeds.mach.toFixed(2)];
     values.forEach((value,i)=>{
       const text=live?String(value):'—';
       if(statValues[i].textContent!==text) statValues[i].textContent=text;
@@ -2200,7 +2361,7 @@ function initialize(){
         (autoStatus?' · '+autoStatus:''):'航電未供電';
       if(profile.role&&live){
         const guide=approachGuidance(f);
-        byId('instrumentType').textContent+=' · VAPP '+profile.approach+(f.boost&&f.power>.89?' · 加力':'');
+        byId('instrumentType').textContent+=' · VAPP '+knotsToKmh(profile.approach)+' km/h'+(f.boost&&f.power>.89?' · 加力':'');
         if(guide.valid) byId('instrumentType').textContent+=' · 下滑偏差 '+Math.round(guide.height)+' m · 航向道 '+Math.round(guide.cross)+' m';
       }
       if(profile.role==='cargo'){
@@ -2220,8 +2381,9 @@ function initialize(){
     [-27,-12,0,27,-12,0,27,12,0,-27,12,0],3));
   const nextGateMaterial=new THREE.LineBasicMaterial({color:0x76ffd4,transparent:true,opacity:.90,depthWrite:false});
   const laterGateMaterial=new THREE.LineBasicMaterial({color:0x8bcaff,transparent:true,opacity:.40,depthWrite:false});
+  const gateFlashMaterial=nextGateMaterial.clone();
   const approachGates=new THREE.Group();
-  let approachGateRunway;
+  let gateProgress=null;
   const approachGateDistances=[4.5,3.9,3.3,2.7,2.1,1.5,.9,.3].map(nm=>nm*1852);
   for(const distance of approachGateDistances){
     const gate=new THREE.LineLoop(approachGateGeometry,laterGateMaterial);
@@ -2229,27 +2391,80 @@ function initialize(){
     approachGates.add(gate);
   }
   scene.add(approachGates);
-  function drawApproachGates(f){
-    const visible=f?.regional&&f.approach&&!f.voyage&&!f.tactical&&!replay&&!f.ground&&!f.ended;
-    approachGates.visible=Boolean(visible);
+  const labelCanvas=document.createElement('canvas');
+  labelCanvas.width=384;labelCanvas.height=84;
+  const labelInk=labelCanvas.getContext('2d');
+  const airportLabelTexture=new THREE.CanvasTexture(labelCanvas);
+  airportLabelTexture.colorSpace=THREE.SRGBColorSpace;
+  const airportLabel=new THREE.Sprite(new THREE.SpriteMaterial({
+    map:airportLabelTexture,transparent:true,depthTest:false,depthWrite:false,sizeAttenuation:false,fog:false,toneMapped:false
+  }));
+  airportLabel.scale.set(.34,.0744,1);
+  airportLabel.renderOrder=20;
+  scene.add(airportLabel);
+  let lastAirportLabel='';
+  function drawAirportLabel(f){
+    const r=f?.destination;
+    const distance=r?Math.hypot(f.x-r.x,f.z-r.z):Infinity;
+    const visible=!renderer.instrumentOnly&&f&&!f.ground&&!f.tactical&&!replay&&!overviewActive&&
+      distance>2200&&distance<(byId('weather').value==='fog'?5500:45000);
+    airportLabel.visible=Boolean(visible);
     if(!visible) return;
-    const runway=f.destination;
-    const {along}=runwayCoordinates(f.x,f.z,runway);
-    const distance=-along-runway.length/2;
-    let first=true;
-    for(const gate of approachGates.children){
-      const d=gate.userData.distance;
-      gate.visible=d<distance-15;
-      if(runway!==approachGateRunway){
-        const {x,z}=airportPoint(runway,-runway.length/2-d,0);
-        gate.position.set(x,runway.elevation+15+d*Math.tan(Math.PI/60),z);
+    airportLabel.position.set(r.x,r.elevation+130+distance*.009,r.z);
+    const name=r.code+' '+r.designator+' · '+(distance/1000).toFixed(1)+' km';
+    if(name!==lastAirportLabel){
+      lastAirportLabel=name;
+      labelInk.clearRect(0,0,384,84);
+      labelInk.fillStyle='#132f43ed';labelInk.fillRect(12,8,360,68);
+      labelInk.strokeStyle='#8ccfe5';labelInk.lineWidth=2;labelInk.strokeRect(12,8,360,68);
+      labelInk.fillStyle='#f1fcff';labelInk.font='700 30px system-ui';
+      labelInk.textAlign='center';labelInk.textBaseline='middle';labelInk.fillText(name,192,42);
+      airportLabelTexture.needsUpdate=true;
+    }
+  }
+  function drawApproachGates(f){
+    const departure=f?.quickPreset==='sunset'&&!f.approach&&f.waypoint<2;
+    const arrival=f?.regional&&f.approach&&!f.voyage&&!f.tactical;
+    approachGates.visible=Boolean((departure||arrival)&&!replay&&!f.ground&&!f.ended);
+    if(!approachGates.visible) return;
+    const runway=departure?f.departure:f.destination;
+    const {along,cross}=runwayCoordinates(f.x,f.z,runway);
+    if(gateProgress?.runway!==runway||gateProgress?.departure!==departure){
+      gateProgress={runway,departure,along,cross,y:f.y,combo:0,flashUntil:0};
+      approachGates.children.forEach((gate,i)=>{
+        const distance=gate.userData.distance;
+        const at=departure?runway.length/2+240+i*550:-runway.length/2-distance;
+        const {x,z}=airportPoint(runway,at,0);
+        gate.position.set(x,runway.elevation+(departure?48+i*30:15+distance*Math.tan(Math.PI/60)),z);
         gate.rotation.y=-runway.heading;
+        Object.assign(gate.userData,{at,passed:false,flash:0});
+      });
+    }
+    const progress=gateProgress;
+    let first=true;
+    for(let i=0;i<approachGates.children.length;i++){
+      const gate=approachGates.children[i],data=gate.userData;
+      if(!paused&&!data.passed&&(!departure||i<3)&&progress.along<data.at&&along>=data.at){
+        const blend=(data.at-progress.along)/(along-progress.along);
+        const offset=THREE.MathUtils.lerp(progress.cross,cross,blend);
+        const height=THREE.MathUtils.lerp(progress.y,f.y,blend)-gate.position.y;
+        data.passed=true;
+        if(Math.abs(offset)<=27*1.35&&Math.abs(height)<=12*1.35){
+          data.flash=f.elapsed+.55;
+          progress.combo++;
+          progress.flashUntil=f.elapsed+1.5;
+          if(audioEnabled) flightAudio.gateChime();
+        }else progress.combo=0;
       }
+      const flash=Math.max(0,data.flash-f.elapsed);
+      gate.visible=(!departure||i<3)&&(data.at>along||flash>0);
       if(!gate.visible) continue;
-      gate.material=first?nextGateMaterial:laterGateMaterial;
+      gate.scale.setScalar(1+(flash>0?(.55-flash)*1.6:0));
+      if(flash>0) gateFlashMaterial.opacity=flash/.55;
+      gate.material=flash>0?gateFlashMaterial:first?nextGateMaterial:laterGateMaterial;
       first=false;
     }
-    approachGateRunway=runway;
+    Object.assign(progress,{along,cross,y:f.y});
   }
   function animateCargoDoors(data,noseOpen,sideOpen,dt){
     const blend=Math.min(1,dt*2.8);
@@ -2272,7 +2487,7 @@ function initialize(){
     if(hangarStage) hangarStage.visible=hangarMode;
     const model=aircraftModel(profile);
     const livery=hangarLiveries[profile.id]||!flight&&byId('liveryPreview').checked;
-    updateDownloadedAircraft(model,profile,flight,livery,renderer.capabilities.getMaxAnisotropy());
+    if(!renderer.instrumentOnly) updateDownloadedAircraft(model,profile,flight,livery,renderer.capabilities.getMaxAnisotropy());
     model.userData.setLivery?.(livery);
     for(const other of models.values()){
       other.visible=other===model&&(!flight||cameraMode===0)&&!flight?.cabinView;
@@ -2286,7 +2501,6 @@ function initialize(){
     bridgeQueue.visible=tug.visible=tanker.visible=false;
     cargoLoader.visible=false;
     serviceLamp.intensity=0;
-    drawApproachGates(flight);
     if(flight){
       const f=flight,input=replay?{roll:0}:inputs(f);
       if(poseFlight!==f){
@@ -2356,8 +2570,9 @@ function initialize(){
         drawPassengerStatus(f);
       }
       completeLesson(f);
+      drawApproachGates(f);
       if(f.touchdown&&previousTouchdown!==f.touchdown){
-        if(audioEnabled) flightAudio.effect(48,.11);
+        if(audioEnabled&&!replay) flightAudio.touchdown(f.touchdown.verticalSpeed);
         previousTouchdown=f.touchdown;
       }
       const continuous=Math.hypot(f.x-previousPose.x,f.y-previousPose.y,f.z-previousPose.z)<30;
@@ -2538,6 +2753,8 @@ function initialize(){
       if(now>=nextInstrumentDraw){
         nextInstrumentDraw=now+80;
         drawInstruments(f,profile,speeds,knots,live);
+        approachCallouts(f);
+        drawLandingCard(f,speeds);
       }
       attitudePanel.hidden=!live||Boolean(f.tactical)||Boolean(f.cabinView)||Boolean(f.tow);
       if(!attitudePanel.hidden){
@@ -2548,9 +2765,12 @@ function initialize(){
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}
       const statusBox=byId('status');
       statusBox.hidden=Boolean(f.tactical&&!paused)||!byId('gateGuide').hidden&&!paused&&!f.towMessage;
-      const statusText=status(f,knots,target);
+      const hint=status(f,knots,target);
+      const statusText=!paused&&approachGates.visible&&gateProgress.flashUntil>f.elapsed?
+        hint+' · +100 分 ×'+gateProgress.combo:hint;
       if(statusBox.textContent!==statusText) statusBox.textContent=statusText;
       statusBox.classList.toggle('practice-status',statusText.startsWith('起飛 ')||Boolean(f.approach&&!f.voyage));
+      statusBox.classList.toggle('coach-warning',statusText.startsWith('起飛警告'));
       const readyToTowIn=arrivalTowReady(f);
       byId('towControls').hidden=!f.tow&&!readyToTowIn;
       byId('startGateTow').hidden=!readyToTowIn;
@@ -2564,6 +2784,7 @@ function initialize(){
       drawFlightNext(f);
       if(now>=nextNavDraw){drawNav(f,target);nextNavDraw=now+100;}
     }else{
+      approachGates.visible=false;
       taxiLamp.intensity=0;
       const airport=planPreviewAirport||selectedAirport('departure');
       model.userData.passengerCabin?.update(null,dt);
@@ -2695,9 +2916,20 @@ function initialize(){
       model.userData.closeDetails.visible=hangarMode||apparentSize>145;
     }
     if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}
-    atmosphericSky.update(camera,dt,qualitySelect.value);
+    drawMouseYoke();
+    updateTaiwanOverview(flight);
+    drawAirportLabel(flight);
+    const weather=byId('weather').value;
+    scene.fog.density=weather==='fog'?.00064:weather==='wet'?.000065:
+      THREE.MathUtils.lerp(.000034,.000007,clamp(((flight?.y||0)-2400)/6600,0,1));
+    if(renderer.instrumentOnly&&flight){
+      camera.position.set(flight.x,flight.y+1.4,flight.z);
+      camera.rotation.set(flight.pitch,-flight.heading,-flight.bank,'YXZ');
+      renderer.draw(flight,camera,approachGates,activeDay);
+    }else if(!renderer.instrumentOnly) atmosphericSky.update(camera,dt,qualitySelect.value);
     tacticalView.render(flight,dt,now,qualitySelect.value==='low'||touchControls.mode.value==='mobile');
-    renderer.render(scene,camera);
+    if(overviewActive) taiwanOverview.draw(renderer,flight);
+    else renderer.render(scene,camera);
   }
   let tacticalSelection='radar';
   for(const [id,mission] of Object.entries(tacticalScenarios)){
@@ -2707,6 +2939,7 @@ function initialize(){
     details.textContent='SF-16 · '+mission.difficulty+' · '+mission.minutes+' 分 · '+mission.base+' 金幣';
     brief.textContent=(id==='intercept'?'跑道起飛':'空中開始')+' · '+mission.brief;
     card.type='button';
+    card.dataset.scenario=id;
     card.setAttribute('aria-pressed',String(id===tacticalSelection));
     card.append(name,details,brief);
     card.onclick=()=>{

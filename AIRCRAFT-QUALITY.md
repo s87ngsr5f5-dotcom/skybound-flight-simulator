@@ -2,6 +2,14 @@
 
 後續新增或重做機型，以現有 Boeing 777-300ER（`b773`）為品質基準。參照它的機身比例、翼型、發動機短艙、駕駛艙玻璃、舷窗與輪組的辨識度，以及近看與飛行中的整體一致性。沿用模型載入、材質與座艙整合方式。各機型依自己的實際外形和部件配置建模。
 
+## 0.22 臺灣戰機
+
+三架使用本專案的程序化模型、原創配色和簡化座艙。比例參照下列公開資料，氣動、航電和戰術玩法採遊戲近似。
+
+- F-16V 戰隼沿用 F-16 系列的機腹進氣、單發和翼根延伸。參考同系列機身尺寸與 F-16V 航電資訊。 [Lockheed Martin F-16V](https://www.lockheedmartin.com/en-us/news/features/2016/meet-the-f-16v--the-most-technologically-advanced-4th-generation.html) · [F-16 系列尺寸](https://www.lockheedmartin.com/content/dam/lockheed-martin/aero/documents/F-16/25-00470_F-16%20Block70_72_Product%20Card_Jan%202025.pdf)
+- F-CK-1 經國號有兩側進氣道及雙尾噴口，機身及翼展參考空軍公開規格。 [空軍經國號資料](https://air.mnd.gov.tw/EN/Weapon/Weapon_Detail.aspx?CID=221&ID=167)
+- Mirage 2000-5 幻象有無尾三角翼、兩側進氣錐及單尾噴口。 [Dassault Aviation 幻象 2000 資料](https://www.dassault-aviation.com/en/defense/customer-support/operational-aircraft/mirage-2000/)
+
 ## 0.20 機庫與任務檢查
 
 機庫可分類、收合控制、拖曳環視及縮放。機首、側面、機尾、機腹、日間座艙與夜間座艙是所有機型的共同視角。

@@ -142,6 +142,83 @@ body:not(.mobile-mode) #flightNext.cargo-action {
 }
 body.hangar-active .quick-controls { display: none; }
 #deviceMode { color-scheme: dark; }
+#quickFlights {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+  padding: 0 clamp(14px,3vw,28px) 14px;
+}
+#quickFlights button { min-height: 48px; font-weight: 700; }
+#quickFlights button:first-child { background: #694423; }
+#quickFlights button:nth-child(2) { background: #164e57; }
+#quickFlights button:last-child { background: #503c55; }
+#start2D { margin-top: 8px; }
+#overviewScale {
+  position: absolute;
+  bottom: 135px;
+  right: 0;
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  padding: 8px 10px;
+  color: #f2fbff;
+  background: #102638ed;
+  font: 700 12px system-ui,sans-serif;
+}
+#scaleBar { border: 2px solid #fff; border-top: 0; text-align: center; white-space: nowrap; }
+.mobile-mode #overviewScale { bottom: calc(var(--stick-size) + 76px); }
+.overview-active #attitudePanel,.overview-active #flightGuide,.overview-active #reticle,
+.overview-active #systems,.overview-active #flightNavigation { visibility: hidden; }
+.mobile-mode #taiwanOverview { white-space: nowrap; }
+#mouseYoke {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  width: min(210px,48vw,48vh);
+  transform: translate(-50%,-50%);
+  stroke: #e7f9ff;
+  stroke-width: 2;
+  fill: none;
+  filter: drop-shadow(0 1px 2px #071827);
+}
+#mouseDeadzone { stroke-dasharray: 3 3; }
+#mouseYokeLine,#mouseYokeDot { stroke: #58daff; }
+#mouseYokeDot { fill: #58daff; }
+.mobile-mode #mouseYoke { display: none; }
+#gunSight {
+  position: fixed;
+  transform: translate(-50%,-50%);
+  color: #ffdb8a;
+  font: bold 27px monospace;
+  text-shadow: 0 1px 3px #030b11;
+}
+#landingCard {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  bottom: 170px;
+  transform: translateX(-50%);
+  width: min(94%,340px);
+  padding: 12px;
+  text-align: center;
+  background: #10283bf5;
+  border: 1px solid #79aec8;
+  border-radius: 7px;
+  pointer-events: auto;
+}
+#landingGrade { color: #ffd976; }
+#landingDetails { margin: 5px 0 9px; }
+#landingCard button { min-height: 42px; padding: 5px 12px; }
+.mobile-mode #landingCard { bottom: calc(var(--stick-size) + 56px); }
+#status.coach-warning { color: #fff0e3; background: #85332bf0; }
+.instrument-flight #adiCanvas { width: min(250px,36vh,33vw); }
+.instrument-flight.mobile-mode #adiCanvas { width: min(135px,30vh,32vw); }
+.instrument-flight.mobile-mode #attitudeMode { left: min(139px,31vh,33vw); }
+.instrument-flight #openHangar,.instrument-flight #viewScene,.instrument-flight #view,
+.instrument-flight #cockpitViews,.instrument-flight #touchQuick [data-action="KeyC"] { display: none !important; }
+.instrument-flight:not(.mobile-mode) #flightNavigation { width: min(230px,24vw); }
+body:not(.mobile-mode):has(#hud:not([hidden])) #quickControls { top: 100px; right: 225px; bottom: auto; width: min(260px,28vw); }
+body:not(.mobile-mode):has(#hud:not([hidden])) #quickControls[open] { z-index: 9; }
 #adiCanvas {
   position: absolute;
   left: 0;
@@ -179,8 +256,15 @@ body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudeMode {
   left: min(49vw, 370px);
 }
 @media (max-width: 700px) {
+  #quickFlights { gap: 5px; }
+  #quickFlights button { padding: 5px; font-size: 13px; }
   #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }
   #plan .plan-setup, #plan .plan-preview, #plan .plan-intro, #plan .plan-history { padding-inline: 14px; }
   .plan-modes { padding-inline: 14px; gap: 5px; }
   .plan-modes button { padding: 6px 3px; font-size: 13px; }
+}
+@media (max-height: 590px) {
+  body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #adiCanvas { left: 0; bottom: 101px; width: min(22vh,130px); }
+  body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudeMode { left: min(22vh,130px); bottom: 101px; }
+  body:not(.mobile-mode) #hud #systems { max-height: max(62px,calc(100% - 236px)); }
 }
