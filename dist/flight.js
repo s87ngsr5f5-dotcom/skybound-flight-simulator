@@ -1436,7 +1436,11 @@ function initialize(){
       const b=document.createElement('button');
       b.textContent=label+' · '+(settings.bindings?.[code]||code);
       let binding=false;
-      b.onclick=()=>{binding=true;b.textContent=label+' · 按下新按鍵';};
+      b.onclick=()=>{
+        b.focus();
+        binding=true;
+        b.textContent=label+' · 按下新按鍵';
+      };
       b.onblur=()=>{binding=false;b.textContent=label+' · '+(settings.bindings?.[code]||code);};
       b.onkeydown=event=>{
         if(!binding||event.code==='Tab') return;
