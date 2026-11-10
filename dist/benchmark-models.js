@@ -81,6 +81,7 @@ function buildBenchmarkAirframe(profile,scene){
     mesh(group,new THREE.CircleGeometry(.46,24),dark,0,0,half+.013);
     }
   }else{
+    let hump=null;
     if(freight&&!profile.sideCargo){
       hull(group,body.slice(2),surface,.96);
       noseDoor.position.set(0,radius*.60,-half*.77);
@@ -89,7 +90,7 @@ function buildBenchmarkAirframe(profile,scene){
       sideDoor.position.set(-radius*.99,radius*.64,half*.31);
       block(sideDoor,metal,.12,2.58,3.45,0,-1.29,0);
       block(sideDoor,paint,.15,2.36,3.26,-.08,-1.29,0);
-      const hump=mesh(group,new THREE.SphereGeometry(1,36,20),surface,0,radius*.66,-half*.58);
+      hump=mesh(group,new THREE.SphereGeometry(1,48,24),surface,0,radius*.66,-half*.58);
       hump.scale.set(radius*.72,radius*.61,half*.29);
     }else{
       hull(group,body,surface,1.18);
@@ -101,8 +102,14 @@ function buildBenchmarkAirframe(profile,scene){
         block(sideDoor,paint,.14,2.38,3.25,-.06,-1.29,0);
       }
     }
-    if(detailed){
-      function skinPoint(z,angle,offset){
+    {
+      function skinPoint(z,angle,offset,onUpperDeck=false){
+        if(onUpperDeck&&hump){
+          const position=(z-hump.position.z)/hump.scale.z;
+          const section=Math.sqrt(Math.max(0,1-position*position));
+          return [Math.sin(angle)*(hump.scale.x*section+offset),
+            hump.position.y+Math.cos(angle)*(hump.scale.y*section+offset),z];
+        }
         const next=body.findIndex(station=>station[0]>=z);
         const a=body[Math.max(0,next-1)],b=body[Math.max(1,next)];
         const t=Math.max(0,Math.min(1,(z-a[0])/(b[0]-a[0])));
@@ -118,7 +125,7 @@ function buildBenchmarkAirframe(profile,scene){
             const u=j/steps;
             const lo=corners[0].map((n,k)=>n+(corners[1][k]-n)*u);
             const hi=corners[3].map((n,k)=>n+(corners[2][k]-n)*u);
-            vertices.push(...skinPoint(lo[0]+(hi[0]-lo[0])*t,lo[1]+(hi[1]-lo[1])*t,offset));
+            vertices.push(...skinPoint(lo[0]+(hi[0]-lo[0])*t,lo[1]+(hi[1]-lo[1])*t,offset,true));
             if(i&&j){
               const a=i*(steps+1)+j,b=a-steps-1;
               indices.push(a,b,a-1,b,b-1,a-1);
@@ -143,25 +150,30 @@ function buildBenchmarkAirframe(profile,scene){
       windowShape.quadraticCurveTo(-.20,-.14,-.12,-.14);
       const windowGeo=new THREE.ShapeGeometry(windowShape,4);
       const windowPositions=[];
-      for(let z=-half*.63;z<half*.65;z+=.83){
+      for(let z=-half*.63;!freight&&z<half*.65;z+=.83){
         if(doorZ.every(door=>Math.abs(z-door)>.72)) windowPositions.push(z);
       }
       for(const side of [-1,1]){
         for(const [left,right] of [[.08,.44],[.49,.80],[.85,1.12]]){
-          const z0=-half*.909+(left-.08)*half*.078;
-          const z1=z0+half*.049;
+          const z0=half*(hump?-.827:-.909)+(left-.08)*half*.068;
+          const z1=z0+Math.min(1.24,half*.044);
           const outline=[[z0,left*side],[z1,(left-.055)*side],[z1+half*.008,right*side],[z0+half*.014,right*side]];
           skinPanel(outline,windowFrame,.032);
           const center=outline.reduce((mean,p)=>[mean[0]+p[0]/4,mean[1]+p[1]/4],[0,0]);
           skinPanel(outline.map(p=>p.map((value,k)=>center[k]+(value-center[k])*.86)),windshield,.053);
         }
-        const windows=new THREE.InstancedMesh(windowGeo,windshield,windowPositions.length);
+        if(freight) continue;
+        const rows=engineCount===4?[1.44,.91]:[1.38];
+        const windows=new THREE.InstancedMesh(windowGeo,windshield,windowPositions.length*rows.length);
         const transform=new THREE.Object3D();
-        for(const [index,z] of windowPositions.entries()){
-          transform.position.set(...skinPoint(z,side*1.38,.03));
-          transform.rotation.y=side*Math.PI/2;
-          transform.updateMatrix();
-          windows.setMatrixAt(index,transform.matrix);
+        let index=0;
+        for(const angle of rows){
+          for(const z of windowPositions){
+            transform.position.set(...skinPoint(z,side*angle,.035));
+            transform.rotation.set(-side*(Math.PI/2-angle),side*Math.PI/2,0,'YXZ');
+            transform.updateMatrix();
+            windows.setMatrixAt(index++,transform.matrix);
+          }
         }
         group.add(windows);
         for(const z of doorZ){
@@ -177,28 +189,12 @@ function buildBenchmarkAirframe(profile,scene){
           group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),seam));
         }
       }
-      const radome=[];
-      for(let i=0;i<=48;i++) radome.push(new THREE.Vector3(...skinPoint(-half*.928,i*Math.PI/24,.024)));
-      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(radome),seam));
-    }else{
-      const windshield=mesh(group,new THREE.SphereGeometry(1,28,16),glazing,0,radius*(freight?1.04:.75),-half*.79);
-      windshield.scale.set(radius*.68,radius*.17,half*.062);
-      for(const side of [-1,1]){
-        if(!freight){
-          const glassBank=new THREE.InstancedMesh(new THREE.BoxGeometry(.12,.27,.48),glazing,engineCount===4?110:55);
-          const transform=new THREE.Object3D();
-          for(let i=0;i<glassBank.count;i++){
-            const y=i<55?radius*.22:radius*.63;
-            transform.position.set(side*(radius*(i<55?.98:.86)),y,-half*.64+(i%55)*half*.0225);
-            transform.updateMatrix();glassBank.setMatrixAt(i,transform.matrix);
-          }
-          group.add(glassBank);
-        }
-        for(const z of [-half*.57,-half*.16,half*.25,half*.55]){
-          block(group,metal,.045,1.7,1.06,side*radius*.97,radius*.26,z);
-          block(group,surface,.058,1.53,.91,side*radius*.981,radius*.26,z);
-        }
+      if(!hump){
+        const radome=[];
+        for(let i=0;i<=48;i++) radome.push(new THREE.Vector3(...skinPoint(-half*.928,i*Math.PI/24,.024)));
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(radome),seam));
       }
+      if(freight) windowGeo.dispose();
     }
   }
   function foil(parent,points,material,depth=.13){
@@ -261,19 +257,20 @@ function buildBenchmarkAirframe(profile,scene){
         fan.rotation.y=Math.PI;
         const fanGroup=new THREE.Group();engine.add(fanGroup);fans.push(fanGroup);
         const lip=mesh(engine,new THREE.TorusGeometry(size*.91,size*.065,16,64),metal,0,0,-2.72);
-        const spinner=mesh(fanGroup,new THREE.ConeGeometry(size*.22,size*.52,24),metal,0,0,-2.70);spinner.rotation.x=-Math.PI/2;
+        const spinner=mesh(fanGroup,new THREE.ConeGeometry(size*.20,size*.42,24),metal,0,0,-2.76);
+        spinner.rotation.x=-Math.PI/2;
         const exhaust=mesh(engine,new THREE.CircleGeometry(size*.60,32),dark,0,0,1.81);
         for(let v=0;v<20;v++){
           const blade=block(fanGroup,metal,size*.07,size*.70,.08,Math.sin(v*Math.PI/10)*size*.48,Math.cos(v*Math.PI/10)*size*.48,-2.71);
           blade.rotation.z=-v*Math.PI/10-.42;
         }
-        if(detailed){
+        if(detailed||freight||engineCount===4){
           hull(engine,[[-2.73,size*.91],[-2.55,size*.84],[-2.20,size*.82]],metal);
           hull(engine,[[1.15,size*.72],[1.78,size*.66],[2.18,size*.49],[2.36,size*.43]],metal);
           mesh(engine,new THREE.ConeGeometry(size*.25,.92,28),metal,0,0,2.22).rotation.x=Math.PI/2;
           const pylon=block(engine,surface,size*.47,1.42,2.7,0,1.18,.18);
           pylon.rotation.x=.14;
-        }else block(engine,metal,size*.40,1.48,2.3,0,1.06,.14);
+        }
         engine.scale.z=length;
         engine.position.set(side*span*factor,wingY-size*.55-.40,root+sweep*factor-1.5);
         group.add(engine);
@@ -291,17 +288,15 @@ function buildBenchmarkAirframe(profile,scene){
   const bogies=fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:engineCount===2?[[0,-half*.71,1],[-span*.128,2,profile.mainAxles??2],[span*.128,2,profile.mainAxles??2]]:
     [[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2],[-radius*.82,7.8,3],[radius*.82,7.8,3]];
   for(const [x,z,axles] of bogies){
-    const size=fighter?.32:.58;
-    block(gear,metal,.23,profile.gearHeight*.69,.30,x,-profile.gearHeight*.43,z);
-    if(detailed){
-      mesh(gear,new THREE.CylinderGeometry(.21,.26,profile.gearHeight*.52,12),metal,x,-profile.gearHeight*.35,z);
-      mesh(gear,new THREE.CylinderGeometry(.145,.145,profile.gearHeight*.27,12),metal,x,-profile.gearHeight*.65,z);
-      block(gear,metal,.28,.20,axles>1?(axles-1)*1.12+.58:.72,x,-profile.gearHeight+size,z);
-      const brace=block(gear,metal,.11,profile.gearHeight*.54,.13,x+.33,-profile.gearHeight*.32,z+.21);
-      brace.rotation.z=.28;
-      const door=block(gear,surface,.09,profile.gearHeight*.39,.91,x+(x<0?-.41:.41),-profile.gearHeight*.29,z);
-      door.rotation.z=x<0?-.13:.13;
-    }
+    const size=fighter?.32:radius>2.9?.64:.55;
+    const strut=size*(x===0?.27:.36),height=profile.gearHeight;
+    mesh(gear,new THREE.CylinderGeometry(strut,strut*1.16,height*.59,12),metal,x,-height*.32,z);
+    mesh(gear,new THREE.CylinderGeometry(strut*.64,strut*.64,height*.40,12),metal,x,-height*.69,z);
+    block(gear,metal,strut*1.6,size*.26,axles>1?(axles-1)*1.12+size:.64,x,-height+size,z);
+    const brace=block(gear,metal,strut*.58,height*.49,strut*.68,x+strut*1.7,-height*.36,z+.16);
+    brace.rotation.z=-.29;
+    const door=block(gear,surface,.075,height*.38,size*1.57,x+(x<0?-1:1)*size*.69,-height*.28,z);
+    door.rotation.z=x<0?-.13:.13;
     for(let a=0;a<axles;a++){
       for(const offset of fighter?[0]:[-.29,.29]){
         const wheel=mesh(gear,new THREE.CylinderGeometry(size,size,fighter?.21:.34,40),rubber,x+offset,-profile.gearHeight+size,z+(a-(axles-1)/2)*1.12);

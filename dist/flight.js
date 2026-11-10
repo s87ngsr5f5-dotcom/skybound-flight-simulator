@@ -535,7 +535,8 @@ function initialize(){
   }
   box(scene,landmark,8,76,8,towerX,towerBase+470,towerZ);
 
-  let inspectionMode=false;
+  let inspectionMode=false,hangarMode=false;
+  let hangarStage,planPreviewAirport;
   let flight=null, cameraMode=0, last=performance.now(), accumulator=0, paused=false;
   let nextNavDraw=0,nextInstrumentDraw=0;
   let savedControls={};
@@ -676,10 +677,10 @@ function initialize(){
   byId('aircraft').value='a223';
   const selectedAircraft=()=>fleet.find(m=>m.id===byId('aircraft').value);
   const selectedAirport=name=>airports.find(r=>r.code===byId(name).value);
-  function parsePlan(){
+  function parsePlan(custom=true){
     const departure=selectedAirport('departure'), destination=selectedAirport('destination');
     const auto=regionalRoute(departure,destination);
-    const lines=byId('waypoints').value.trim().split(/\r?\n/).filter(Boolean);
+    const lines=custom?byId('waypoints').value.trim().split(/\r?\n/).filter(Boolean):[];
     const route=lines.length?lines.map((line,i)=>{
       const match=line.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
       if(!match) throw new Error('航點 '+(i+1)+' 請輸入「緯度,經度」。');
@@ -754,6 +755,7 @@ function initialize(){
     fillSaved(byId('savedMission'),missions.map(checkpoint=>checkpoint.flight),f=>f.checkpointId);
     byId('resumeAirline').hidden=!passengers.length;
     byId('resumeMission').hidden=byId('discardMission').hidden=!missions.length;
+    byId('planResumes').hidden=!passengers.length&&!missions.length;
     if(!active) return;
     const aircraft=selectedAircraft();
     const field=byId('airlineFuel');
@@ -846,34 +848,69 @@ function initialize(){
     if(!checkpoint||!confirm('刪除尚未完成的任務進度與其未完成的回放？')) return;
     if(clearMissionCheckpoint(checkpoint.flight.checkpointId)) drawPlan();
   };
+  const planModes=Array.from(document.querySelectorAll('[data-plan-mode]'));
+  const terrainPreview=document.createElement('canvas');
+  terrainPreview.width=430;terrainPreview.height=440;
+  const terrainPreviewInk=terrainPreview.getContext('2d');
+  terrainPreviewInk.fillStyle='#12364d';terrainPreviewInk.fillRect(0,0,430,440);
+  for(let y=0;y<440;y+=4){
+    for(let x=0;x<430;x+=4){
+      const h=regionalHeight((x-290)*900,(y-43)*900);
+      if(h<.8) continue;
+      terrainPreviewInk.fillStyle=h>1900?'#afb7a1':h>550?'#5d805f':'#426d56';
+      terrainPreviewInk.fillRect(x,y,4,4);
+    }
+  }
+  for(const button of planModes) button.onclick=()=>{
+    byId('lesson').value=button.dataset.planMode;
+    drawPlan();
+  };
   function drawPlan(){
-    updateAirlinePlan();
-    const isCircuit=['circuit','crosswind'].includes(byId('lesson').value);
+    const lesson=byId('lesson').value;
+    const isCircuit=['circuit','crosswind'].includes(lesson);
     if(isCircuit) byId('aircraft').value='a223';
-    const isTactical=byId('lesson').value==='tactical';
+    const isTactical=lesson==='tactical';
     byId('tacticalSetup').hidden=!isTactical;
     if(isTactical) byId('aircraft').value='sf16';
-    const isVoyage=byId('lesson').value==='naritaCargo';
-    const isClimb=byId('lesson').value==='climbLesson';
-    const isCruise=isClimb||byId('lesson').value==='cruiseTrial';
+    const isVoyage=lesson==='naritaCargo';
+    if(isVoyage) byId('aircraft').value='sf748';
+    const isClimb=lesson==='climbLesson';
+    if(isClimb) byId('aircraft').value='b773';
+    const isCruise=isClimb||lesson==='cruiseTrial';
+    const rangeLesson=lesson==='range';
+    if(rangeLesson) byId('aircraft').value='sf16';
+    const contract=regionalContracts[lesson];
+    if(contract) byId('aircraft').value='a223';
+    if(lesson==='airline'&&selectedAircraft().role!=='passenger') byId('aircraft').value='a223';
+    byId('aircraft').disabled=isTactical||isVoyage||isClimb||isCircuit||rangeLesson||Boolean(contract);
+    const custom=['free','cold','taxi','benchmark'].includes(lesson);
+    byId('planRouteFields').hidden=!custom;
+    byId('waypoints').closest('label').hidden=!custom;
+    byId('startType').closest('label').hidden=lesson!=='free'&&lesson!=='route';
+    byId('approach').hidden=isTactical||isCruise||lesson==='airline'||Boolean(contract)||lesson==='benchmark'||rangeLesson;
+    for(const button of planModes) button.setAttribute('aria-pressed',String(button.dataset.planMode===lesson));
     byId('cruiseWeather').hidden=!isCruise;
     byId('voyageOptions').hidden=!isVoyage;
+    updateAirlinePlan();
     const model=selectedAircraft();
     byId('aircraftInfo').textContent=model.type+' · 起飛 '+model.rotation+' KTS · 進場 '+model.approach+' KTS'+(model.sideCargo?' · 側門貨運 · 高雄至桃園':model.role?' · '+benchmarkMissions[model.role].label:'');
     try{
-      const rangeLesson=byId('lesson').value==='range';
-      const contract=regionalContracts[byId('lesson').value];
-      let {departure,destination,route}=contract?regionalContractPlan(byId('lesson').value):parsePlan();
+      let {departure,destination,route}=contract?regionalContractPlan(lesson):parsePlan(custom);
       if(isCircuit){
         departure=destination=airports.find(a=>a.code==='RCSS');
         route=trainingRoute(departure);
       }
-      const mission=byId('lesson').value==='benchmark'?benchmarkMissions[model.role]:null;
+      const mission=lesson==='benchmark'?benchmarkMissions[model.role]:null;
+      if(lesson==='route'){
+        departure=airports.find(a=>a.code==='RCSS');
+        destination=airports.find(a=>a.code==='RCYU');
+        route=regionalRoute(departure,destination);
+      }
       if(isTactical){
         departure=destination=airports.find(a=>a.code==='RCMQ');
         route=tacticalRoute(departure,tacticalSelection);
       }
-      if(byId('lesson').value==='airline'){
+      if(lesson==='airline'){
         [departure,destination]=airlineRoute();
         route=passengerBrief(model,departure,destination).route;
       }
@@ -899,19 +936,11 @@ function initialize(){
         destination=airports.find(a=>a.code===mission.to);
         route=benchmarkRoute(model.role,departure,destination);
       }
+      planPreviewAirport=departure;
       const points=isClimb?[departure,...route]:[departure,...route,destination];
-      planMap.fillStyle='#12364d';planMap.fillRect(0,0,430,440);
-      for(let y=0;y<440;y+=4){
-        for(let x=0;x<430;x+=4){
-          const h=regionalHeight((x-290)*900,(y-43)*900);
-          if(h<.8) continue;
-          planMap.fillStyle=h>1900?'#afb7a1':h>550?'#5d805f':'#426d56';
-          planMap.fillRect(x,y,4,4);
-        }
-      }
       if(isVoyage||destination.code==='RJAA'){
         planMap.fillStyle='#12364d';planMap.fillRect(0,0,430,440);
-      }
+      }else planMap.drawImage(terrainPreview,0,0);
       const project=isVoyage||destination.code==='RJAA'?
         (p=>[48+(p.x-departure.x)/6200,389+(p.z-departure.z)/3550]):
         (p=>[290+p.x/900,43+p.z/900]);
@@ -1268,7 +1297,8 @@ function initialize(){
   function start(approach,restart=false){
     try{
       const lesson=byId('lesson').value;
-      const selection=regionalContracts[lesson]?regionalContractPlan(lesson):parsePlan();
+      const selection=regionalContracts[lesson]?regionalContractPlan(lesson):
+        parsePlan(['free','cold','taxi','benchmark'].includes(lesson));
       const weather=byId('weather').value;
       const savesMission=Boolean(regionalContracts[lesson]||lesson==='climbLesson'||lesson==='naritaCargo'||
         (lesson==='benchmark'&&['fighter','cargo'].includes(selectedAircraft().role)||lesson==='range'));
@@ -1525,11 +1555,49 @@ function initialize(){
     if(event.button===0&&event.pointerId===pointer.id) pointer.active=false;
     if(event.target instanceof HTMLInputElement&&event.target.type==='range'&&event.target.closest('#quickControls')) event.target.blur();
   });
+  const hangarAircraft=byId('hangarAircraft'),hangarView=byId('hangarView');
+  hangarAircraft.replaceChildren(...Array.from(byId('aircraft').options,option=>new Option(option.text,option.value)));
+  hangarView.replaceChildren(...Array.from(byId('inspect').options)
+    .filter(option=>!option.value.startsWith('tour-')).map(option=>new Option(option.text,option.value)));
+  const displayedAircraft=()=>fleet.find(a=>a.id===hangarAircraft.value);
+  function updateHangarInfo(){
+    const plane=displayedAircraft();
+    byId('hangarInfo').textContent=plane.type+' · 機長 '+(plane.geometry[0]*2).toFixed(1)+
+      ' m · 翼展 '+(plane.geometry[2]*2).toFixed(1)+' m';
+    for(const option of hangarView.options){
+      option.disabled=option.value==='cabin'&&plane.role==='fighter';
+    }
+    if(hangarView.selectedOptions[0]?.disabled) hangarView.value='orbit';
+  }
+  hangarAircraft.onchange=updateHangarInfo;
+  function openInspection(inHangar,view='orbit'){
+    if(inHangar){
+      if(!hangarStage){hangarStage=createHangar(box,material);scene.add(hangarStage);}
+      hangarAircraft.value=byId('aircraft').value;
+      hangarView.value=view;
+      updateHangarInfo();
+    }
+    inspectionMode=true;hangarMode=inHangar;
+    document.body.classList.toggle('hangar-active',inHangar);
+    byId('plan').hidden=true;byId('exitInspection').hidden=false;
+    byId('exitInspection').textContent=inHangar?'返回飛行計畫':'結束巡覽';
+    byId('hangarControls').hidden=!inHangar;
+  }
+  function closeInspection(){
+    inspectionMode=hangarMode=false;
+    document.body.classList.remove('hangar-active');
+    byId('plan').hidden=false;byId('exitInspection').hidden=byId('hangarControls').hidden=true;
+  }
+  byId('openHangar').onclick=()=>openInspection(true);
   byId('viewScene').onclick=()=>{
-    inspectionMode=true;byId('plan').hidden=true;byId('exitInspection').hidden=false;
+    const view=byId('inspect').value;
+    openInspection(!view.startsWith('tour-'),view);
   };
-  byId('exitInspection').onclick=()=>{
-    inspectionMode=false;byId('plan').hidden=false;byId('exitInspection').hidden=true;
+  byId('exitInspection').onclick=closeInspection;
+  byId('hangarFly').onclick=()=>{
+    byId('aircraft').value=hangarAircraft.value;
+    byId('lesson').value='free';
+    closeInspection();drawPlan();byId('fly').focus();
   };
   byId('view').onclick=()=>{if(flight) action('KeyC');};
   byId('cockpitPreset').onclick=cycleCockpitView;
@@ -2015,7 +2083,9 @@ function initialize(){
     const frameSeconds=clamp((now-last)/1000,0,1);
     const dt=Math.min(.25,frameSeconds);last=now;
     adjustResolution(now,frameSeconds);
-    const profile=flight?.aircraft||selectedAircraft();
+    const profile=flight?.aircraft||(hangarMode?displayedAircraft():selectedAircraft());
+    const previewInspection=hangarMode?hangarView.value:byId('inspect').value;
+    if(hangarStage) hangarStage.visible=hangarMode;
     const model=aircraftModel(profile);
     const livery=hangarLiveries[profile.id]||!flight&&byId('liveryPreview').checked;
     updateDownloadedAircraft(model,profile,flight,livery,renderer.capabilities.getMaxAnisotropy());
@@ -2281,23 +2351,28 @@ function initialize(){
       if(now>=nextNavDraw){drawNav(f,target);nextNavDraw=now+100;}
     }else{
       taxiLamp.intensity=0;
-      const airport=selectedAirport('departure');
+      const airport=planPreviewAirport||selectedAirport('departure');
       model.userData.passengerCabin?.update(null,dt);
       const p=profile.role?airportPoint(airport,230,0):parkingPoint(airport);
-      updateTerrain(airport.x,airport.z);
+      if(!hangarMode) updateTerrain(airport.x,airport.z);
       model.userData.gear.scale.y=1;model.userData.gear.visible=true;
-      model.position.set(p.x,airport.elevation+profile.gearHeight,p.z);
+      model.position.set(p.x,airport.elevation+profile.gearHeight+(hangarMode?.12:0),p.z);
+      if(hangarMode) hangarStage.position.set(p.x,airport.elevation,p.z);
       model.rotation.set(0,now*.00045,0);
       camera.up.set(0,1,0);
       camera.position.set(p.x-21,airport.elevation+8,p.z+16);
       camera.lookAt(p.x,airport.elevation+profile.gearHeight,p.z);
-      const inspection=byId('inspect').value;
+      const inspection=previewInspection;
       if(profile.role){
         const data=model.userData;
         const h=data.half;
         const station={nose:[0,3,-2.9],side:[2.8,3,0],tail:[0,3,2.9],belly:[.3,-9,2.6]}[inspection];
         if(inspection==='orbit'){
-          camera.position.set(p.x-h*1.62,model.position.y+h*.64,p.z+h*1.42);
+          if(hangarMode){
+            const angle=now*.00038;
+            model.rotation.set(0,0,0);
+            camera.position.set(p.x+Math.sin(angle)*h*2.32,model.position.y+h*.59,p.z+Math.cos(angle)*h*2.32);
+          }else camera.position.set(p.x-h*1.62,model.position.y+h*.64,p.z+h*1.42);
           camera.lookAt(model.position);
         }else{
           model.rotation.set(0,0,0);
@@ -2324,13 +2399,18 @@ function initialize(){
       if(night){ambient.intensity=.25;sunlight.intensity=.08;}
       else if(previewNight) activeDay=setEnvironment();
       previewNight=Boolean(night);
+      if(hangarMode&&model.visible&&inspection!=='belly'){
+        placeGroundShadow(aircraftShadow,p.x,p.z,airport.elevation,0,
+          profile.geometry[2]*2.12,profile.geometry[0]*2.15,0);
+      }
     }
     const px=flight?.x??0,pz=flight?.z??0;
-    for(const {group,airport} of airportGroups) group.visible=Math.hypot(px-airport.x,pz-airport.z)<24000||!flight&&selectedAirport('departure')===airport;
-    if(!flight&&byId('inspect').value.startsWith('tour-')){
+    for(const {group,airport} of airportGroups) group.visible=!hangarMode&&
+      (Math.hypot(px-airport.x,pz-airport.z)<24000||!flight&&planPreviewAirport===airport);
+    if(!flight&&previewInspection.startsWith('tour-')){
       models.forEach(model=>{model.visible=false;if(model.userData.cabin)model.userData.cabin.visible=false;});
-      const tour=byId('inspect').value;
-      const airport=selectedAirport('departure');
+      const tour=previewInspection;
+      const airport=planPreviewAirport||selectedAirport('departure');
       if(tour==='tour-terminal'||tour==='tour-runway'){
         const apron=airport.apron, half=airport.length/2;
         const terminal=tour==='tour-terminal';
@@ -2358,7 +2438,7 @@ function initialize(){
     cityWall.emissiveIntensity=(1-activeDay)*.85;
     sunlight.target.position.set(viewerX,model.position.y,viewerZ);
     sunlight.position.copy(sunlight.target.position).add(sunDirection);
-    if(renderer.shadowMap.enabled&&activeDay>.18) aircraftShadow.visible=false;
+    if(renderer.shadowMap.enabled&&activeDay>.18&&!hangarMode) aircraftShadow.visible=false;
     if(sceneryBuild&&(touchControls.mode.value==='desktop'||qualitySelect.value!=='low')){
       const budget=performance.now()+3;
       try{
@@ -2367,7 +2447,7 @@ function initialize(){
         }while(performance.now()<budget);
       }catch(error){sceneryUnavailable(error);}
     }
-    if(detailedScenery&&sceneryLayers.visible){
+    if(detailedScenery&&sceneryLayers.visible&&!hangarMode){
       const {x,y,z}=camera.position;
       const heightAboveGround=y-renderedGround(x,z);
       const groundTraffic=heightAboveGround<1500;
@@ -2376,11 +2456,17 @@ function initialize(){
       detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',
         paused||Boolean(replay),qualitySelect.value,groundTraffic);
     }
-    airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:byId('inspect').value==='night'?0:1);
+    airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:previewInspection==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);
     const panelView=cockpitActive()&&cockpitView.preset===(twoSeats(profile)?2:1);
-    const viewFov=cockpitActive()?clamp((panelView?53:69)+cockpitView.zoom,34,86):
-      !flight&&['panel','night'].includes(byId('inspect').value)?82:64;
+    let viewFov=cockpitActive()?clamp((panelView?53:69)+cockpitView.zoom,34,86):
+      !flight&&['panel','night'].includes(previewInspection)?82:64;
+    if(hangarMode&&model.visible){
+      const [half,,span]=profile.geometry;
+      const halfWidth=['nose','tail'].includes(previewInspection)?span:Math.max(half,span);
+      const distance=camera.position.distanceTo(model.position);
+      viewFov=clamp(2*Math.atan(halfWidth/(distance*camera.aspect*.67))/rad,24,104);
+    }
     if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}
     atmosphericSky.update(camera,dt,qualitySelect.value);
     tacticalView.render(flight,dt,now,qualitySelect.value==='low'||touchControls.mode.value==='mobile');

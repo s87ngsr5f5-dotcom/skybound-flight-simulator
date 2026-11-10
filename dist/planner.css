@@ -1,0 +1,69 @@
+#plan {
+  margin-top: clamp(14px, 3vh, 30px);
+}
+#plan .plan-intro {
+  padding-bottom: 14px;
+}
+#plan .plan-intro p {
+  margin: 0 0 10px;
+}
+#plan a {
+  color: #a8d9ef;
+}
+.plan-modes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 24px 18px;
+}
+.plan-modes button {
+  min-height: 44px;
+  font-weight: 650;
+}
+.plan-modes button[aria-pressed="true"] {
+  border-color: #73d9fb;
+  background: #1c526e;
+}
+#plan .planner {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-areas: "preview setup";
+}
+.plan-setup { grid-area: setup; min-width: 0; }
+.plan-preview { grid-area: preview; min-width: 0; background: #102c40; }
+.plan-setup section { padding: 0; }
+.plan-setup select, .plan-preview select { min-width: 0; max-width: 100%; }
+.plan-setup details, .plan-preview details, .plan-reference {
+  border-top: 1px solid #8cc8eb3d;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+.plan-primary label { margin-top: 0; }
+.plan-start { margin: 4px 0 16px; }
+.plan-start #fly { flex: 1; min-height: 46px; }
+.plan-preview #hangarPreview { display: block; height: auto; max-height: 215px; object-fit: contain; }
+.plan-preview .map { margin-top: 16px; min-height: 130px; }
+.plan-preview #planMap { max-height: 290px; width: auto; }
+.plan-preview #aircraftInfo { min-height: 2.25em; }
+.plan-reference a { display: inline-block; margin: 6px 12px 0 0; }
+#plan .plan-history { padding-top: 0; }
+.mobile-mode #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }
+#hangarControls {
+  position: fixed;
+  z-index: 5;
+  right: clamp(8px, 2vw, 24px);
+  bottom: 24px;
+  width: min(450px, calc(100vw - 16px));
+  padding: 12px 14px;
+  border: 1px solid #79aec8;
+  background: #0c2335ed;
+}
+#hangarControls label { margin: 5px 0; }
+#hangarControls select { min-width: 0; padding: 7px; }
+#hangarControls p { margin: 6px 0 0; }
+body.hangar-active .quick-controls { display: none; }
+@media (max-width: 700px) {
+  #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }
+  #plan .plan-setup, #plan .plan-preview, #plan .plan-intro, #plan .plan-history { padding-inline: 14px; }
+  .plan-modes { padding-inline: 14px; gap: 5px; }
+  .plan-modes button { padding: 6px 3px; font-size: 13px; }
+}
