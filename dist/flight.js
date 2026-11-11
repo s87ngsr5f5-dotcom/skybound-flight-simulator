@@ -535,6 +535,8 @@ function initialize(){
       }
     });
   }
+  const taipeiCity=typeof createTaipeiCity==='function'?createTaipeiCity(scene,renderedGround,airports):
+    {root:new THREE.Group(),inside:()=>false,update(){}};
   const buildingGeo = new THREE.BoxGeometry();
   const windows=document.createElement('canvas');
   windows.width=windows.height=64;
@@ -555,6 +557,7 @@ function initialize(){
   const cityTones=[0xa6a3a1,0xc9c2ad,0x9fa9af,0xada299,0x9dada7,0xc7c8c2,0xa3a7b0];
   blocks.count=0;
   for(const [lat,lon,width,depth,height,tone] of cityLiteVolumes){
+    if(taipeiCity.inside(lat,lon))continue;
     const {x,z}=geoPoint(lat,lon),ground=renderedGround(x,z);
     if(ground<.5||airports.some(a=>{
       const reach=a.length/2+Math.max(width,depth)+220;
@@ -590,8 +593,8 @@ function initialize(){
     sceneryLayers.visible=detailed&&Boolean(detailedScenery);
     if(!detailed||loadingScenery) return;
     loadingScenery=true;
-    const assets=['taipei-data.js','taipei-visuals.js?v=flow15','forest-cover.js?v=1',
-      'vegetation.js?v=flow15','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=flow15'];
+    const assets=['taipei-data.js','forest-cover.js?v=1',
+      'vegetation.js?v=city27','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=city27'];
     Promise.all(assets.map(src=>new Promise((resolve,reject)=>{
       const script=document.createElement('script');
       script.src=src;
@@ -603,9 +606,9 @@ function initialize(){
   function* buildScenery(){
     const cover=createTreeCover(worldCoverTrees);
     yield;
-    const taipei=yield* buildTaipeiVisuals(sceneryLayers,renderedGround);
+    const taipei={update(){}}; // Taipei geometry now streams in all device modes.
     const region=yield* buildRegionalScenery(sceneryLayers,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
-    const plants=yield* buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways);
+    const plants=yield* buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways,taipeiCity.blocked);
     detailedScenery={taipei,region,plants};
     treeCover=cover;
     terrainColorRevision++;
@@ -695,15 +698,6 @@ function initialize(){
     const label=hit.object.userData.action;
     for(const button of byId('switches').children)if(button.textContent===label){button.click();break;}
   });
-  const landmark = material('#698c91');
-  const towerX=(121.5645-runway10.lon)*111319.49*Math.cos(runway10.lat*rad);
-  const towerZ=(runway10.lat-25.03396)*110772;
-  const towerBase=terrainHeight(towerX,towerZ);
-  for(let section=0;section<8;section++){
-    box(scene,landmark,59-section*3,54,59-section*3,towerX,towerBase+27+section*54,towerZ);
-  }
-  box(scene,landmark,8,76,8,towerX,towerBase+470,towerZ);
-
   let inspectionMode=false,hangarMode=false;
   let hangarStage,planPreviewAirport;
   let flight=null, cameraMode=0, last=performance.now(), accumulator=0, paused=false, previousFlightRate=1;
@@ -1653,8 +1647,8 @@ function initialize(){
             power:.66,hold:{heading,altitude},gear:false,parkingBrake:false});
         }
         if(preset==='taipei'){
-          const position=geoPoint(24.993,121.485),heading=22*rad,speed=99;
-          Object.assign(flight,{...position,y:1450,heading,speed,vx:Math.sin(heading)*speed,vz:-Math.cos(heading)*speed,
+          const position=geoPoint(25.0225,121.5490),heading=55*rad,speed=99;
+          Object.assign(flight,{...position,y:1050,heading,speed,vx:Math.sin(heading)*speed,vz:-Math.cos(heading)*speed,
             pitch:.08,trim:.06,power:.43,gear:false,parkingBrake:false});
         }
         if(flight.approach){
@@ -3194,7 +3188,8 @@ function initialize(){
         const tours={
           'tour-apron':[25.0652,121.5507,28,25.0646,121.5527,10],
           'tour-river':[25.0787,121.5531,280,25.0742,121.5475,12],
-          'tour-city':[25.0558,121.5447,370,25.0662,121.5585,18],
+          'tour-city':[25.0262,121.5534,650,25.0351,121.5649,190],
+          'tour-downtown':[25.0401,121.5047,550,25.0470,121.5160,85],
           'tour-woods':[25.1122,121.5770,34,25.1132,121.5777,12]
         };
         const t=tours[tour],eye=geoPoint(t[0],t[1]),target=geoPoint(t[3],t[4]);
@@ -3205,6 +3200,9 @@ function initialize(){
     }
     const viewerX=flight?.x??selectedAirport('departure').x;
     const viewerZ=flight?.z??selectedAirport('departure').z;
+    taipeiCity.root.visible=!hangarMode;
+    if(!renderer.instrumentOnly&&!hangarMode)taipeiCity.update(dt,camera.position.x,camera.position.z,
+      renderingQuality(),activeDay,byId('weather').value==='wet',paused||Boolean(replay));
     blocks.visible=!(detailedScenery&&sceneryLayers.visible);
     cityWall.emissiveIntensity=(1-activeDay)*.85;
     sunlight.target.position.set(viewerX,model.position.y,viewerZ);

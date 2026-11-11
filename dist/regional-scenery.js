@@ -17,7 +17,7 @@ function* buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBou
   }
   function insideTaipei(x,z){
     const {lat,lon}=latLon(x,z);
-    return lat>=taipeiBounds[0]&&lat<=25.11&&lon>=taipeiBounds[1]&&lon<=taipeiBounds[3];
+    return lat>=24.97&&lat<=25.14&&lon>=121.43&&lon<=121.65;
   }
   for(const [width,bridge,coords] of roadData){
     yield;
@@ -49,6 +49,7 @@ function* buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBou
     if(i%64===0) yield;
     const [lat,lon,width,depth,height,tone]=cityData[i];
     const {x,z}=geoPoint(lat,lon);
+    if(insideTaipei(x,z))continue;
     if(inAirport(x,z,195+Math.max(width,depth)/2)) continue;
     tileAt(x,z).buildings.push({x,z,width,depth,height,tone});
   }

@@ -16,7 +16,7 @@ function createTreeCover(source){
     return density[row*source.columns+col]/15;
   };
 }
-function* buildVegetation(scene,ground,airports,map,cover,highways){
+function* buildVegetation(scene,ground,airports,map,cover,highways,cityBlocked){
   // Index mapped obstructions once. A tree only checks features in its own cell.
   const masks=new Map(), maskSize=120;
   const key=(x,z)=>x+':'+z;
@@ -121,6 +121,7 @@ function* buildVegetation(scene,ground,airports,map,cover,highways){
     mesh.setColorAt(mesh.count++,color);
   }
   function blocked(x,z,radius){
+    if(cityBlocked?.(x,z,radius))return true;
     for(const a of airports){
       const reach=a.length/2+460+radius;
       if(Math.abs(x-a.x)>reach||Math.abs(z-a.z)>reach) continue;
