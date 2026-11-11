@@ -1,6 +1,6 @@
 'use strict';
 function makeFlightAudio(){
-  let context, master, noiseBuffer, fan, core, roar, air, stall, roarFilter, windFilter;
+  let context, master, noiseBuffer, fan, core, roar, air, stall, roarFilter, windFilter,rotorPulse,rotorDepth;
   let level=.85, speaking=false;
   function layer(source,filter){
     const gain=context.createGain();
@@ -25,6 +25,9 @@ function makeFlightAudio(){
       master.gain.value=level;
       master.connect(context.destination);
       fan=tone('triangle');
+      rotorPulse=context.createOscillator();rotorPulse.frequency.value=25;
+      rotorDepth=context.createGain();rotorDepth.gain.value=0;
+      rotorPulse.connect(rotorDepth).connect(fan.gain);rotorPulse.start();
       core=tone('sine');
       stall=tone('triangle');
       stall.frequency.value=830;
@@ -57,13 +60,16 @@ function makeFlightAudio(){
     const running=engines.length?engines.filter(Boolean).length/engines.length:0;
     const power=f?.power||0;
     const t=context.currentTime;
+    const helicopter=f?.aircraft?.helicopter;
     const jet=f?.aircraft?.jet, widebody=f?.aircraft?.id==='b773';
     const afterburner=f?.boost&&power>.89;
     const strength=enabled&&f?.fuel!==0?Math.sqrt(running)*(cockpit?.60:1):0;
-    const fanHz=widebody?82+160*power:jet?112+220*power:58+80*power;
+    const fanHz=helicopter?25+65*(f.rotorRPM??0):widebody?82+160*power:jet?112+220*power:58+80*power;
     fan.frequency.setTargetAtTime(fanHz,t,.30);
     core.frequency.setTargetAtTime(fanHz*(widebody?2.17:2.7),t,.38);
-    fan.gain.setTargetAtTime(strength*(.065+.085*power),t,.25);
+    fan.gain.setTargetAtTime(strength*(helicopter?.17:.065+.085*power),t,.25);
+    rotorPulse.frequency.setTargetAtTime(Math.max(1,25*(f?.rotorRPM??1)),t,.2);
+    rotorDepth.gain.setTargetAtTime(helicopter?strength*.06:0,t,.2);
     core.gain.setTargetAtTime(strength*(cockpit?.47:1)*(.018+.042*power),t,.30);
     roarFilter.frequency.setTargetAtTime((cockpit?300:490)+power*(afterburner?1600:970),t,.30);
     roar.setTargetAtTime(strength*(.10+power*(afterburner?.57:.39)),t,.29);

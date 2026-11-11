@@ -35,7 +35,7 @@ function createTaipeiCity(scene,ground,airports){
   facade.wrapS=facade.wrapT=THREE.RepeatWrapping;
   const night=document.createElement('canvas');night.width=256;night.height=128;
   const ink=night.getContext('2d');ink.fillStyle='#000';ink.fillRect(0,0,256,128);
-  for(let i=0;i<4;i++){ink.fillStyle=i%3?'#ffc977':'#32434a';ink.fillRect(i*64+11,18,40,66);}
+  for(let i=0;i<4;i++){ink.fillStyle=i===1?'#d7b37c':'#080c10';ink.fillRect(i*64+11,18,40,66);}
   const lights=new THREE.CanvasTexture(night);lights.wrapS=lights.wrapT=THREE.RepeatWrapping;
   const wall=new THREE.MeshStandardMaterial({color:0xffffff,map:facade,vertexColors:true,roughness:.83,
     emissiveMap:lights,emissive:0xffd6a2,emissiveIntensity:0});
@@ -44,8 +44,40 @@ function createTaipeiCity(scene,ground,airports){
   const stripe=new THREE.MeshStandardMaterial({color:0xddd8b5,roughness:.9,side:THREE.DoubleSide});
   const water=new THREE.MeshStandardMaterial({color:0x486f76,roughness:.3,metalness:.2,side:THREE.DoubleSide});
   for(const mat of [asphalt,stripe,water]){mat.polygonOffset=true;mat.polygonOffsetFactor=-3;mat.polygonOffsetUnits=-3;}
-  const palette=['#b36e55','#d1ac67','#619f9b','#64869f','#c28e76','#dbcfb3','#829768','#91929e'].map(c=>new THREE.Color(c));
-  const roofPalette=['#944f42','#a29b89','#38756e','#47697d','#aa6e56','#aaa999','#677d57','#596372'].map(c=>new THREE.Color(c));
+  const palette=['#9b7f6d','#b7ab8e','#8b9f9c','#8896a3','#ad9585','#c8c2b2','#96a08a','#929599'].map(c=>new THREE.Color(c));
+  const roofPalette=['#85675a','#888a81','#496b67','#526675','#96745f','#92958c','#727d66','#626b73'].map(c=>new THREE.Color(c));
+  const officeCanvas=document.createElement('canvas');officeCanvas.width=officeCanvas.height=256;
+  const oi=officeCanvas.getContext('2d');
+  const officeNight=document.createElement('canvas');officeNight.width=officeNight.height=256;
+  const ni=officeNight.getContext('2d');ni.fillStyle='#000';ni.fillRect(0,0,256,256);
+  const roughCanvas=document.createElement('canvas');roughCanvas.width=roughCanvas.height=256;
+  const ri=roughCanvas.getContext('2d');ri.fillStyle='#bababa';ri.fillRect(0,0,256,256);
+  oi.fillStyle='#8c9a9f';oi.fillRect(0,0,256,256);
+  for(let row=0;row<4;row++)for(let col=0;col<4;col++){
+    const x=col*64+3,y=row*64+4;
+    const reflection=oi.createLinearGradient(x,y,x+58,y+55);
+    reflection.addColorStop(0,['#546f81','#668494','#4d6c7b','#718692'][(row+col)%4]);
+    reflection.addColorStop(.56,'#263e50');reflection.addColorStop(1,'#7b929e');
+    oi.fillStyle=reflection;oi.fillRect(x,y,58,55);
+    oi.fillStyle='#aeb5b4';oi.fillRect(x+28,y,1.2,55);
+    ri.fillStyle='#737373';ri.fillRect(x,y,58,55);
+    if((row*5+col*7)%9<3){ni.fillStyle=(row+col)%3?'#c7b28a':'#b9d0d5';ni.fillRect(x+3,y+5,52,45);}
+  }
+  function repeatTexture(canvas,color=false){const t=new THREE.CanvasTexture(canvas);t.wrapS=t.wrapT=THREE.RepeatWrapping;if(color)t.colorSpace=THREE.SRGBColorSpace;return t;}
+  const officeGlass=new THREE.MeshPhysicalMaterial({map:repeatTexture(officeCanvas,true),roughnessMap:repeatTexture(roughCanvas),
+    color:0x3e6074,metalness:.72,roughness:.68,clearcoat:.25,clearcoatRoughness:.22,envMapIntensity:.8,
+    emissiveMap:repeatTexture(officeNight),emissive:0xffe6bb,emissiveIntensity:0,side:THREE.DoubleSide});
+  const reflectedCity=document.createElement('canvas');reflectedCity.width=1024;reflectedCity.height=512;
+  const reflected=reflectedCity.getContext('2d'),sky=reflected.createLinearGradient(0,0,0,512);
+  sky.addColorStop(0,'#517fa6');sky.addColorStop(.44,'#adc4d1');sky.addColorStop(.58,'#c5c5b6');sky.addColorStop(1,'#515c60');
+  reflected.fillStyle=sky;reflected.fillRect(0,0,1024,512);
+  for(let i=0;i<54;i++){
+    const x=i*19,h=25+(i*47%113);reflected.fillStyle=['#697c88','#81939e','#5d707e'][i%3];
+    reflected.fillRect(x,288-h,15,h+120);
+    reflected.fillStyle='#bac9cc';for(let y=296-h;y<365;y+=10)reflected.fillRect(x+3,y,9,2);
+  }
+  const reflectedMap=new THREE.CanvasTexture(reflectedCity);reflectedMap.colorSpace=THREE.SRGBColorSpace;
+  reflectedMap.mapping=THREE.EquirectangularReflectionMapping;officeGlass.envMap=reflectedMap;
   const landmarks=new THREE.Group();landmarks.name='Taipei landmarks';root.add(landmarks);
   const landmarkSites=[
     {name:'臺北101',lat:25.03396,lon:121.56450,radius:53,height:508,type:'101'},
@@ -171,7 +203,7 @@ function createTaipeiCity(scene,ground,airports){
   function* build(key,data){
     const group=new THREE.Group();group.name='Taipei tile '+key;
     group.userData.masks=[];
-    const walls=buffers(),roofs=buffers(),roads=buffers(),lines=buffers(),waters=buffers();
+    const walls=buffers(),glazed=buffers(),roofs=buffers(),roads=buffers(),lines=buffers(),waters=buffers();
     let built=0;
     for(const [x,z,h,tone,kind,coords] of data.b){
       if(skipBuilding(x,z))continue;
@@ -179,15 +211,17 @@ function createTaipeiCity(scene,ground,airports){
       mask(group,Math.min(...points.map(p=>p[0]))-2,Math.min(...points.map(p=>p[1]))-2,Math.max(...points.map(p=>p[0]))+2,Math.max(...points.map(p=>p[1]))+2);
       const center=ground(x,z),base=Math.min(center,...points.map(p=>ground(...p)))-.25;
       const top=center+h,color=palette[tone].clone().multiplyScalar(h>75?.76:1);
+      const isGlazed=h>50||kind===1&&h>25;
+      const facadeTarget=isGlazed?glazed:walls;
       polygon(roofs,points,top,roofPalette[tone]);
       for(let i=0;i<points.length;i++){
         const a=points[i],b=points[(i+1)%points.length],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);
         if(length<.01)continue;
         const normal=[dz/length,0,-dx/length];
         // Double-sided walls handle either winding from OSM, with physically scaled windows.
-        const u=length/12.8,v=(top-base)/3.2;
-        tri(walls,[a[0],base,a[1]],[b[0],base,b[1]],[b[0],top,b[1]],color,normal,[[0,0],[u,0],[u,v]]);
-        tri(walls,[a[0],base,a[1]],[b[0],top,b[1]],[a[0],top,a[1]],color,normal,[[0,0],[u,v],[0,v]]);
+        const u=length/12.8,v=(top-base)/(isGlazed?12.8:3.2);
+        tri(facadeTarget,[a[0],base,a[1]],[b[0],base,b[1]],[b[0],top,b[1]],color,normal,[[0,0],[u,0],[u,v]]);
+        tri(facadeTarget,[a[0],base,a[1]],[b[0],top,b[1]],[a[0],top,a[1]],color,normal,[[0,0],[u,v],[0,v]]);
       }
       built++;if(built%24===0)yield;
     }
@@ -222,7 +256,7 @@ function createTaipeiCity(scene,ground,airports){
     }
     // Winding may differ between OSM ways; use both sides for facades only.
     wall.side=THREE.DoubleSide;
-    mesh(group,walls,wall,'OSM footprint facades');mesh(group,roofs,roof,'Taipei rooftops');
+    mesh(group,walls,wall,'OSM footprint facades');mesh(group,glazed,officeGlass,'Taipei glass curtain walls');mesh(group,roofs,roof,'Taipei rooftops');
     mesh(group,roads,asphalt,'Taipei streets and bridges');mesh(group,lines,stripe,'Road markings');mesh(group,waters,water,'Taipei water');
     Object.assign(group.userData,{buildings:built,roads:data.r.length,routes:data.r.filter(r=>r[0]>=11&&r[2].length>=6)});root.add(group);loaded.set(key,group);
     stats.buildings+=built;stats.roads+=data.r.length;stats.tiles=loaded.size;
@@ -292,7 +326,8 @@ function createTaipeiCity(scene,ground,airports){
     const at=latLon(x,z),near=at.lat>24.90&&at.lat<25.22&&at.lon>121.35&&at.lon<121.74;
     root.visible=near;if(!near)return;
     const mobile=touchControls.mode.value==='mobile',range=mobile?4800:quality==='ultra'?11000:quality==='high'?9000:6500;
-    wall.emissiveIntensity=glass.emissiveIntensity=(1-day)*.8;
+    wall.emissiveIntensity=(1-day)*.36;glass.emissiveIntensity=(1-day)*.55;officeGlass.emissiveIntensity=(1-day)*.72;
+    officeGlass.envMapIntensity=.13+day*.95;
     asphalt.roughness=wet?.32:.95;asphalt.metalness=wet?.15:0;
     traffic(dt,x,z,paused,mobile);
     if(!index&&!indexRequest&&clock>=nextScan){

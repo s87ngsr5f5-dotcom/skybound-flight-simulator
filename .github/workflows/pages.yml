@@ -27,6 +27,7 @@ jobs:
       - run: node verify-tactical-lock.cjs
       - run: node verify-island-fields.cjs
       - run: node verify-taipei-city.cjs
+      - run: node verify-helicopter.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

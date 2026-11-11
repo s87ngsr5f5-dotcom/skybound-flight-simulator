@@ -22,9 +22,10 @@ assert.equal(index.counts.taggedHeight+index.counts.estimatedHeight,buildings);
 assert.ok(buildings>90000);assert.ok(roads>19000);
 for(const name of ['index.html','iphone.html']){
   const html=fs.readFileSync(path.join(__dirname,'dist',name),'utf8');
-  assert.ok(html.includes('taipei-city.js?v=28'));
+  assert.ok(html.includes('taipei-city.js?v=glass29'));
   assert.ok(html.includes('natural-trees.js?v=28')&&html.includes('airport-surroundings.js?v=28'));
   assert.ok(html.indexOf('natural-trees.js?v=28')<html.indexOf('airport-surroundings.js?v=28'));
-  assert.ok(html.indexOf('airport-surroundings.js?v=28')<html.indexOf('flight.js?v=scene28'));
+  assert.ok(html.indexOf('airport-surroundings.js?v=28')<html.indexOf('flight.js?v=rotor29'));
+  assert.ok(html.indexOf('helicopter.js?v=29')<html.indexOf('flight.js?v=rotor29'));
 }
 console.log({tiles:index.tiles.length,buildings,roads,water,estimatedHeight:index.counts.estimatedHeight});

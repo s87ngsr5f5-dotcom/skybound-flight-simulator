@@ -368,7 +368,7 @@ function makeRegionalFlight(departure,destination,aircraft,start,wind,waypoints)
   const threshold=-departure.length/2+95;
   const first=airportPoint(departure,departure.parkingAlong??threshold+40,departure.shortField?0:departure.apron);
   const holding=airportPoint(departure,departure.shortField?threshold:threshold+40,0);
-  return {
+  const flight={
     ...position,heading,pitch:0,bank:0,pitchRate:0,bankRate:0,yawRate:0,
     y:air?950:departure.elevation+aircraft.gearHeight,
     vx:Math.sin(heading)*speed,vy:0,vz:-Math.cos(heading)*speed,
@@ -382,6 +382,7 @@ function makeRegionalFlight(departure,destination,aircraft,start,wind,waypoints)
       {name:departure.shortField?'沿跑道滑至起飛端':'轉入跑道',...holding}],
     taxiIndex:0,arrivalTaxi:null,phase:cold?'cold':air?'cruise':'takeoff',recorded:false,finished:false
   };
+  return aircraft.helicopter?configureHelicopterFlight(flight):flight;
 }
 function makeCruiseTrial(departure,destination,aircraft,tailwind,fast=false,indicated=false){
   const heading=Math.atan2(destination.x-departure.x,departure.z-destination.z);
@@ -447,6 +448,7 @@ function startEngine(f,index){
   return true;
 }
 function updateRegionalFlight(f,save=recordFlight){
+  if(f.aircraft.helicopter){updateHelicopterFlight(f,save);return;}
   if(f.finished||f.tow) return;
   if(f.climbLesson){updateClimbLesson(f,save);return;}
   if(f.ended){

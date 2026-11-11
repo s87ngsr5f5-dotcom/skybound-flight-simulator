@@ -681,7 +681,8 @@ function initialize(){
   const models=new Map(),airlinerDetails={};
   function aircraftModel(profile){
     if(models.has(profile.id)) return models.get(profile.id);
-    const model=profile.role?buildBenchmarkAirframe(profile,scene):makeAircraft(profile,fleet.indexOf(profile));
+    const model=profile.helicopter?buildHelicopter(profile,scene):profile.role?buildBenchmarkAirframe(profile,scene):makeAircraft(profile,fleet.indexOf(profile));
+    if(profile.role==='fighter')refineFighter(model,profile);
     model.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
     if(profile.id==='sa380'||profile.id==='b773'){
       airlinerDetails[profile.id]=refineAirliner(model,{twin:profile.id==='b773'});
@@ -818,6 +819,7 @@ function initialize(){
   touchThrottle.oninput=()=>{
     if(!flight||replay||paused||flight.finished||flight.tow||!byId('gateGuide').hidden) return;
     if(flight.hold) stopNavigation(flight);
+    if(flight.aircraft.helicopter)flight.hover=null;
     flight.power=Number(touchThrottle.value)/100;
   };
   const switches=byId('switches');
@@ -1219,10 +1221,16 @@ function initialize(){
   }
   function changeView(){
     chaseHeading=null;
+    const heli=Boolean(flight?.aircraft.helicopter),keysHelp=document.querySelector('#hud .keys');
+    if(keysHelp){
+      keysHelp.dataset.fixedHelp??=keysHelp.textContent;
+      keysHelp.textContent=heli?'W / S 總距升降 · ↑/↓ 前飛／後退 · ←/→ 側飛 · Q/E 轉機頭 · J 懸停 · C 視角 · B 停機煞車':keysHelp.dataset.fixedHelp;
+    }
+    byId('touchStick').setAttribute('aria-label',heli?'直升機搖桿，向前推前飛、後拉後退、左右側飛':'飛行搖桿，上拉升、下壓低、左右轉向');
     const cockpit=cockpitActive();
-    byId('cockpit').hidden=byId('struts').hidden=!cockpit||Boolean(flight?.aircraft.role);
+    byId('cockpit').hidden=byId('struts').hidden=!cockpit||Boolean(flight?.aircraft.role||flight?.aircraft.helicopter);
     byId('systems').hidden=!flight?.regional;
-    byId('reticle').hidden=!cockpit||Boolean(flight?.aircraft.role);
+    byId('reticle').hidden=!cockpit||Boolean(flight?.aircraft.role||flight?.aircraft.helicopter);
     document.body.classList.toggle('cockpit-active',cockpit);
     document.body.classList.toggle('cockpit-panel-view',
       cockpit&&cockpitView.preset===(twoSeats(flight.aircraft)?2:1));
@@ -1443,7 +1451,7 @@ function initialize(){
       ...f.engines.map((_,i)=>['引擎 '+(i+1),()=>f.engines[i],()=>startEngine(f,i)]),
       ['停機煞車',()=>f.parkingBrake,()=>f.parkingBrake=!f.parkingBrake],
       ['燈光',()=>f.lights,()=>{if(f.battery) f.lights=!f.lights;}],
-      ['襟翼',()=>f.flaps>0,()=>f.flaps=(f.flaps+1)%3]
+      ...(!f.aircraft.helicopter?[['襟翼',()=>f.flaps>0,()=>f.flaps=(f.flaps+1)%3]]:[])
     ];
     if(f.aircraft.retract) entries.push(['起落架',()=>f.gear,()=>{if(!f.ground&&f.battery) f.gear=!f.gear;}]);
     if(f.aircraft.reverse){
@@ -1464,10 +1472,11 @@ function initialize(){
       }]);
       entries.push(['航向／高度保持',()=>Boolean(f.hold),()=>{f.hold=f.hold?null:!f.ground&&f.battery?{heading:f.heading,altitude:f.y,mach:f.y>7000&&!f.flaps&&!f.gear?cruiseMachTarget(f):null}:null;}]);
     }
-    entries.push(['自動導航',()=>Boolean(f.hold?.nav),()=>toggleNavigation(f)]);
+    if(f.aircraft.helicopter)entries.push(['懸停輔助',()=>Boolean(f.hover),()=>toggleHelicopterHover(f)]);
+    else entries.push(['自動導航',()=>Boolean(f.hold?.nav),()=>toggleNavigation(f)]);
     if(f.range) entries.push(['射擊訓練靶 M',()=>f.range.hit,()=>{if(!paused&&!replay) rangeShot(f);}]);
     if(f.aircraft.role==='fighter') entries.push(['加力待命',()=>f.boost,()=>{if(f.engines[0]) f.boost=!f.boost;}]);
-    entries.push(['拖車牽引至跑道',()=>Boolean(f.tow),()=>callRunwayTow(f)]);
+    if(!f.aircraft.helicopter)entries.push(['拖車牽引至跑道',()=>Boolean(f.tow),()=>callRunwayTow(f)]);
     if(f.service) addPassengerSystems(f,entries);
     if(f.aircraft.role==='passenger'&&!f.service) entries.push(['連接空橋',()=>f.bridge,()=>{
       if(f.awaitingService&&groundServiceAllowed(f)) f.bridge=!f.bridge;
@@ -1627,7 +1636,7 @@ function initialize(){
         if(['passenger','cargo'].includes(chosen.role)&&!chosen.regionalGates&&[departure,destination].some(r=>r.width<55||r.length<3000)){
           throw new Error('此廣體機請選桃園、臺中或高雄的寬體起降場。');
         }
-        if(departure===destination&&!mission&&!circuit) throw new Error('請選不同的起降機場，或使用松山起落航線訓練。');
+        if(departure===destination&&!mission&&!circuit&&!chosen.helicopter) throw new Error('請選不同的起降機場，或使用松山起落航線訓練。');
         const mode=circuit?'runway':mission||['cold','taxi'].includes(lesson)?'cold':byId('startType').value;
         const route=circuit?trainingRoute(departure):mission?(chosen.role==='fighter'||!byId('waypoints').value.trim()?
           benchmarkRoute(chosen.role,departure,destination):[...selection.route.slice(0,-2),...regionalRoute(departure,destination).slice(-2)]):
@@ -1672,7 +1681,11 @@ function initialize(){
         flight.fuelStart=flight.fuel;
       }
       flight.quickPreset=preset;
-      flight.fastCruise=byId('speedProfile').value==='fast';
+      flight.fastCruise=!flight.aircraft.helicopter&&byId('speedProfile').value==='fast';
+      if(preset==='helipad'&&flight.aircraft.helicopter){
+        const p=airportPoint(flight.departure,385,flight.departure.apron+46);
+        Object.assign(flight,p,{y:flight.departure.elevation+flight.aircraft.gearHeight,parkingBrake:true});
+      }
       beginFlight();
       if(savesMission){
         flight.checkpointId=crypto.randomUUID();
@@ -1696,6 +1709,7 @@ function initialize(){
     showLog();drawPlan();changeView();
   }
   function toggleNavigation(f){
+    if(f.aircraft.helicopter){toggleHelicopterHover(f);return;}
     if(f.iasTrial&&!f.ground&&!f.finished&&f.battery){
       f.hold=f.hold?null:{heading:f.heading,altitude:f.y,mach:cruiseMachTarget(f)};
       return;
@@ -1856,7 +1870,7 @@ function initialize(){
   let hangarYaw=null,hangarElevation=.59,hangarZoom=1;
   const displayedAircraft=()=>fleet.find(a=>a.id===hangarAircraft.value);
   function populateHangar(selected){
-    const matching=fleet.filter(plane=>hangarFilter.value==='all'||plane.role===hangarFilter.value);
+    const matching=fleet.filter(plane=>hangarFilter.value==='all'||(plane.helicopter?'helicopter':plane.role)===hangarFilter.value);
     hangarAircraft.replaceChildren(...matching.map(plane=>new Option(plane.name,plane.id)));
     if(matching.some(plane=>plane.id===selected)) hangarAircraft.value=selected;
     updateHangarInfo();
@@ -1969,6 +1983,11 @@ function initialize(){
     byId('waypoints').value='';
     drawPlan();
     start(false,false,'taipei');
+  };
+  byId('quickHelicopter').onclick=()=>{
+    byId('lesson').value='free';byId('aircraft').value='sh6';
+    byId('departure').value=byId('destination').value='RCSS';
+    byId('startType').value='runway';drawPlan();start(false,false,'helipad');
   };
   for(const button of document.querySelectorAll('[data-island-departure]')){
     button.onclick=()=>{
@@ -2134,7 +2153,7 @@ function initialize(){
     if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
       f.hold=null;
     }
-    if(f.ground||!settings.keepBank||f.hold||f.tactical?.aimAssist) f.bankCommand=0;
+    if(f.aircraft.helicopter||f.ground||!settings.keepBank||f.hold||f.tactical?.aimAssist) f.bankCommand=0;
     else if(Math.abs(roll)>.04) f.bankCommand=roll;
     else roll=f.bankCommand||0;
     if(f.hold){
@@ -2310,6 +2329,15 @@ function initialize(){
     previousCalloutHeight=height;
   }
   function status(f,knots,target){
+    if(f.aircraft.helicopter){
+      if(f.ended)return '接地過重 · 重新練習';
+      if(f.finished)return '直升機飛行已儲存';
+      if(!f.battery)return '開電瓶，再啟動引擎';
+      if(!f.engines.some(Boolean))return '啟動引擎 · 右側總距控制升降';
+      if(f.rotorRPM<.9)return '旋翼加速中 · NR '+Math.round(f.rotorRPM*100)+'%';
+      if(f.ground)return f.parkingBrake?'鬆開停機煞車，再將總距提高至約 60%':'總距 60% 起飛 · 約 55% 懸停';
+      return f.hover?'懸停輔助 · 搖桿或總距輸入可接管':'搖桿控制前後左右 · 右側方向舵轉機頭 · 總距控制升降';
+    }
     const mobile=touchControls.mode.value==='mobile';
     const retry=mobile?'':' · R 重飛';
     if(replay) return '貨運回放 · '+Math.floor(replay.time/60)+' 分鐘 · '+f.phase;
@@ -2420,7 +2448,13 @@ function initialize(){
       run=f.service?menu:()=>action('KeyR');
     }
     else if(!replay&&!f.finished&&!f.ended&&!f.tow&&byId('gateGuide').hidden){
-      if(f.hold?.nav){label='接回手動';run=()=>toggleNavigation(f);}
+      if(f.aircraft.helicopter){
+        if(!f.battery){label='開電瓶';run=()=>setBattery(f,true);}
+        else if(!f.engines.some(Boolean)){label='啟動引擎';run=()=>startEngine(f,0);}
+        else if(f.ground&&f.parkingBrake){label='鬆開停機煞車';run=()=>action('KeyB');}
+        else if(!f.ground){label=f.hover?'接回手動':'懸停輔助';run=()=>toggleHelicopterHover(f);}
+      }
+      else if(f.hold?.nav){label='接回手動';run=()=>toggleNavigation(f);}
       else if(f.climbLesson&&!f.hold?.climb&&climbReady(f)){
         label='自動爬升';
         run=()=>{f.hold={heading:f.heading,altitude:35000*.3048,mach:cruiseMachTarget(f),climb:true};};
@@ -2449,6 +2483,10 @@ function initialize(){
     if(touchBrake.textContent!==brakeLabel) touchBrake.textContent=brakeLabel;
     touchBrake.setAttribute('aria-pressed',String(Boolean(f.airBrake)));
     touchGear.hidden=!f.aircraft.retract;
+    touchFlaps.hidden=Boolean(f.aircraft.helicopter);
+    touchGlide.hidden=Boolean(f.aircraft.helicopter);
+    touchAssist.textContent=f.aircraft.helicopter?(f.hover?'手動':'懸停'):'輔助';
+    touchThrottle.setAttribute('aria-label',f.aircraft.helicopter?'總距（控制升降）':'油門');
     touchGear.disabled=f.ground||!f.battery||Boolean(replay);
     touchParking.hidden=!f.ground;
     touchParking.setAttribute('aria-pressed',String(f.parkingBrake));
@@ -2948,6 +2986,8 @@ function initialize(){
       gear.visible=gear.scale.y>.06;
       model.userData.blades.forEach((blade,i)=>{if(!paused&&(f.engines?.[i]??true)) blade.rotation.z+=dt*(9+f.power*135)*(f.propLow?.72:1);});
       model.userData.navLights.forEach(lamp=>lamp.visible=Boolean(f.battery&&f.lights));
+      model.userData.updateHelicopter?.(f,dt,now,cameraMode===1,paused||Boolean(replay));
+      model.userData.updateFighterDeck?.(f,now);
       if(profile.role){
         const data=model.userData;
         data.flaps.forEach(part=>part.rotation.x=-f.flaps*.21);
@@ -3028,7 +3068,7 @@ function initialize(){
         }else{
           if(chaseHeading===null||!continuous||replay) chaseHeading=heading;
           chaseHeading+=wrapAngle(heading-chaseHeading)*(1-Math.exp(-dt*5.5));
-          const distance=profile.geometry[0]*(profile.id==='b773'?2.7:5);
+          const distance=profile.geometry[0]*(profile.helicopter?3.1:profile.id==='b773'?2.7:5);
           camera.position.set(pos.x-Math.sin(chaseHeading)*distance,
             pos.y+profile.gearHeight*4,pos.z+Math.cos(chaseHeading)*distance);
           camera.lookAt(pos.x+dir.x*12,pos.y+Math.sin(pitch)*8,pos.z+dir.z*12);
@@ -3042,6 +3082,8 @@ function initialize(){
         const setback=airliner?(profile.id==='b773'?.86:.64):0;
         cockpitEye.set(panel&&airliner?-.28:seat,height-(panel?.08:0),
           -half*(profile.role?.56:.30)+setback+(panel?.26:0));
+        if(profile.helicopter)cockpitEye.set(.42,.60,panel?-.92:-.65);
+        if(model.userData.cockpitEye){const eye=model.userData.cockpitEye;cockpitEye.set(eye.x,eye.y,eye.z+(panel?.14:0));}
         camera.position.copy(cockpitEye.applyQuaternion(model.quaternion).add(pos));
         cockpitAngles.set(cockpitView.pitch-(panel?(airliner?.24:.31):0),cockpitView.yaw,0);
         lookRotation.setFromEuler(cockpitAngles);
@@ -3097,7 +3139,7 @@ function initialize(){
       if(statusBox.textContent!==statusText) statusBox.textContent=statusText;
       statusBox.classList.toggle('practice-status',statusText.startsWith('起飛 ')||Boolean(f.approach&&!f.voyage));
       statusBox.classList.toggle('coach-warning',statusText.startsWith('起飛警告'));
-      const readyToTowIn=arrivalTowReady(f);
+      const readyToTowIn=!f.aircraft.helicopter&&arrivalTowReady(f);
       byId('towControls').hidden=!f.tow&&!readyToTowIn;
       byId('startGateTow').hidden=!readyToTowIn;
       byId('startGateTow').disabled=paused||Boolean(replay);
@@ -3124,8 +3166,24 @@ function initialize(){
       camera.position.set(p.x-21,airport.elevation+8,p.z+16);
       camera.lookAt(p.x,airport.elevation+profile.gearHeight,p.z);
       const inspection=previewInspection;
+      if(profile.helicopter){
+        model.userData.updateHelicopter(null,dt,now,['panel','night','cabin'].includes(inspection),false);
+        if(['panel','night','cabin'].includes(inspection)){
+          model.visible=false;model.rotation.set(0,0,0);
+          const data=model.userData;data.cabin.quaternion.identity();
+          camera.position.copy(model.position).add(new THREE.Vector3(.42,.60,-.65));
+          camera.lookAt(camera.position.x,camera.position.y-.1,camera.position.z-10);
+        }else if(hangarMode){
+          model.rotation.set(0,0,0);
+          const station={nose:[0,3,-18],side:[19,4,0],tail:[0,4,18],belly:[0,-9,4]}[inspection];
+          const angle=hangarYaw??now*.0003;
+          const offset=station?new THREE.Vector3(...station):new THREE.Vector3(Math.sin(angle)*18,18*hangarElevation,Math.cos(angle)*18);
+          camera.position.copy(model.position).addScaledVector(offset,hangarZoom);camera.lookAt(model.position);
+        }
+      }
       if(profile.role){
         const data=model.userData;
+        data.updateFighterDeck?.(null,now);
         const h=data.half;
         const showCargo=hangarMode&&inspection==='cargoDoor';
         animateCargoDoors(data,showCargo&&!profile.sideCargo,showCargo&&Boolean(profile.sideCargo),dt);
@@ -3155,6 +3213,7 @@ function initialize(){
             data.cabin.position.copy(model.position);data.cabin.quaternion.identity();
             const interior=inspection==='cabin'&&profile.role!=='fighter';
             camera.position.copy(model.position).add(new THREE.Vector3(.20,interior?.88:profile.role==='fighter'?.68:data.radius*.17+.62,interior?h*.39:-h*.56));
+            if(data.cockpitEye){const eye=data.cockpitEye;camera.position.copy(model.position).add(new THREE.Vector3(eye.x,eye.y,eye.z));}
             camera.lookAt(p.x,model.position.y+(interior?.45:.20),interior?p.z-h*.44:p.z-h*.72);
             if(profile.id==='b773'&&!interior){
               camera.position.set(p.x-.72,model.position.y+data.radius*.17+.60,p.z-h*.56+1.20);
@@ -3195,6 +3254,7 @@ function initialize(){
           'tour-apron':[25.0652,121.5507,28,25.0646,121.5527,10],
           'tour-river':[25.0787,121.5531,280,25.0742,121.5475,12],
           'tour-city':[25.0262,121.5534,650,25.0351,121.5649,190],
+          'tour-glass':[25.0377,121.5622,160,25.0396,121.5642,95],
           'tour-downtown':[25.0401,121.5047,550,25.0470,121.5160,85],
           'tour-woods':[25.1122,121.5770,34,25.1132,121.5777,12]
         };
@@ -3234,6 +3294,7 @@ function initialize(){
     }
     airlinerDetails[profile.id]?.update(flight,now,flight?activeDay:previewInspection==='night'?0:1);
     flightAudio.update(flight,cameraMode===1,audioEnabled&&!paused);
+    glassCanvas.style.opacity=cockpitActive()&&profile.role==='fighter'?'0':'1';
     const panelView=cockpitActive()&&cockpitView.preset===(twoSeats(profile)?2:1);
     let viewFov=cockpitActive()?clamp((panelView?53:69)+cockpitView.zoom,34,86):
       !flight&&['panel','night'].includes(previewInspection)?82:64;

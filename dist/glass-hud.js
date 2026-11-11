@@ -84,13 +84,13 @@ function makeGlassReadouts(canvas){
     const rising=f.vy>=0;
     const vertical=(rising?'▲ ':'▼ ')+Math.abs(f.vy).toFixed(1)+' m/s';
     const tas='TAS '+displayKmh(speeds.tas),gs='GS '+displayKmh(speeds.gs);
-    const mach='M '+speeds.mach.toFixed(2),power='油門 '+Math.round(f.power*100)+'%';
+    const mach='M '+speeds.mach.toFixed(2),power=(f.aircraft.helicopter?'總距 ':'油門 ')+Math.round(f.power*100)+'%';
     if(width>=365&&innerWidth>innerHeight){
       const iasX=center-tapeOffset-44*unit,right=center+tapeOffset+44*unit;
       const infoY=y-height*.21;
       [tas,gs,mach].forEach((text,i)=>label(text,iasX,infoY+i*13*unit,10,'right'));
       label(power,iasX,infoY+41*unit,11,'right','#ffdb87');
-      [vertical,f.gear?'起落架放下':'起落架收起',f.hold?'輔助開啟':'輔助關閉',view]
+      [vertical,f.aircraft.helicopter?'旋翼 '+Math.round((f.rotorRPM??0)*100)+'%':f.gear?'起落架放下':'起落架收起',f.hold||f.hover?'輔助開啟':'輔助關閉',view]
         .forEach((text,i)=>label(text,right,infoY+i*13*unit,10,'left'));
     }else{
       label(tas+'   '+gs+'   '+mach,center,height-20*unit,11);

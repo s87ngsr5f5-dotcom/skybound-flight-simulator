@@ -146,6 +146,7 @@ function createTrainer(approach,wind){
 }
 function stepTrainer(f, input, dt=simTick){
   if(f.ended) return;
+  if(f.aircraft?.helicopter)return stepHelicopter(f,input,dt);
   const aircraft=f.aircraft||trainer;
   const terrain=f.regional?regionalHeight:groundHeight;
   const payload=f.aircraft?.cargoLimit?(f.cargoState??=cargoBalance(f)):null;
