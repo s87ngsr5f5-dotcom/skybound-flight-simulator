@@ -1695,6 +1695,7 @@ function initialize(){
   }
   function menu(){
     flightAudio.stopSpeech();
+    setMobilePanel('');
     setOverview(false);
     tacticalView.clear();
     touchControls.reset();
@@ -1796,6 +1797,9 @@ function initialize(){
   }
   drawBindings();
   addEventListener('keydown',event=>{
+    if(event.code==='Escape'&&byId('hud').dataset.mobilePanel){
+      event.preventDefault();setMobilePanel('');mapButton.focus();return;
+    }
     if(event.target.closest('input,select,textarea,#quickControls[open]')) return;
     const code=boundCode(event.code);
     if(!flight||(!controls.has(code)&&!throttleKeys().includes(event.code))) return;
@@ -2038,13 +2042,33 @@ function initialize(){
   byId('menu').onclick=menu;
   const mobilePanels=Array.from(document.querySelectorAll('#flightBar [data-panel],#mobileExtras [data-panel]'));
   function setMobilePanel(name){
+    // The overview hides cockpit panels. Leave it before opening any menu.
+    if(name&&overviewActive)setOverview(false);
+    if(name){releaseFlightInputs();touchControls.reset();}
     byId('hud').dataset.mobilePanel=name;
+    document.body.classList.toggle('flight-panel-open',Boolean(name));
     byId('tacticalPanel').open=name==='nav'&&Boolean(flight?.tactical);
     for(const button of mobilePanels){
       button.setAttribute('aria-expanded',String(button.dataset.panel===name));
     }
     byId('quickControls').open=false;
   }
+  // A consistent exit remains reachable even on short phone screens.
+  for(const id of ['flightNavigation','systems','mobileExtras','quickControls']){
+    const close=document.createElement('button');close.type='button';
+    close.className='flight-panel-close';close.textContent='關閉 ×';
+    close.setAttribute('aria-label','關閉選單');
+    close.onclick=()=>{setMobilePanel('');mapButton.focus();};
+    const panel=byId(id);
+    if(id==='quickControls')panel.querySelector('summary').after(close);
+    else panel.prepend(close);
+  }
+  byId('quickControls').addEventListener('toggle',()=>{
+    if(!byId('quickControls').open&&byId('hud').dataset.mobilePanel==='settings')setMobilePanel('');
+  });
+  byId('tacticalPanel').addEventListener('toggle',()=>{
+    if(!byId('tacticalPanel').open&&flight?.tactical&&byId('hud').dataset.mobilePanel==='nav')setMobilePanel('');
+  });
   for(const button of mobilePanels){
     button.onclick=()=>{
       if(overviewActive&&button===mapButton){setOverview(false);setMobilePanel('');return;}
@@ -2052,7 +2076,7 @@ function initialize(){
     };
   }
   byId('touchSettings').onclick=()=>{
-    setMobilePanel('');
+    setMobilePanel('settings');
     byId('quickControls').open=true;
   };
   byId('mobilePause').onclick=()=>{if(flight) action('KeyP');};

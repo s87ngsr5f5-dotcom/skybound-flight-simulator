@@ -159,6 +159,23 @@
   max-height: 68vh;
   z-index: 10;
 }
+.flight-ui .flight-panel-close {
+  display: block;
+  position: sticky;
+  top: 0;
+  margin: 0 0 8px auto;
+  min-height: 44px;
+  z-index: 2;
+  background: #183d50;
+  border-radius: 8px;
+  touch-action: manipulation;
+}
+body:not(.flight-ui) .flight-panel-close { display: none; }
+.flight-ui #quickControls[open] { overflow-y: auto; overscroll-behavior: contain; }
+.flight-ui #flightNavigation,.flight-ui #systems,.flight-ui #mobileExtras { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.mobile-mode.flight-panel-open #touchRudderControl,
+.mobile-mode.flight-panel-open #touchQuick,
+.mobile-mode.flight-panel-open #touchThrottleControl { visibility: hidden; pointer-events: none; }
 .flight-ui #tacticalPanel { top: calc(var(--flight-top) + 51px); }
 .flight-ui #tacticalPanel:not([open]) { display: none; }
 .flight-ui #tacticalGuide { bottom: calc(var(--flight-bottom) + 34px); }

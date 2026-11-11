@@ -10,6 +10,7 @@ const touchControls=(()=>{
   const input={roll:0,pitch:0,rudder:0,brake:false};
   const motion={enabled:false,neutral:null,roll:0,pitch:0};
   const brakePointers=new Set();
+  const cancelRanges=[];
   let stickPointer=null,originX=0,originY=0,permissionRequest=0,motionTimer;
   const bounded=(value,min,max)=>Math.max(min,Math.min(max,value));
 
@@ -19,7 +20,9 @@ const touchControls=(()=>{
     thumb.style.transform='';
   }
   function reset(){
+    if(stickPointer!==null){try{stick.releasePointerCapture(stickPointer);}catch{}}
     center();
+    for(const cancel of cancelRanges)cancel();
     rudder.value='0';
     input.rudder=0;
     motion.neutral=null;
@@ -63,6 +66,10 @@ const touchControls=(()=>{
   });
   function dragRange(range,vertical,spring){
     let pointer=null;
+    cancelRanges.push(()=>{
+      const id=pointer;pointer=null;
+      if(id!==null){try{range.releasePointerCapture(id);}catch{}}
+    });
     function update(event){
       const box=range.getBoundingClientRect();
       const position=vertical?1-(event.clientY-box.top)/box.height:(event.clientX-box.left)/box.width;
