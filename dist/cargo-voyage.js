@@ -69,7 +69,7 @@ function applyVoyageFrame(f,frames,time){
   const fraction=a===b?0:limit((time-a[0])/(b[0]-a[0]),0,1);
   replayFields.forEach((key,i)=>{
     const from=a[i+1],to=b[i+1];
-    if(key==='heading') f[key]=from+wrapAngle(to-from)*fraction;
+    if(key==='heading'||key==='bank') f[key]=from+wrapAngle(to-from)*fraction;
     else if(i<14) f[key]=from+(to-from)*fraction;
     else f[key]=from;
   });

@@ -287,7 +287,9 @@ function createTacticalView(scene,camera,callbacks){
       frame=index>0?s.frames[index-1]:s.frames.at(-1);
       blend=next?clamp((replay.time-frame.time)/(next.time-frame.time),0,1):0;
     }
-    const plane=frame?.plane||[f.x,f.y,f.z,f.heading,f.pitch,f.bank,s.ammo];
+    const rawPlane=frame?.plane||[f.x,f.y,f.z,f.heading,f.pitch,f.bank,s.ammo];
+    const plane=rawPlane.map((value,i)=>next&&i<6?
+      (i===3||i===5?value+wrapAngle(next.plane[i]-value)*blend:interpolate(value,next.plane[i],blend)):value);
     const shots=6-plane[6];
     flash.intensity=0;
     for(let i=0;i<6;i++){
@@ -359,8 +361,7 @@ function createTacticalView(scene,camera,callbacks){
       const target=unitPool[0].position;
       camera.position.set(target.x+48,target.y+24,target.z+55);camera.lookAt(target);
     }else if(replay){
-      const state=plane.map((value,i)=>i<3&&next?interpolate(value,next.plane[i],blend):value);
-      const [x,y,z,heading,pitch,bank]=state;
+      const [x,y,z,heading,pitch,bank]=plane;
       const point=tacticalPoint({x,y,z},heading,view==='cockpit'?4:-75,0,y+(view==='cockpit'?1.3:17));
       camera.position.set(point.x,point.y,point.z);
       const aim=tacticalPoint({x,y,z},heading,view==='cockpit'?70:12,0,y+(view==='cockpit'?pitch*60:0));

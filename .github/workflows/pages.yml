@@ -24,6 +24,7 @@ jobs:
       - run: node verify-arrival-tow.cjs
       - run: node verify-heavy-cargo.cjs
       - run: node verify-fighter-controls.cjs
+      - run: node verify-roll-replay.cjs
       - run: node verify-tactical-lock.cjs
       - run: node verify-island-fields.cjs
       - run: node verify-taipei-city.cjs

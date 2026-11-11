@@ -25,7 +25,7 @@ for(const name of ['index.html','iphone.html']){
   assert.ok(html.includes('taipei-city.js?v=glass29'));
   assert.ok(html.includes('natural-trees.js?v=28')&&html.includes('airport-surroundings.js?v=30'));
   assert.ok(html.indexOf('natural-trees.js?v=28')<html.indexOf('airport-surroundings.js?v=30'));
-  assert.ok(html.indexOf('airport-surroundings.js?v=30')<html.indexOf('flight.js?v=airport30'));
-  assert.ok(html.indexOf('helicopter.js?v=29')<html.indexOf('flight.js?v=airport30'));
+  assert.ok(html.indexOf('airport-surroundings.js?v=30')<html.indexOf('flight.js?v=roll31'));
+  assert.ok(html.indexOf('helicopter.js?v=29')<html.indexOf('flight.js?v=roll31'));
 }
 console.log({tiles:index.tiles.length,buildings,roads,water,estimatedHeight:index.counts.estimatedHeight});

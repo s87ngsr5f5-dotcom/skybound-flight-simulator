@@ -42,9 +42,9 @@ for(const wind of [-50,50]){
  const manual={roll:.55,pitch:.10,rudder:0,trim:0,throttle:0};
  f.hold=null;
  for(let i=0;i<120*4;i++) stepTrainer(f,smoothControls(f,manual,simTick));
- assert(f.bank>.10&&f.bank<.42&&wrapAngle(f.heading-heading)>0);
- const centered={...manual,roll:0,pitch:0};
- for(let i=0;i<120*3;i++) stepTrainer(f,smoothControls(f,centered,simTick));
+ assert(f.bank>Math.PI/2&&f.bank<Math.PI&&wrapAngle(f.heading-heading)>0,'high-speed fighter rolls beyond 90 degrees without a heading snap');
+ const centered={...manual,roll:0,pitch:0,autoLevel:true};
+ for(let i=0;i<120*4;i++) stepTrainer(f,smoothControls(f,centered,simTick));
  assert(Math.abs(f.bank)<.02&&flightSpeeds(f).ias*3.6>1950&&f.y<2675);
 }
 const cold=makeRegionalFlight(from,to,plane,'cold',0,regionalRoute(from,to));

@@ -212,16 +212,17 @@ function stepTrainer(f, input, dt=simTick){
   const asymmetricYaw=engines.length>1?.26*f.power*(left-right)/engines.length:0;
   const g=9.80665;
   const fighterAirborne=aircraft.role==='fighter'&&!f.ground;
+  const attitudeAssist=Boolean(f.hold||f.tactical?.aimAssist||input.attitudeAssist);
   const fighterManual=fighterAirborne&&!f.hold&&!f.gear&&!f.flaps;
   const maneuver=input.maneuver??1;
   const highSpeedAuthority=gameAirborne?limit(1.65-mach*.65,.40,1):1;
   // Feed in part of the additional lift needed for a steep turn.
-  const turnLift=fighterManual?limit(mass*g/(Math.max(q,1)*aircraft.wingArea*liftSlope)*
+  const turnLift=fighterManual&&(attitudeAssist||Math.cos(f.bank)>.35&&Math.abs(input.roll)<.1)?limit(mass*g/(Math.max(q,1)*aircraft.wingArea*liftSlope)*
     (1/Math.max(.32,Math.cos(f.bank))-1),0,.15)*(1-Math.abs(input.pitch)):0;
   const trimBlend=gameAirborne&&!f.hold?limit((q-9000)/12000,0,1):0;
   const normalPitch=.015+f.trim+f.flaps*.008+turnLift;
   const centerPitch=trimBlend>0?normalPitch+trimBlend*(fastLevelPitch(f,q,speed,0,fighterManual?1.4:1)+f.trim*.25-normalPitch):normalPitch;
-  const pitchTarget=limit(centerPitch+input.pitch*(fighterManual?.50*highSpeedAuthority:.24*maneuver*(f.hold?1:highSpeedAuthority)),
+  const pitchTarget=limit(centerPitch+input.pitch*(attitudeAssist?1:Math.cos(f.bank))*(fighterManual?.50*highSpeedAuthority:.24*maneuver*(f.hold?1:highSpeedAuthority)),
     fighterManual?-.48:-.36,fighterManual?.54:.38);
   const bankTarget=input.roll*(fighterManual?1.25*highSpeedAuthority:.57*maneuver);
   f.commandPitch=pitchTarget;
@@ -230,17 +231,29 @@ function stepTrainer(f, input, dt=simTick){
   const pitchDamping=(fighterManual?9200:7800)+(input.yokeDamping?2100:0);
   const cgMoment=lift*(aircraft.cgOffset+(payload?.shift||0)*.18)*(gameAirborne?fastTrimAuthority(q):1);
   const pitchMoment=(pitchTarget-f.pitch)*14500*response*(fighterManual?1.4:1)*aircraft.inertia[0]/1650-f.pitchRate*pitchDamping*aircraft.inertia[0]/1650+cgMoment;
-  const bankMoment=(bankTarget-f.bank)*14000*response*(fighterManual?2.2:1)*aircraft.inertia[1]/2450-f.bankRate*(fighterManual?9500:5300)*aircraft.inertia[1]/2450;
-  const targetYaw=f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40): Math.tan(f.bank)*g/Math.max(20,speed)+input.rudder*(fighterManual?.37:.25)+beta*.35;
+  const bankMoment=wrapAngle(bankTarget-f.bank)*14000*response*(fighterManual?2.2:1)*aircraft.inertia[1]/2450-f.bankRate*(fighterManual?9500:5300)*aircraft.inertia[1]/2450;
+  // Manual ailerons command a roll rate, not a limited bank-angle target.
+  // Assisted navigation retains its bank-angle controller for stable approaches.
+  if(!f.ground&&!attitudeAssist){
+    const maxRollRate=aircraft.rollRate??(aircraft.role==='fighter'?2.8:aircraft.mass>20000?.48:1.05);
+    const authority=limit(q/600,.08,1)*highSpeedAuthority;
+    let rate=input.roll*maxRollRate*authority;
+    if(input.autoLevel&&Math.abs(input.roll)<.035)rate=limit(-wrapAngle(f.bank)*1.5,-maxRollRate*.55,maxRollRate*.55);
+    const responseTime=aircraft.role==='fighter'?.18:aircraft.mass>20000?.65:.30;
+    const settling=Math.abs(rate)<Math.abs(f.bankRate)&&rate*f.bankRate>=0;
+    f.bankRate+=(rate-f.bankRate)*(1-Math.exp(-dt/(responseTime*(settling?.45:1))));
+  }else f.bankRate+=bankMoment/aircraft.inertia[1]*dt;
+  // Actual lateral lift stays finite at 90 degrees; tan(bank) does not.
+  const coordinatedYaw=attitudeAssist?Math.tan(limit(f.bank,-1.2,1.2))*g/Math.max(20,speed):
+    limit(lift*Math.sin(f.bank)/(mass*Math.max(20,speed)),-1.3,1.3);
+  const targetYaw=f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40):
+    coordinatedYaw+input.rudder*(fighterManual?.37:.25)*(attitudeAssist?1:Math.cos(f.bank))+beta*.35;
   const yawMoment=(targetYaw+asymmetricYaw-f.yawRate)*8800*aircraft.inertia[2]/2850;
   f.pitchRate+=pitchMoment/aircraft.inertia[0]*dt;
-  f.bankRate+=bankMoment/aircraft.inertia[1]*dt;
   f.yawRate+=yawMoment/aircraft.inertia[2]*dt;
   f.pitch=limit(f.pitch+f.pitchRate*dt,-.62,.66);
-  const bankLimit=fighterAirborne?1.28:.86;
-  f.bank=limit(f.bank+f.bankRate*dt,-bankLimit,bankLimit);
+  f.bank=wrapAngle(f.bank+f.bankRate*dt);
   if((f.pitch===-.62&&f.pitchRate<0)||(f.pitch===.66&&f.pitchRate>0)) f.pitchRate=0;
-  if(Math.abs(f.bank)===bankLimit&&f.bank*f.bankRate>0) f.bankRate=0;
   f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/6,0,1):1));
   if(f.ground){
     f.lateralAcceleration=0;
@@ -260,7 +273,7 @@ function stepTrainer(f, input, dt=simTick){
     const s=Math.sin(f.heading), c=Math.cos(f.heading);
     const side=lift*Math.sin(f.bank)-q*aircraft.wingArea*.19*Math.sin(beta);
     const vertical=lift*Math.cos(f.bank)*Math.cos(pathAngle);
-    const axial=thrust*Math.cos(f.pitch)-lift*Math.sin(pathAngle);
+    const axial=thrust*Math.cos(f.pitch)-lift*Math.cos(f.bank)*Math.sin(pathAngle);
     const airBrakeDrag=f.airBrake?Math.min(q*aircraft.wingArea*.24,mass*17):0;
     const d=(drag+airBrakeDrag+(f.spoilers?q*aircraft.wingArea*.10:0))/Math.max(1,speed);
     f.vx+=(s*axial+c*side-airX*d)/mass*dt;

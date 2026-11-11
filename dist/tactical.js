@@ -110,6 +110,7 @@ function tacticalAssistControls(f){
   const {bearing,elevation}=tacticalAim(f,target);
   const desiredPitch=limit(elevation,-.10,.22);
   return {
+    attitudeAssist:true,
     roll:limit(bearing*1.25-f.bank*.24,-.67,.67),
     rudder:limit(bearing*.66,-.32,.32),
     pitch:limit((desiredPitch-.015-f.trim)/.50,-.25,.42)

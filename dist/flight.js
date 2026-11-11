@@ -1737,7 +1737,7 @@ function initialize(){
       else rangeShot(flight);
     }
     if(code==='KeyK'&&!paused&&flight.tactical) tacticalView.command('gun');
-    if(code==='KeyV') flight.bankCommand=0;
+    if(code==='KeyV'){flight.bankCommand=0;flight.levelWings=true;}
     if(code==='KeyN') cycleCockpitView();
     if(code==='Home'&&cockpitActive()){
       cockpitView.preset=0;
@@ -2177,9 +2177,9 @@ function initialize(){
     if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
       f.hold=null;
     }
-    if(f.aircraft.helicopter||f.ground||!settings.keepBank||f.hold||f.tactical?.aimAssist) f.bankCommand=0;
-    else if(Math.abs(roll)>.04) f.bankCommand=roll;
-    else roll=f.bankCommand||0;
+    // Holding bank must not latch the last aileron input into an endless roll.
+    f.bankCommand=0;
+    if(Math.abs(roll)>.04)f.levelWings=false;
     if(f.hold){
       const manualThrottle=throttle;
       if(Math.abs(roll)+Math.abs(pitch)+Math.abs(manual.rudder)+(!f.hold.climb?Math.abs(throttle):0)>.15) stopNavigation(f);
@@ -2201,7 +2201,7 @@ function initialize(){
         f.tactical.notice='手動接管';
       }else ({roll,pitch,rudder:assistedRudder}=assist);
     }
-    return {response:settings.sensitivity,yokeDamping:settings.mouse&&!f.hold&&!f.tactical?.aimAssist&&Math.abs(manual.pitch)<.07,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
+    return {autoLevel:!settings.keepBank||Boolean(f.levelWings),response:settings.sensitivity,yokeDamping:settings.mouse&&!f.hold&&!f.tactical?.aimAssist&&Math.abs(manual.pitch)<.07,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
       rudder:assistedRudder??clamp(manual.rudder+(f.ground?roll:0),-1,1),
       throttle,
       trim:axis('KeyX','KeyZ')*.22,brake:touch.brake||keys.has('Space')||Boolean(buttons[0]?.pressed)};
@@ -2957,7 +2957,7 @@ function initialize(){
       const blend=replay||paused||f.finished||!continuous?1:clamp(accumulator/simTick,0,1);
       const heading=previousPose.heading+wrapAngle(f.heading-previousPose.heading)*blend;
       const pitch=THREE.MathUtils.lerp(previousPose.pitch,f.pitch,blend);
-      const bank=THREE.MathUtils.lerp(previousPose.bank,f.bank,blend);
+      const bank=previousPose.bank+wrapAngle(f.bank-previousPose.bank)*blend;
       const pos=visualPosition.set(
         THREE.MathUtils.lerp(previousPose.x,f.x,blend),
         THREE.MathUtils.lerp(previousPose.y,f.y,blend),
