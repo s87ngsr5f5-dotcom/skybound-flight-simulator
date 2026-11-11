@@ -18,17 +18,17 @@ function createTaipeiCity(scene,ground,airports){
     }
     return false;
   }
-  const stats={buildings:0,tiles:0,roads:0,loading:0,vehicles:0};
+  const stats={buildings:0,tiles:0,roads:0,loading:0,vehicles:0,maskRevision:0};
   let index=null,indexRequest=false,nextScan=0,clock=0,jobs=[],day=1;
   const bounds=[24.97,121.43,25.14,121.65];
   const inside=(lat,lon)=>lat>=bounds[0]&&lat<=bounds[2]&&lon>=bounds[1]&&lon<=bounds[3];
   const canvas=document.createElement('canvas');canvas.width=256;canvas.height=128;
   const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#c5c6c1';ctx.fillRect(0,0,256,128);
+  ctx.fillStyle='#eee9e0';ctx.fillRect(0,0,256,128);
   for(let i=0;i<4;i++){
     ctx.fillStyle=i%2?'#455e69':'#71858c';ctx.fillRect(i*64+9,16,45,72);
     ctx.fillStyle='#b4c8cb';ctx.fillRect(i*64+11,18,20,65);
-    ctx.fillStyle='#e2dfd1';ctx.fillRect(i*64+29,16,3,72);
+    ctx.fillStyle='#c7c3b8';ctx.fillRect(i*64+29,16,3,72);
     ctx.fillStyle='#999d98';ctx.fillRect(i*64+8,96,47,12);
   }
   const facade=new THREE.CanvasTexture(canvas);facade.colorSpace=THREE.SRGBColorSpace;
@@ -44,8 +44,8 @@ function createTaipeiCity(scene,ground,airports){
   const stripe=new THREE.MeshStandardMaterial({color:0xddd8b5,roughness:.9,side:THREE.DoubleSide});
   const water=new THREE.MeshStandardMaterial({color:0x486f76,roughness:.3,metalness:.2,side:THREE.DoubleSide});
   for(const mat of [asphalt,stripe,water]){mat.polygonOffset=true;mat.polygonOffsetFactor=-3;mat.polygonOffsetUnits=-3;}
-  const palette=['#b8b6ab','#d1c6ae','#9faeb0','#b9aaa1','#c7c8c2','#a8b4ad','#b5b4ba','#dad4c7'].map(c=>new THREE.Color(c));
-  const roofPalette=['#7c8684','#a9aaa1','#588184','#a9a294','#a4a8a6','#717a7b','#a9a397','#79866c'].map(c=>new THREE.Color(c));
+  const palette=['#b36e55','#d1ac67','#619f9b','#64869f','#c28e76','#dbcfb3','#829768','#91929e'].map(c=>new THREE.Color(c));
+  const roofPalette=['#944f42','#a29b89','#38756e','#47697d','#aa6e56','#aaa999','#677d57','#596372'].map(c=>new THREE.Color(c));
   const landmarks=new THREE.Group();landmarks.name='Taipei landmarks';root.add(landmarks);
   const landmarkSites=[
     {name:'臺北101',lat:25.03396,lon:121.56450,radius:53,height:508,type:'101'},
@@ -141,6 +141,7 @@ function createTaipeiCity(scene,ground,airports){
   const skipBuilding=(x,z)=>landmarkSites.some(s=>Math.abs(x-s.x)<s.radius&&Math.abs(z-s.z)<s.radius)||airports.some(a=>{
     if(Math.hypot(x-a.x,z-a.z)>a.length/2+500)return false;
     const p=runwayCoordinates(x,z,a);
+    if(typeof airportSurroundingsContains==='function'&&airportSurroundingsContains(a,p))return true;
     return Math.abs(p.along)<a.length/2+80&&Math.abs(p.cross)<110;
   });
   function buffers(){return {p:[],n:[],uv:[],c:[]};}
@@ -177,7 +178,7 @@ function createTaipeiCity(scene,ground,airports){
       const points=[];for(let i=0;i<coords.length;i+=2)points.push([x+coords[i],z+coords[i+1]]);
       mask(group,Math.min(...points.map(p=>p[0]))-2,Math.min(...points.map(p=>p[1]))-2,Math.max(...points.map(p=>p[0]))+2,Math.max(...points.map(p=>p[1]))+2);
       const center=ground(x,z),base=Math.min(center,...points.map(p=>ground(...p)))-.25;
-      const top=center+h,color=palette[tone];
+      const top=center+h,color=palette[tone].clone().multiplyScalar(h>75?.76:1);
       polygon(roofs,points,top,roofPalette[tone]);
       for(let i=0;i<points.length;i++){
         const a=points[i],b=points[(i+1)%points.length],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);
@@ -225,12 +226,14 @@ function createTaipeiCity(scene,ground,airports){
     mesh(group,roads,asphalt,'Taipei streets and bridges');mesh(group,lines,stripe,'Road markings');mesh(group,waters,water,'Taipei water');
     Object.assign(group.userData,{buildings:built,roads:data.r.length,routes:data.r.filter(r=>r[0]>=11&&r[2].length>=6)});root.add(group);loaded.set(key,group);
     stats.buildings+=built;stats.roads+=data.r.length;stats.tiles=loaded.size;
+    stats.maskRevision++;
   }
   function dispose(key){
     const group=loaded.get(key);if(!group)return;
     stats.buildings-=group.userData.buildings;stats.roads-=group.userData.roads;
     for(const [key,rect] of group.userData.masks){const cell=masks.get(key);cell.delete(rect);if(!cell.size)masks.delete(key);}
     group.traverse(o=>o.geometry?.dispose());root.remove(group);loaded.delete(key);stats.tiles=loaded.size;
+    stats.maskRevision++;
   }
   function request(tile){
     const key=tile[0];pending.add(key);stats.loading=pending.size;

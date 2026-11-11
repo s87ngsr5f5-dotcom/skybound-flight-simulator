@@ -20,5 +20,11 @@ for(const [key,x,z,count] of index.tiles){
 assert.equal(buildings,index.counts.buildings);assert.equal(roads,index.counts.roads);assert.equal(water,index.counts.waterPolygons);
 assert.equal(index.counts.taggedHeight+index.counts.estimatedHeight,buildings);
 assert.ok(buildings>90000);assert.ok(roads>19000);
-for(const name of ['index.html','iphone.html'])assert.ok(fs.readFileSync(path.join(__dirname,'dist',name),'utf8').includes('taipei-city.js?v=27'));
+for(const name of ['index.html','iphone.html']){
+  const html=fs.readFileSync(path.join(__dirname,'dist',name),'utf8');
+  assert.ok(html.includes('taipei-city.js?v=28'));
+  assert.ok(html.includes('natural-trees.js?v=28')&&html.includes('airport-surroundings.js?v=28'));
+  assert.ok(html.indexOf('natural-trees.js?v=28')<html.indexOf('airport-surroundings.js?v=28'));
+  assert.ok(html.indexOf('airport-surroundings.js?v=28')<html.indexOf('flight.js?v=scene28'));
+}
 console.log({tiles:index.tiles.length,buildings,roads,water,estimatedHeight:index.counts.estimatedHeight});

@@ -69,7 +69,7 @@ function* buildVegetation(scene,ground,airports,map,cover,highways,cityBlocked){
   }
   const limit=23000;
   const bark=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,envMapIntensity:.12});
-  const leaves=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.96,envMapIntensity:.15});
+  const leaves=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.96,envMapIntensity:.15,vertexColors:true});
   // A small shared texture breaks up the solid color of the nearest crowns.
   const tile=document.createElement('canvas');
   tile.width=tile.height=128;
@@ -78,7 +78,7 @@ function* buildVegetation(scene,ground,airports,map,cover,highways,cityBlocked){
   ink.fillRect(0,0,128,128);
   for(let i=0;i<2100;i++){
     const x=hash(i,0,20)*128,z=hash(i,0,21)*128;
-    const shade=100+Math.round(hash(i,0,22)*145);
+    const shade=150+Math.round(hash(i,0,22)*90);
     ink.fillStyle='rgb('+shade+' '+shade+' '+shade+')';
     ink.beginPath();
     ink.ellipse(x,z,1.2+hash(i,0,23)*2.6,.6+hash(i,0,24)*1.2,hash(i,0,25)*Math.PI,0,Math.PI*2);
@@ -99,12 +99,12 @@ function* buildVegetation(scene,ground,airports,map,cover,highways,cityBlocked){
     return mesh;
   }
   const trunks=batch('Vegetation trunks',new THREE.CylinderGeometry(.68,1,1,7),bark);
-  const crowns=batch('Vegetation crowns',new THREE.IcosahedronGeometry(1,1),detailedLeaves);
-  const branches=batch('Vegetation crown lobes',new THREE.IcosahedronGeometry(1,0),detailedLeaves);
-  const distant=batch('Vegetation distant crowns',new THREE.IcosahedronGeometry(1,0),leaves);
+  const crowns=batch('Vegetation crowns',naturalTreeCrown(2),detailedLeaves);
+  const branches=batch('Vegetation crown lobes',naturalTreeCrown(1),detailedLeaves);
+  const distant=batch('Vegetation distant crowns',naturalTreeCrown(0),leaves);
   const matrix=new THREE.Object3D(), color=new THREE.Color();
   const up=new THREE.Vector3(0,1,0), normal=new THREE.Vector3(), yawRotation=new THREE.Quaternion();
-  let last='';
+  let last='',seenCityRevision=-1,nextMaskReview=0;
   function hash(x,z,salt){
     let n=Math.imul(x,374761393)^Math.imul(z,668265263)^Math.imul(salt,1442695041);
     n=Math.imul(n^(n>>>13),1274126177);
@@ -131,20 +131,23 @@ function* buildVegetation(scene,ground,airports,map,cover,highways,cityBlocked){
     const cell=masks.get(key(Math.floor(x/maskSize),Math.floor(z/maskSize)));
     return cell?.some(test=>test(x,z,radius));
   }
-  function update(x,z,quality,visible=true){
+  function update(x,z,quality,visible=true,cityRevision=0){
     if(!visible){
       for(const mesh of [trunks,crowns,branches,distant]) mesh.visible=false;
       last='';
       return;
     }
     const spacing=quality==='ultra'?160:128;
+    if(cityRevision!==seenCityRevision&&performance.now()>=nextMaskReview){
+      last='';seenCityRevision=cityRevision;nextMaskReview=performance.now()+1200;
+    }
     const col=Math.floor(x/spacing),row=Math.floor(z/spacing),id=key(col,row)+':'+quality;
     if(last===id) return;
     last=id;
     for(const mesh of [trunks,crowns,branches,distant]) mesh.count=0;
     const [near,mid,far]=quality==='ultra'?[680,2200,7300]:quality==='low'?[215,930,2900]:quality==='high'?[450,1500,5300]:[320,1200,4200];
     const centerX=(col+.5)*spacing,centerZ=(row+.5)*spacing;
-    for(const [grid,inner,outer,detail] of [[10,0,near,2],[23,near,mid,1],[54,mid,far,0]]){
+    for(const [grid,inner,outer,detail] of [[11,0,near,2],[21,near,mid,1],[42,mid,far,0]]){
       for(let iz=Math.floor((centerZ-outer)/grid);iz*grid<centerZ+outer;iz++){
         for(let ix=Math.floor((centerX-outer)/grid);ix*grid<centerX+outer;ix++){
           const tx=(ix+.12+.76*hash(ix,iz,1))*grid,tz=(iz+.12+.76*hash(ix,iz,2))*grid;
@@ -158,11 +161,11 @@ function* buildVegetation(scene,ground,airports,map,cover,highways,cityBlocked){
           if(hash(ix,iz,3)>density) continue;
           const size=hash(ix,iz,4), tall=hash(ix,iz,5)>.84;
           const height=8+size*10;
-          const width=detail===2?height*(tall?.30:.47):grid*(.40+density*.23);
+          const width=height*(tall?.26:.39);
           if(blocked(tx,tz,width*(detail===2?1.25:1)+1)) continue;
           const angle=hash(ix,iz,6)*Math.PI*2;
           const grove=hash(Math.floor(tx/65),Math.floor(tz/65),8);
-          color.setHSL(.225+grove*.08,.36+grove*.14,.25+size*.09+grove*.06,THREE.SRGBColorSpace);
+          color.setHSL(.255+grove*.055,.26+grove*.12,.23+size*.055+grove*.025,THREE.SRGBColorSpace);
           if(detail===2){
             place(crowns,tx,elevation+height*.69,tz,width,height*(tall?.42:.34),width*.88,angle);
             color.multiplyScalar(.83);
@@ -172,11 +175,9 @@ function* buildVegetation(scene,ground,airports,map,cover,highways,cityBlocked){
             color.setHSL(.08,.34,.27+size*.09,THREE.SRGBColorSpace);
             place(trunks,tx,elevation+height*.23-.35,tz,.19+size*.23,height*.48,.19+size*.23,angle);
           }else{
-            // A wider crown stands in for a group of trees beyond the near view.
-            const probe=grid*.30;
-            const slopeX=(ground(tx+probe,tz)-elevation)/probe;
-            const slopeZ=(ground(tx,tz+probe)-elevation)/probe;
-            place(distant,tx,elevation+height*.39,tz,width,height*.49,width*.92,angle,slopeX,slopeZ);
+            // Keep distant trees upright and tree-sized instead of stretching one
+            // flat polyhedron over an entire 54 m forest cell.
+            place(distant,tx,elevation+height*.65,tz,width,height*.38,width*.93,angle);
           }
         }
       }

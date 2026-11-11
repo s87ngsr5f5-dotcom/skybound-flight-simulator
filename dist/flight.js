@@ -362,7 +362,7 @@ function initialize(){
   asphalt.map=pavementTexture(false);concrete.map=pavementTexture(true);
   asphalt.color.set('#d3d7d7');concrete.color.set('#d4d6d1');
   const glass = material('#53758b'), roof = material('#a4afac');
-  const airportGroups=[],jetwayWalls=new Map();
+  const airportGroups=[],airportDetails=[],jetwayWalls=new Map();
   const jetwayPaint=material('#b4c0c7'), jetwayDark=material('#36464d');
   const jetwayGlass=new THREE.MeshStandardMaterial({color:0x527f99,roughness:.25,transparent:true,opacity:.37,depthWrite:false});
   function makeJetway(){
@@ -507,6 +507,8 @@ function initialize(){
     terminalLabel.rotation.y=-sideOfApron*Math.PI/2;
     terminalLabel.position.set(gateWall-sideOfApron*.15,height*.78,apronZ);
     group.add(terminalLabel);
+    if(!local&&typeof createAirportSurroundings==='function'&&typeof naturalTreeCrown==='function')airportDetails.push(createAirportSurroundings(group,airport,
+      {terminalX,terminalWidth,height,buildingLength,apronZ,gateWall}));
     const byMaterial=new Map();
     for(const child of group.children){
       if(child.geometry?.type!=='BoxGeometry') continue;
@@ -594,7 +596,7 @@ function initialize(){
     if(!detailed||loadingScenery) return;
     loadingScenery=true;
     const assets=['taipei-data.js','forest-cover.js?v=1',
-      'vegetation.js?v=city27','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=city27'];
+      'vegetation.js?v=scene28','taiwan-highways.js?v=1','airport-city-data.js?v=2','regional-scenery.js?v=city27'];
     Promise.all(assets.map(src=>new Promise((resolve,reject)=>{
       const script=document.createElement('script');
       script.src=src;
@@ -1931,6 +1933,7 @@ function initialize(){
   }
   byId('openHangar').onclick=()=>openInspection(true);
   byId('viewScene').onclick=()=>{
+    if(byId('inspect').value==='tour-landside')planPreviewAirport=airports.find(a=>a.code==='RCSS');
     openInspection(false);
   };
   byId('exitInspection').onclick=closeInspection;
@@ -3176,14 +3179,17 @@ function initialize(){
       models.forEach(model=>{model.visible=false;if(model.userData.cabin)model.userData.cabin.visible=false;});
       const tour=previewInspection;
       const airport=planPreviewAirport||selectedAirport('departure');
-      if(tour==='tour-terminal'||tour==='tour-runway'){
+      if(tour==='tour-terminal'||tour==='tour-runway'||tour==='tour-landside'){
         const apron=airport.apron, half=airport.length/2;
         const terminal=tour==='tour-terminal';
-        const eye=terminal?airportPoint(airport,-122,apron*.62):airportPoint(airport,-half+14,0);
-        const target=terminal?airportPoint(airport,65,jetwayWalls.get(airport.code)):airportPoint(airport,-half+300,0);
-        camera.position.set(eye.x,airport.elevation+(terminal?27:21),eye.z);
+        const landside=tour==='tour-landside';
+        const eye=landside?airportPoint(airport,155,apron+Math.sign(apron)*210):
+          terminal?airportPoint(airport,-122,apron*.62):airportPoint(airport,-half+14,0);
+        const target=landside?airportPoint(airport,25,apron+Math.sign(apron)*98):
+          terminal?airportPoint(airport,65,jetwayWalls.get(airport.code)):airportPoint(airport,-half+300,0);
+        camera.position.set(eye.x,airport.elevation+(landside?32:terminal?27:21),eye.z);
         camera.up.set(0,1,0);
-        camera.lookAt(target.x,airport.elevation+(terminal?5:0),target.z);
+        camera.lookAt(target.x,airport.elevation+(landside?4:terminal?5:0),target.z);
       }else{
         const tours={
           'tour-apron':[25.0652,121.5507,28,25.0646,121.5527,10],
@@ -3200,6 +3206,7 @@ function initialize(){
     }
     const viewerX=flight?.x??selectedAirport('departure').x;
     const viewerZ=flight?.z??selectedAirport('departure').z;
+    for(const detail of airportDetails)detail.update(camera.position.x,camera.position.z,activeDay,renderingQuality());
     taipeiCity.root.visible=!hangarMode;
     if(!renderer.instrumentOnly&&!hangarMode)taipeiCity.update(dt,camera.position.x,camera.position.z,
       renderingQuality(),activeDay,byId('weather').value==='wet',paused||Boolean(replay));
@@ -3220,7 +3227,7 @@ function initialize(){
       const {x,y,z}=camera.position;
       const heightAboveGround=y-renderedGround(x,z);
       const groundTraffic=heightAboveGround<1500;
-      detailedScenery.plants.update(x,z,renderingQuality(),heightAboveGround<3200);
+      detailedScenery.plants.update(x,z,renderingQuality(),heightAboveGround<3200,taipeiCity.stats?.maskRevision??0);
       detailedScenery.region.update(x,z,renderingQuality(),dt,activeDay,groundTraffic);
       detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',
         paused||Boolean(replay),renderingQuality(),groundTraffic);
