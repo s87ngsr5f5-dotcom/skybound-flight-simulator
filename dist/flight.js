@@ -3680,6 +3680,16 @@ function initialize(){
   scene.add(airportLabel,runwayMarker,markerStem);
   if(typeof carrierOps!=='undefined') carrierOps.buildCarrier3D(scene);
   if(typeof airRefueling!=='undefined') airRefueling.buildTanker3D(THREE, scene);
+  const airportPalsUpdaters=[];
+  if(typeof airwaysNav!=='undefined'){
+    airwaysNav.ensureVORCoordinates(geoPoint);
+    if(typeof taiwanAirports!=='undefined'){
+      for(const ap of taiwanAirports){
+        const pals=airwaysNav.buildPrecisionLighting(THREE,scene,ap);
+        if(pals&&pals.updateRabbit) airportPalsUpdaters.push(pals.updateRabbit);
+      }
+    }
+  }
   let lastAirportLabel='';
   function drawAirportLabel(f){
     const r=f?.destination;
@@ -3836,6 +3846,7 @@ function initialize(){
               if(wsEl&&!wsEl.hidden) wsEl.hidden=true;
             }
             if(typeof flightRecorder!=='undefined') flightRecorder.step(f,simTick);
+            if(airportPalsUpdaters.length) airportPalsUpdaters.forEach(fn=>fn(f.elapsed));
             if(typeof airRefueling!=='undefined'){
               airRefueling.stepRefueling(f,simTick,showPill);
               const pdiHud=byId('aarPdiHud');

@@ -1,0 +1,33 @@
+SKYBOUND GLOBAL v0.41 更新紀錄 (Release 0.41)
+==================================================
+
+【核心亮點：航圖與地圖細節深度升級 · 全台 VOR/DME 導航網絡 · 民航航路走廊 · 14 NM ILS 羽狀波束 · ALSF-2 精密跑道燈光】
+
+1. 全台民航特高頻全向信標網絡 (Taiwan VOR/DME Navigation Network)
+   - 建立全台 7 座核心 VOR/DME 導航台完整資料庫：
+     * APU (鞍部 VOR/DME 112.5 MHz / CH 72X · 陽明山要衝)
+     * TNA (台北 VOR/DME 114.3 MHz / CH 90X · 松山場內)
+     * HLG (後龍 VOR/DME 114.0 MHz / CH 87X · 苗栗西部導航點)
+     * MKG (馬公 VOR/DME 115.2 MHz / CH 99X · 澎湖海峽樞紐)
+     * TNN (台南 VOR/DME 113.3 MHz / CH 80X · 西南平原中心)
+     * GID (綠島 VOR/DME 113.7 MHz / CH 84X · 東部外海國際線)
+     * HCN (恆春 VOR/DME 113.5 MHz / CH 82X · 南端進出空域)
+   - 支援即時 VOR 徑向線 (Radial Bearing) 解算與 DME 斜距 (Nautical Miles) 測距，判斷 TO/FROM 電台航向。
+
+2. 民航高/低空航路走廊 (Civil Airways Corridors)
+   - 納入台灣空域主要標準航線：
+     * W4 航線：台北 (TNA) - 後龍 (HLG) - 馬公 (MKG)，最低安全高度 MEA 5,000 ft。
+     * B591 航線：鞍部 (APU) - 後龍 (HLG) - 台南 (TNN) - 恆春 (HCN) 西部縱貫幹線，MEA 7,000 ft。
+     * A1 航線：恆春 (HCN) - 綠島 (GID) - 花蓮外海 (RCYU) 東部國際大動脈，MEA 11,000 ft。
+   - 航圖支援青藍雙向走廊標繪與航線標籤。
+
+3. 14 NM ILS 儀表著陸羽狀引導扇面 (14 NM ILS Feather & Markers)
+   - 依據標準民航規範，為主要跑道建立長達 14 海浬 (~26 公里) 的 3° 儀表著陸系統羽狀引導錐面 (Feather Cone)。
+   - 標繪航向道 (Localizer) ±2.5° 扇形帶與 3° 下滑波束 (Glide Slope)。
+   - 包含 Outer Marker (OM, 4 NM, 高度 ~411m) 與 Middle Marker (MM, 1 NM, 高度 ~120m) 測距定位點。
+
+4. ALSF-2 高強度精密跑道與滑行道夜航照明系統 (Precision Runway Lighting System)
+   - 跑道進近燈光排 (Approach Light Bars)：跑道頭外延伸 720m 的白色 5 燈橫向排燈、前 300m 紅色側排燈。
+   - 循序奔流跑馬閃光燈 (Rabbit Flasher)：以 2 Hz 頻率自 720m 沿中線奔流湧向跑道頭，引導夜間與低能見度降落。
+   - 跑道中線嵌入燈 (Runway Centerline Lights)：全白 -> 跑道後段 900m 紅白相間 -> 最後 300m 全紅終止預警。
+   - 接地帶排燈 (TDZ) 與滑行道中線綠燈、道邊藍燈完整鋪設。
