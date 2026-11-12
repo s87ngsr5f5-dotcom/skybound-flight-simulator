@@ -1366,11 +1366,19 @@ function initialize(){
     const mpCard=byId('multiplayerSection');
     if(mpCard){
       if(isMultiplayer){
+        mpCard.hidden=false;
         mpCard.open=true;
         mpCard.classList.add('mp-card-highlight');
         byId('fly').textContent='🌐 開始多人連線飛行 →';
         byId('fly').classList.add('mp-btn-primary');
+      }else if(lesson==='free'){
+        mpCard.hidden=false;
+        mpCard.open=false;
+        mpCard.classList.remove('mp-card-highlight');
+        byId('fly').textContent='開始飛行 →';
+        byId('fly').classList.remove('mp-btn-primary');
       }else{
+        mpCard.hidden=true;
         mpCard.classList.remove('mp-card-highlight');
         byId('fly').textContent='開始飛行 →';
         byId('fly').classList.remove('mp-btn-primary');

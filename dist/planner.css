@@ -11,39 +11,129 @@
 }
 .plan-modes {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   padding: 0 24px 18px;
 }
 .plan-modes button {
-  min-height: 44px;
-  font-weight: 650;
+  min-height: 46px;
+  font-weight: 700;
+  border-radius: 9px;
+  border: 1px solid rgba(140, 200, 235, 0.25);
+  background: rgba(16, 38, 58, 0.75);
+  color: #aed5e8;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: 0.2px;
+}
+.plan-modes button:hover {
+  background: rgba(28, 76, 108, 0.9);
+  color: #fff;
+  border-color: #65dcff;
+  transform: translateY(-1px);
 }
 .plan-modes button[aria-pressed="true"] {
-  border-color: #73d9fb;
-  background: #1c526e;
+  border-color: #00e5ff;
+  background: linear-gradient(135deg, #154c6d, #1b6da4);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+  font-weight: 800;
 }
 #plan .planner {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   grid-template-areas: "preview setup";
+  gap: 20px;
+  padding: 20px 24px 24px;
 }
 .plan-setup { grid-area: setup; min-width: 0; }
-.plan-preview { grid-area: preview; min-width: 0; background: #102c40; }
+.plan-preview {
+  grid-area: preview;
+  min-width: 0;
+  background: rgba(12, 32, 48, 0.75);
+  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid rgba(140, 200, 235, 0.2);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.35);
+}
 .plan-setup section { padding: 0; }
 .plan-setup select, .plan-preview select { min-width: 0; max-width: 100%; }
 .plan-setup details, .plan-preview details, .plan-reference {
-  border-top: 1px solid #8cc8eb3d;
+  border: 1px solid rgba(140, 200, 235, 0.2);
+  border-radius: 10px;
+  background: rgba(11, 26, 40, 0.6);
   margin-top: 14px;
-  padding-top: 12px;
+  padding: 10px 14px;
+  transition: all 0.2s ease;
+}
+.plan-setup details[open], .plan-preview details[open] {
+  border-color: rgba(0, 229, 255, 0.35);
+  background: rgba(11, 26, 40, 0.9);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 .plan-primary label { margin-top: 0; }
-.plan-start { margin: 4px 0 16px; }
-.plan-start #fly { flex: 1; min-height: 46px; }
-.plan-preview .map { margin-top: 16px; min-height: 130px; }
-.plan-preview #planMap { max-height: 290px; width: auto; }
+.plan-start {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+}
+.plan-start #fly {
+  flex: 1.6;
+  min-height: 50px;
+  font-size: 16px;
+  font-weight: 800;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #0f1c24;
+  border: none;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+  letter-spacing: 0.5px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.plan-start #fly:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 22px rgba(245, 158, 11, 0.6);
+}
+.plan-start #fly:active {
+  transform: translateY(0);
+}
+.plan-start #approach, .plan-start #quickFastCruise {
+  flex: 1;
+  min-height: 50px;
+  font-size: 14px;
+  font-weight: 650;
+  border-radius: 10px;
+  background: rgba(18, 45, 66, 0.85);
+  border: 1px solid rgba(140, 200, 235, 0.35);
+  color: #e0f2fe;
+  transition: all 0.2s ease;
+}
+.plan-start #approach:hover, .plan-start #quickFastCruise:hover {
+  background: rgba(28, 70, 102, 0.95);
+  border-color: #65dcff;
+  transform: translateY(-2px);
+}
+.plan-preview .map {
+  margin-top: 14px;
+  min-height: 140px;
+  background: #0a1826;
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.plan-preview #planMap { max-height: 310px; width: auto; border-radius: 8px; }
+#routePreview {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  background: rgba(9, 23, 36, 0.85);
+  border-radius: 8px;
+  border: 1px solid rgba(140, 200, 235, 0.2);
+  color: #aae0fa;
+  font-size: 13px;
+}
 .plan-reference a { display: inline-block; margin: 6px 12px 0 0; }
 #plan .plan-history { padding-top: 0; }
-.mobile-mode #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }
+.mobile-mode #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; gap: 14px; }
 #hangarControls {
   position: fixed;
   z-index: 5;
@@ -144,14 +234,47 @@ body.hangar-active .quick-controls { display: none; }
 #deviceMode { color-scheme: dark; }
 #quickFlights {
   display: grid;
-  grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 8px;
-  padding: 0 clamp(14px,3vw,28px) 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 clamp(14px, 3vw, 28px) 16px;
 }
-#quickFlights button { min-height: 48px; font-weight: 700; }
-#quickFlights button:first-child { background: #694423; }
-#quickFlights button:nth-child(2) { background: #164e57; }
-#quickFlights button:last-child { background: #503c55; }
+#quickFlights button {
+  min-height: 48px;
+  font-weight: 700;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+#quickFlights button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+#quickFlights button:active {
+  transform: translateY(0);
+}
+#quickFlights button[data-quick="sunset"] {
+  background: linear-gradient(135deg, #7c3a14, #b45309);
+  border-color: #f59e0b;
+}
+#quickFlights button[data-quick="landing"] {
+  background: linear-gradient(135deg, #0e4e5e, #157383);
+  border-color: #06b6d4;
+}
+#quickFlights button[data-quick="mirage"] {
+  background: linear-gradient(135deg, #1e3a68, #2563eb);
+  border-color: #60a5fa;
+}
+#quickFlights button[data-quick="duel"] {
+  background: linear-gradient(135deg, #7f1d1d, #b91c1c);
+  border-color: #ef4444;
+}
+#quickFlights button[data-quick="multiplayer"] {
+  background: linear-gradient(135deg, #064e3b, #059669);
+  border-color: #10b981;
+}
 #start2D { margin-top: 8px; }
 #overviewScale {
   position: absolute;
@@ -255,13 +378,42 @@ body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudePanel[data-mode
 body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudeMode {
   left: min(49vw, 370px);
 }
-@media (max-width: 700px) {
-  #quickFlights { gap: 5px; }
-  #quickFlights button { padding: 5px; font-size: 13px; }
-  #plan .planner { grid-template-columns: 1fr; grid-template-areas: "setup" "preview"; }
-  #plan .plan-setup, #plan .plan-preview, #plan .plan-intro, #plan .plan-history { padding-inline: 14px; }
-  .plan-modes { padding-inline: 14px; gap: 5px; }
-  .plan-modes button { padding: 6px 3px; font-size: 13px; }
+@media (max-width: 860px) {
+  #quickFlights {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .plan-modes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
+@media (max-width: 580px) {
+  #quickFlights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  #quickFlights button:last-child {
+    grid-column: 1 / -1;
+  }
+  .plan-modes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    padding-inline: 12px;
+  }
+  .plan-modes button {
+    padding: 8px 4px;
+    font-size: 13px;
+    min-height: 42px;
+  }
+  #plan .planner {
+    grid-template-columns: 1fr;
+    grid-template-areas: "setup" "preview";
+    padding: 14px;
+  }
+  #plan .plan-setup, #plan .plan-preview {
+    padding: 12px;
+  }
 }
 @media (max-height: 590px) {
   body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #adiCanvas { left: 0; bottom: 101px; width: min(22vh,130px); }
