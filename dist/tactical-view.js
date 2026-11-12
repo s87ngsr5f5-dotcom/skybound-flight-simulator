@@ -120,7 +120,7 @@ function createTacticalView(scene,camera,callbacks){
       s.notice='已設定返場航線';
     }else if(name==='leave'){
       const outcome=tacticalOutcome(s);
-      tacticalFinish(f,outcome==='成功'&&s.kind!=='duel'?'部分完成':outcome,'主動撤離');
+      tacticalFinish(f,outcome==='成功'&&!['duel','dogfight','melee','swarm','canyon','headon'].includes(s.kind)?'部分完成':outcome,'主動撤離');
     }
   }
   for(const element of [panel,guide]) element.addEventListener('click',event=>{
@@ -149,12 +149,13 @@ function createTacticalView(scene,camera,callbacks){
       ink.beginPath();ink.arc(90,59,radius,0,Math.PI*2);ink.stroke();
     }
     ink.beginPath();ink.moveTo(90,7);ink.lineTo(90,111);ink.moveTo(38,59);ink.lineTo(142,59);ink.stroke();
-    ink.fillStyle='#cefad4';ink.fillText(s.radar?'12.5 km':'雷達關閉',6,13);
+    ink.fillStyle='#cefad4';ink.fillText(s.radar?(s.kind==='headon'?'25.0 km':'12.5 km'):'雷達關閉',6,13);
     lookup.length=0;
     const sn=Math.sin(f.heading), cs=Math.cos(f.heading);
+    const scale=s.kind==='headon'?.002:.004;
     for(const t of tacticalContacts(f)){
       const dx=t.x-f.x,dz=t.z-f.z;
-      const x=90+(dx*cs+dz*sn)*.004,y=59+(dz*cs-dx*sn)*.004;
+      const x=90+(dx*cs+dz*sn)*scale,y=59+(dz*cs-dx*sn)*scale;
       ink.fillStyle=t.team==='hostile'?'#ffad68':t.team==='friendly'?'#63d6ff':'#d5e4e7';
       ink.fillRect(x-3,y-3,6,6);
       if(s.selected===t.id){ink.strokeStyle='#fff1a0';ink.strokeRect(x-7,y-7,14,14);}
@@ -224,7 +225,7 @@ function createTacticalView(scene,camera,callbacks){
     const bearing=target?Math.round((Math.atan2(target.x-f.x,f.z-target.z)*180/Math.PI+360)%360)%360:0;
     byId('tacticalContact').textContent=state+(target?' · '+target.name+' · '+bearing+'° · '+(tacticalDistance(f,target)/1000).toFixed(1)+
       ' km · 高差 '+Math.round(target.y-f.y)+' m':'');
-    byId('tacticalCount').textContent='飛彈 '+s.ammo+' 枚 · 機況 '+s.health+'%';
+    byId('tacticalCount').textContent=(s.gunsOnly?'機砲專用 · 機況 '+s.health+'%':'飛彈 '+s.ammo+' 枚 · 機況 '+s.health+'%');
     const complete=s.air+s.sea>=tacticalScenarios[s.kind].count;
     const hostile=s.targets.find(t=>t.alive&&t.team==='hostile');
     const threat=s.missiles.find(m=>m.owner==='enemy')||hostile;
@@ -245,9 +246,11 @@ function createTacticalView(scene,camera,callbacks){
     const prompt=s.returning?'依導航返場並停妥'+nav:
       complete?(s.kind==='radar'||s.kind==='sea'?'飛過訓練區出口'+nav:'目標完成，可返場或撤離'):
       f.ground?'從跑道起飛':!s.radar?'開啟雷達搜尋訓練目標':
-      !s.armed?'啟用武器':!s.ammo?'彈藥用盡':
+      !s.armed?'啟用武器':
+      s.gunsOnly?(gunSight.hidden?'鎖定目標後對準金色前置環機砲開火':'對準金色前置環開火'):
+      !s.ammo?'彈藥用盡':
       !blocked?'已鎖定，可發射':s.missiles.some(m=>m.owner==='player')?'飛彈追蹤中':
-      aim&&aim.distance>=8200?'接近至 8.2 km 內再鎖定':
+      aim&&aim.distance>=(s.kind==='headon'?18000:8200)?'接近至 '+(s.kind==='headon'?'18':'8.2')+' km 內再鎖定':
       steering|| (target?'保持機鼻朝向目標':'搜尋中 · 查看雷達');
     const warningText=warning?' · 警告：'+(direction<-.18?'左側':direction>.18?'右側':'前方')+'有敵方威脅':'';
     byId('tacticalCaption').textContent=prompt+warningText+(target&&target.team!=='hostile'?' · 非指定目標':'')+
@@ -259,7 +262,7 @@ function createTacticalView(scene,camera,callbacks){
     assist.setAttribute('aria-pressed',String(s.aimAssist));
     assist.textContent=s.aimAssist?'手動接管':'輔助對準';
     byId('tacticalFire').disabled=Boolean(blocked)||callbacks.paused();
-    byId('tacticalFire').hidden=complete;
+    byId('tacticalFire').hidden=complete||Boolean(s.gunsOnly);
     byId('tacticalFire').title=blocked;
     const gun=byId('tacticalGun');
     gun.hidden=!s.armed||s.mode!=='air'||complete;

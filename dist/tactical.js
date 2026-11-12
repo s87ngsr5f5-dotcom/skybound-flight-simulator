@@ -2,6 +2,11 @@
 const tacticalScenarios={
   radar:{name:'雷達與飛彈入門',brief:'鎖定無人靶機，命中後通過出口。',difficulty:'入門',minutes:3,base:1800,count:1},
   duel:{name:'一對一空戰',brief:'與會機動和反擊的對手交戰，可選擇返場或撤離。',difficulty:'中等',minutes:6,base:3600,count:1},
+  dogfight:{name:'王牌近身機砲纏鬥',brief:'純靠機砲對準金色前置環！禁用飛彈，擊落高機動王牌敵機。',difficulty:'專家',minutes:5,base:4200,count:1},
+  melee:{name:'四機空中大亂鬥',brief:'遭遇 3 架敵機從多空層合圍突襲，快速切換鎖定與規避迎擊。',difficulty:'進階',minutes:8,base:5800,count:3},
+  swarm:{name:'超音速蜂群攔截',brief:'攔截 6 架超音速楔形編隊推進的無人戰機蜂群，守衛防空識別區。',difficulty:'大師',minutes:6,base:6800,count:6},
+  canyon:{name:'中央山脈峽谷空戰',brief:'在中央山脈崇山峻嶺與花東縱谷間超低空穿梭，擊落穿山敵機。',difficulty:'進階',minutes:7,base:5200,count:2},
+  headon:{name:'超視距迎頭對決',brief:'雙方相距 18 公里超視距高速迎頭對衝，考驗極限鎖定與反飛彈機動。',difficulty:'專家',minutes:4,base:4600,count:1},
   intercept:{name:'雙機攔截',brief:'由臺中跑道起飛，攔截兩架靶機後返場。',difficulty:'中等',minutes:9,base:4600,count:2},
   sea:{name:'海上打擊',brief:'辨識移動靶船，避開中立船隻，命中後通過出口。',difficulty:'中等',minutes:5,base:3200,count:1},
   escort:{name:'護航與撤離',brief:'保護友機通過訓練航線，阻止兩架對手接近。',difficulty:'進階',minutes:7,base:4200,count:2}
@@ -23,12 +28,17 @@ function tacticalRack(f,index){
 function tacticalRoute(airport,kind){
   const runway=kind==='intercept';
   const heading=runway?airport.heading:-Math.PI/2;
-  const origin=tacticalPoint({...airport,y:runway?950:kind==='sea'?360:1400},heading,runway?6500:20000);
-  const exit={...tacticalPoint(origin,heading,7100),name:'訓練區出口'};
+  const isCanyon=kind==='canyon';
+  const isHeadon=kind==='headon';
+  const alt=runway?950:kind==='sea'?360:isCanyon?1450:isHeadon?4200:kind==='dogfight'?2200:1400;
+  const origin=isCanyon?{x:36000,y:alt,z:18000}:
+    tacticalPoint({...airport,y:alt},heading,runway?6500:isHeadon?28000:20000);
+  const exit={...tacticalPoint(origin,heading,isHeadon?15000:7100),name:'訓練區出口'};
   return [{...origin,name:'進入訓練區'},exit,...regionalRoute(airport,airport)];
 }
 function makeTacticalFlight(airport,aircraft,kind,wind,guided,advanced){
-  const scenario=tacticalScenarios[kind], runway=kind==='intercept', sea=kind==='sea';
+  const scenario=tacticalScenarios[kind]||tacticalScenarios.duel;
+  const runway=kind==='intercept', sea=kind==='sea';
   const route=tacticalRoute(airport,kind);
   const f=makeRegionalFlight(airport,airport,aircraft,runway?'runway':'air',wind,route);
   if(!runway){
@@ -39,15 +49,49 @@ function makeTacticalFlight(airport,aircraft,kind,wind,guided,advanced){
   const origin=route[0];
   const unit=(id,name,team,domain,forward,side,height)=>({id,name,team,domain,
     ...tacticalPoint(origin,heading,forward,side,height),heading,alive:true});
-  const targets=Array.from({length:scenario.count},(_,i)=>unit(i+1,sea?'橙色靶船':'靶機 '+(i+1),'hostile',sea?'sea':'air',
-    2200+i*1250,i===0?60:850,sea?8:origin.y+i*230));
-  if(sea) targets.push(unit(3,'中立船隻','neutral','sea',2750,950,8));
-  if(kind==='escort') targets.push(unit(3,'護航友機','friendly','air',1200,-230,origin.y));
+
+  let targets=[];
+  if(kind==='dogfight'){
+    targets=[unit(1,'王牌敵機 (BFM)','hostile','air',1150,20,origin.y+20)];
+  }else if(kind==='melee'){
+    targets=[
+      unit(1,'敵長機 (正面)','hostile','air',2400,60,origin.y+100),
+      unit(2,'敵僚機 (左翼)','hostile','air',2800,-1100,origin.y-140),
+      unit(3,'敵僚機 (右翼)','hostile','air',3100,1200,origin.y+180)
+    ];
+  }else if(kind==='swarm'){
+    targets=[
+      unit(1,'無人蜂群 01 (領隊)','hostile','air',4200,0,origin.y),
+      unit(2,'無人蜂群 02 (左一)','hostile','air',4600,-450,origin.y+50),
+      unit(3,'無人蜂群 03 (右一)','hostile','air',4600,450,origin.y+50),
+      unit(4,'無人蜂群 04 (左二)','hostile','air',5000,-900,origin.y+100),
+      unit(5,'無人蜂群 05 (右二)','hostile','air',5000,900,origin.y+100),
+      unit(6,'無人蜂群 06 (尾隨)','hostile','air',5400,0,origin.y-60)
+    ];
+  }else if(kind==='canyon'){
+    targets=[
+      unit(1,'山脊突防機 01','hostile','air',2200,160,origin.y-120),
+      unit(2,'山谷穿梭機 02','hostile','air',3500,-240,origin.y-180)
+    ];
+  }else if(kind==='headon'){
+    const t=unit(1,'超視距迎頭敵機','hostile','air',16000,0,origin.y);
+    t.heading=wrapAngle(heading+Math.PI);
+    targets=[t];
+  }else{
+    targets=Array.from({length:scenario.count},(_,i)=>unit(i+1,sea?'橙色靶船':'靶機 '+(i+1),'hostile',sea?'sea':'air',
+      2200+i*1250,i===0?60:850,sea?8:origin.y+i*230));
+    if(sea) targets.push(unit(3,'中立船隻','neutral','sea',2750,950,8));
+    if(kind==='escort') targets.push(unit(3,'護航友機','friendly','air',1200,-230,origin.y));
+  }
+
   const exit=route[1];
   f.lesson='tactical';
   f.fuel=f.fuelStart=2700;
+  const isGunsOnly=kind==='dogfight';
+  const ammoCount=kind==='swarm'?10:kind==='melee'?8:isGunsOnly?0:6;
+
   f.tactical={id:crypto.randomUUID(),kind,targets,exit,heading,origin,guided,advanced,elapsed:0,
-    radar:false,automatic:true,aimAssist:false,mode:sea?'sea':'air',selected:null,lock:0,armed:false,ammo:6,health:100,
+    radar:false,automatic:true,aimAssist:false,mode:sea?'sea':'air',selected:null,lock:0,armed:false,ammo:ammoCount,gunsOnly:isGunsOnly,health:100,
     missiles:[],effects:[],events:[],frames:[],shots:0,hits:0,air:0,sea:0,neutral:0,
     gunBursts:0,gunHits:0,nextGun:0,
     enemyShot:guided&&!advanced?24:10,enemyWarning:0,returning:false,notice:'',nextFrame:0,result:null};
@@ -55,7 +99,8 @@ function makeTacticalFlight(airport,aircraft,kind,wind,guided,advanced){
 }
 function tacticalContacts(f){
   const s=f.tactical;
-  return s.radar?s.targets.filter(t=>t.alive&&t.domain===s.mode&&tacticalDistance(f,t)<12500):[];
+  const maxRange=s.kind==='headon'?25000:12500;
+  return s.radar?s.targets.filter(t=>t.alive&&t.domain===s.mode&&tacticalDistance(f,t)<maxRange):[];
 }
 function selectTacticalTarget(s,id){
   if(s.selected===id) return;
@@ -98,6 +143,7 @@ function tacticalGun(f){
 function tacticalFireBlock(f,target=tacticalTarget(f)){
   const s=f.tactical;
   if(f.ground) return '起飛後才能發射';
+  if(s.gunsOnly) return '純機砲模式 · 禁用飛彈，請使用機砲！';
   if(!s.radar) return '先開啟雷達';
   if(!s.armed) return '先啟用武器';
   if(!s.ammo) return '彈藥用盡';
@@ -185,7 +231,7 @@ function stepTactical(f,dt){
   }
   if(f.finished) return;
   if(!s.returning&&f.waypoint===0&&Math.hypot(f.x-s.origin.x,f.z-s.origin.z)<1500) f.waypoint=1;
-  const combat=s.kind==='duel'||s.kind==='escort';
+  const combat=['duel','escort','dogfight','melee','swarm','canyon','headon'].includes(s.kind);
   const friendly=s.targets.find(t=>t.team==='friendly');
   for(const t of s.targets){
     if(!t.alive){
@@ -193,14 +239,50 @@ function stepTactical(f,dt){
       continue;
     }
     if(f.ground&&s.kind==='intercept') continue;
-    const phase=s.elapsed*(s.advanced?.45:.24)+t.id;
-    const maneuver=t.domain==='air'&&t.team==='hostile'&&(combat||s.kind==='intercept');
-    t.heading=s.heading+(maneuver?Math.sin(phase)*.6:t.domain==='sea'?Math.PI/2:0);
-    const speed=t.domain==='sea'?12:combat&&t.team==='hostile'?105:85;
+    let maneuver=t.domain==='air'&&t.team==='hostile'&&(combat||s.kind==='intercept');
+    let speed=t.domain==='sea'?12:combat&&t.team==='hostile'?105:85;
+
+    if(s.kind==='dogfight'){
+      const phase=s.elapsed*(s.advanced?.85:.55)+t.id*1.5;
+      t.heading=s.heading+Math.sin(phase)*1.15+Math.cos(phase*.5)*.35;
+      speed=s.advanced?135:115;
+      t.vy=Math.cos(phase)*28;
+    }else if(s.kind==='headon'){
+      const d=tacticalDistance(f,t);
+      speed=175;
+      if(d>3500){
+        t.heading=wrapAngle(s.heading+Math.PI+Math.sin(s.elapsed*.4)*.22);
+        t.vy=Math.sin(s.elapsed*.5)*12;
+      }else{
+        t.heading+=0.75*dt;
+        t.vy=Math.cos(s.elapsed*.8)*20;
+      }
+    }else if(s.kind==='swarm'){
+      speed=160;
+      const phase=s.elapsed*.4+(t.id%2===0?0:Math.PI*.5);
+      t.heading=s.heading+Math.sin(phase)*.28;
+      t.vy=Math.sin(s.elapsed*.6+t.id)*10;
+    }else if(s.kind==='canyon'){
+      speed=125;
+      const phase=s.elapsed*.55+t.id*1.8;
+      t.heading=s.heading+Math.sin(phase)*.72;
+      t.vy=Math.cos(phase*1.2)*18;
+    }else if(s.kind==='melee'){
+      speed=s.advanced?120:100;
+      const phase=s.elapsed*(s.advanced?.6:.4)+t.id*1.3;
+      t.heading=s.heading+Math.sin(phase)*.85;
+      t.vy=Math.cos(phase)*20;
+    }else{
+      const phase=s.elapsed*(s.advanced?.45:.24)+t.id;
+      t.heading=s.heading+(maneuver?Math.sin(phase)*.6:t.domain==='sea'?Math.PI/2:0);
+      t.vy=maneuver?Math.cos(phase)*16:0;
+    }
     t.vx=Math.sin(t.heading)*speed;
     t.vz=-Math.cos(t.heading)*speed;
-    t.vy=maneuver?Math.cos(phase)*16:0;
     t.x+=t.vx*dt;t.y+=t.vy*dt;t.z+=t.vz*dt;
+    if(s.kind==='canyon'){
+      t.y=Math.max(900,Math.min(2300,t.y));
+    }
   }
   const contacts=tacticalContacts(f);
   if(!contacts.some(t=>t.id===s.selected)){
@@ -213,7 +295,7 @@ function stepTactical(f,dt){
   const target=contacts.find(t=>t.id===s.selected);
   const aim=target&&tacticalAim(f,target);
   const training=s.guided&&!s.advanced;
-  const lockable=!f.ground&&aim&&aim.distance<8200&&Math.abs(aim.bearing)<(training?.79:.66)&&
+  const lockable=!f.ground&&aim&&aim.distance<(s.kind==='headon'?18000:8200)&&Math.abs(aim.bearing)<(training?.79:.66)&&
     Math.abs(aim.elevation-f.pitch)<(training?.52:.44);
   if(lockable){
     const wasLocked=s.lock>=1;
@@ -224,16 +306,18 @@ function stepTactical(f,dt){
     if(s.lock>=1) tacticalEvent(s,'鎖定中斷');
     s.lock=0;
   }
-  if(combat&&!f.ground){
-    const enemy=s.targets.find(t=>t.team==='hostile'&&t.alive&&tacticalDistance(t,friendly||f)<6500);
+  if(combat&&!f.ground&&!s.gunsOnly){
+    const maxRange=s.kind==='headon'?17000:6500;
+    const enemy=s.targets.find(t=>t.team==='hostile'&&t.alive&&tacticalDistance(t,friendly||f)<maxRange);
     if(enemy&&s.elapsed>s.enemyShot-2) s.enemyWarning=.3;
     if(enemy&&s.elapsed>=s.enemyShot){
       const aim=friendly||f;
       s.missiles.push({id:-s.elapsed,owner:'enemy',target:friendly?.id??'player',age:0,
         x:enemy.x,y:enemy.y,z:enemy.z,heading:Math.atan2(aim.x-enemy.x,enemy.z-aim.z),trail:[]});
-      s.enemyShot=s.elapsed+(s.advanced?10:19);
+      const interval=s.kind==='headon'?(s.advanced?8:13):s.kind==='swarm'?(s.advanced?7:11):s.kind==='melee'?(s.advanced?8:12):(s.advanced?10:19);
+      s.enemyShot=s.elapsed+interval;
       s.enemyWarning=3;
-      tacticalEvent(s,'對手發射飛彈');
+      tacticalEvent(s,enemy.name+' 發射飛彈');
     }
   }
   s.enemyWarning=Math.max(0,s.enemyWarning-dt);
@@ -257,9 +341,11 @@ function stepTactical(f,dt){
       }else aim.alive=false;
       tacticalEvent(s,m.owner==='player'?'命中 · '+aim.name:aim===f?'機體受損':'護航友機遭命中');
     }
-    if(impact||!aim||m.age>15||m.y<0||tacticalDistance(m,s.origin)>32000){
+    const maxAge=m.owner==='player'&&s.kind==='headon'?24:15;
+    const maxDist=s.kind==='headon'?48000:32000;
+    if(impact||!aim||m.age>maxAge||m.y<0||tacticalDistance(m,s.origin)>maxDist){
       if(!impact&&m.owner==='player'){
-        s.notice='未命中 · '+(!aim?'目標消失':m.y<0?'飛彈落海':m.age>15?'追蹤逾時':'飛離訓練區');
+        s.notice='未命中 · '+(!aim?'目標消失':m.y<0?'飛彈落海':m.age>maxAge?'追蹤逾時':'飛離訓練區');
         tacticalEvent(s,s.notice);
       }
       s.missiles.splice(i,1);
@@ -286,7 +372,7 @@ function stepTactical(f,dt){
     tacticalFinish(f,'失敗',s.neutral?'誤擊非指定目標':!s.health?'機體嚴重受損':'護航友機失去飛行能力');
   }else if(s.kind==='escort'&&s.elapsed>=72){
     tacticalFinish(f,'成功','護航友機抵達出口');
-  }else if(complete&&(s.kind==='sea'||s.kind==='radar')&&tacticalDistance(f,s.exit)<1100){
+  }else if(complete&&['sea','radar','duel','dogfight','melee','swarm','canyon','headon'].includes(s.kind)&&tacticalDistance(f,s.exit)<1200){
     tacticalFinish(f,'成功','通過訓練區出口');
   }else if(s.kind==='intercept'&&!complete&&s.targets.some(t=>t.alive&&tacticalDistance(t,s.origin)>23500)){
     tacticalFinish(f,tacticalOutcome(s),'目標飛出訓練區');
