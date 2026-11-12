@@ -19,6 +19,8 @@ const taiwanAirports=[
     shortField:true,parkingAlong:-9},
   {...airport('RCLY','蘭嶼',22+(1+43/60)/60,121+(32+1.85/60)/60,309.96,1132,30,12.95,'31','13',51),
     shortField:true,parkingAlong:-261},
+  {...airport('CVN78','福特號航空母艦',24+(21/60),122+(9/60),0,333,78,18.5,'01','19',-40),
+    carrier:true,shortField:true,catapult:true,arrestor:true,parkingAlong:20},
 ];
 const internationalAirports=[
   airport('RJAA','成田',35+(45+31.88/60)/60,140+(22+46.255/60)/60,329.51,4000,60,41,'34L','16R',-205),
@@ -157,6 +159,12 @@ function regionalHeight(x,z){
     const reach=r.length/2+550;
     if(Math.abs(x-r.x)>reach||Math.abs(z-r.z)>reach) continue;
     const {along,cross}=runwayCoordinates(x,z,r);
+    if(r.carrier){
+      if(Math.abs(along)<=r.length/2+8&&Math.abs(cross)<=r.width/2+6){
+        return r.elevation;
+      }
+      continue;
+    }
     const blend=r.shortField?shortFieldBlend(r,along,cross):
       Math.max(0,1-Math.max((Math.abs(along)-r.length/2-60)/270,(Math.abs(cross)-265)/165));
     if(blend>0) return height+(r.elevation-height)*Math.min(1,blend);

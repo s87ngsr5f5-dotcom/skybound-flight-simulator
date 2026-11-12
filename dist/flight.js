@@ -1038,7 +1038,7 @@ function initialize(){
     resetLook();
     changeView();
   }
-  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH','KeyK']);
+  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH','KeyK','KeyO']);
   const radar=byId('radar').getContext('2d');
   const planMap=byId('planMap').getContext('2d');
   const flightRate=byId('flightRate'),flightRateStatus=byId('flightRateStatus');
@@ -1992,6 +1992,37 @@ function initialize(){
         const p=airportPoint(flight.departure,385,flight.departure.apron+46);
         Object.assign(flight,p,{y:flight.departure.elevation+flight.aircraft.gearHeight,parkingBrake:true});
       }
+      if(preset==='carrierCatapult'&&typeof carrierOps!=='undefined'){
+        const carrier=carrierOps.getCarrierData();
+        const p=carrierOps.getDeckPoint(carrier.catapults[0].along, carrier.catapults[0].cross, carrier.deckElevation+flight.aircraft.gearHeight);
+        Object.assign(flight,p,{
+          heading: carrier.heading,
+          speed: 0,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          power: 0,
+          parkingBrake: true,
+          ground: true,
+          tailhook: false
+        });
+      }else if(preset==='carrierTrap'&&typeof carrierOps!=='undefined'){
+        const carrier=carrierOps.getCarrierData();
+        const p=carrierOps.getDeckPoint(carrier.wires[2].along + 4200, carrier.wires[2].cross, carrier.deckElevation + 256);
+        const approachSpeed = 68; // ~132 kts
+        Object.assign(flight,p,{
+          heading: carrier.heading + carrier.angledHeading,
+          speed: approachSpeed,
+          vx: Math.sin(carrier.heading + carrier.angledHeading)*approachSpeed,
+          vy: -4.1,
+          vz: -Math.cos(carrier.heading + carrier.angledHeading)*approachSpeed,
+          power: 0.62,
+          gear: true,
+          flaps: 3,
+          tailhook: true,
+          ground: false
+        });
+      }
       beginFlight();
       if(savesMission){
         flight.checkpointId=crypto.randomUUID();
@@ -2092,6 +2123,11 @@ function initialize(){
     if(code==='KeyF') {
       flight.flaps=(flight.flaps+1)%3;
       if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(25);
+    }
+    if(code==='KeyO'&&!paused) {
+      flight.tailhook=!flight.tailhook;
+      showPill(flight.tailhook?'🪝 尾鉤已放下 (HOOK DOWN)':'🪝 尾鉤已收起 (HOOK UP)');
+      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(22);
     }
     if(code==='KeyR'&&!flight.service) start(flight.approach,true);
     if(!flight.regional) return;
@@ -2360,6 +2396,21 @@ function initialize(){
     const button=event.target.closest('[data-quick]');
     if(!button) return;
     const preset=button.dataset.quick;
+    if(preset==='carrierCatapult'||preset==='carrierTrap'){
+      const cvn=airports.find(a=>a.code==='CVN78')||airports[0];
+      byId('lesson').value='free';
+      byId('aircraft').value='f16v';
+      byId('departure').value=cvn.code;
+      byId('destination').value='RCSS';
+      byId('startType').value='runway';
+      byId('time').value='16:00';
+      byId('weather').value='0';
+      byId('waypoints').value='';
+      drawPlan();
+      start(false,false,preset);
+      button.blur();
+      return;
+    }
     if(preset==='multiplayer'){
       byId('lesson').value='multiplayer';
       byId('aircraft').value='f16v';
@@ -2593,6 +2644,11 @@ function initialize(){
           mpSection.scrollIntoView({behavior:'smooth'});
         }
       };
+    }
+
+    const touchHook=byId('touchHook');
+    if(touchHook){
+      touchHook.onclick=()=>action('KeyO');
     }
 
     const sendCustomBtn=byId('mpSendCustomBtn'), customInput=byId('mpCustomMsg');
@@ -3512,6 +3568,7 @@ function initialize(){
     new THREE.Vector3(),new THREE.Vector3(0,1,0)
   ]),new THREE.LineBasicMaterial({color:0x71e9ff,transparent:true,depthWrite:false}));
   scene.add(airportLabel,runwayMarker,markerStem);
+  if(typeof carrierOps!=='undefined') carrierOps.buildCarrier3D(scene);
   let lastAirportLabel='';
   function drawAirportLabel(f){
     const r=f?.destination;
@@ -3653,6 +3710,10 @@ function initialize(){
               autopilotInput={...input,...guidance,brake:input.brake||guidance.brake};
             }
             stepTrainer(f,smoothControls(f,autopilotInput||input,simTick));
+            if(typeof carrierOps!=='undefined'){
+              carrierOps.stepCatapult(f,simTick,showPill);
+              carrierOps.stepArrestor(f,simTick,showPill);
+            }
           }
           if(f.service) updatePassengerService(f,simTick);
           if(f.tactical) stepTactical(f,simTick);

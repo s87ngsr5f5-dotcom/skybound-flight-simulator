@@ -30,6 +30,9 @@ jobs:
       - run: node verify-taipei-city.cjs
       - run: node verify-helicopter.cjs
       - run: node verify-multiplayer.cjs
+      - run: node verify-tactical.cjs
+      - run: node verify-multiplayer-combat.cjs
+      - run: node verify-carrier-ops.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
