@@ -144,6 +144,35 @@ function createTrainer(approach,wind){
     stall:false,speed,vs:0,wind,elapsed:0,airborne:false,touchdown:null
   };
 }
+function calculateUpdraft(f, terrain, wind){
+  if(!f || f.ground) return 0;
+  let updraft=0;
+  // 1. Ridge lift (山坡地形迎風升力)
+  if(terrain && wind && (Math.abs(wind.x)>0.2 || Math.abs(wind.z)>0.2)){
+    const step=100;
+    const h0=terrain(f.x,f.z);
+    const hx=terrain(f.x+step,f.z);
+    const hz=terrain(f.x,f.z+step);
+    const slopeX=(hx-h0)/step;
+    const slopeZ=(hz-h0)/step;
+    const slopeLift=-(wind.x*slopeX + wind.z*slopeZ);
+    const agl=Math.max(1,f.y-h0);
+    const heightAtten=Math.exp(-agl/750);
+    updraft+=limit(slopeLift*0.85*heightAtten,-4.0,5.0);
+  }
+  // 2. Thermal updrafts (熱對流上升氣流)
+  if(f.enableThermals){
+    const cellX=Math.sin(f.x*0.00035+1.2);
+    const cellZ=Math.cos(f.z*0.00035+0.8);
+    const core=Math.max(0,cellX*cellZ);
+    if(core>0.35 && f.y<3200){
+      const strength=(core-0.35)*3.8;
+      const heightProfile=Math.sin(limit(f.y/3000,0,1)*Math.PI);
+      updraft+=strength*heightProfile;
+    }
+  }
+  return updraft;
+}
 function stepTrainer(f, input, dt=simTick){
   if(f.ended) return;
   if(f.aircraft?.helicopter)return stepHelicopter(f,input,dt);
@@ -155,7 +184,9 @@ function stepTrainer(f, input, dt=simTick){
   f.power=limit(f.power+input.throttle*dt*.55,0,1);
   f.trim=limit(f.trim+input.trim*dt*.08,-.12,.15);
   const wind=flightWind(f);
-  const airX=f.vx-wind.x, airY=f.vy-(wind.y||0), airZ=f.vz-wind.z;
+  const updraft=calculateUpdraft(f,terrain,wind);
+  f.updraft=updraft;
+  const airX=f.vx-wind.x, airY=f.vy-(wind.y||0)-updraft, airZ=f.vz-wind.z;
   const speed=Math.hypot(airX,airY,airZ);
   const track=Math.atan2(airX,-airZ);
   const pathAngle=Math.atan2(airY,Math.hypot(airX,airZ));
@@ -174,11 +205,23 @@ function stepTrainer(f, input, dt=simTick){
   const cl=(.27+liftSlope*limit(alpha,-stallAngle,stallAngle)+aircraft.flapLift[f.flaps])*
     Math.max(.31,1-Math.max(0,Math.abs(alpha)-stallAngle)*2.9);
   f.stall=!f.ground && (alpha>stallAngle || forwardSpeed<12);
-  const lift=q*aircraft.wingArea*cl;
+
+  // Ground effect model (Wieselsberger induced drag reduction & cushion lift)
+  const span=aircraft.wingSpan||(aircraft.geometry?aircraft.geometry[2]*2:Math.sqrt(aircraft.wingArea*7.5));
+  const floorPos=terrain(f.x,f.z)+aircraft.gearHeight;
+  const agl=Math.max(0.05, f.y-floorPos);
+  const eta=limit(agl/span, 0.05, 5.0);
+  const groundEffectActive=!f.ground && eta<1.0;
+  const phiGe=groundEffectActive ? (16*eta*eta)/(1+16*eta*eta) : 1.0;
+  const cushionLift=groundEffectActive ? (1+0.08/(1+14*eta*eta)) : 1.0;
+  f.groundEffect={eta,inducedFactor:phiGe,cushionLift,active:groundEffectActive};
+
+  const lift=q*aircraft.wingArea*cl*cushionLift;
   const cleanDrag=.031+((aircraft.cleanDrag??.031)-.031)*cruiseBlend;
   const waveReference=gameAirborne?cruiseMachTarget(f):aircraft.cruiseMach;
   const waveDrag=waveReference ? .55*Math.pow(Math.max(0,mach-waveReference+.012),2):0;
-  const drag=q*aircraft.wingArea*(cleanDrag+waveDrag+.052*cl*cl+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta));
+  const inducedDrag=.052*cl*cl*phiGe;
+  const drag=q*aircraft.wingArea*(cleanDrag+waveDrag+inducedDrag+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta));
   // The lever can stay at full power while the cruise Mach envelope limits thrust.
   const cruiseProtection=waveReference&&(gameAirborne||!f.gear&&!f.flaps)?
     cruiseBlend*limit((mach-waveReference+.03)*24,0,.85):0;
@@ -216,6 +259,13 @@ function stepTrainer(f, input, dt=simTick){
   const fighterManual=fighterAirborne&&!f.hold&&!f.gear&&!f.flaps;
   const maneuver=input.maneuver??1;
   const highSpeedAuthority=gameAirborne?limit(1.65-mach*.65,.40,1):1;
+
+  // Propeller P-Factor & Torque yaw (C172S etc. single-engine propeller at high alpha/power)
+  const isPropeller=!aircraft.jet && Boolean(aircraft.power);
+  const propPfactor=(isPropeller && !attitudeAssist && !f.ground && !f.hold) ?
+    -0.12*limit(alpha,-0.15,0.35)*f.power*(aircraft.power/119000) : 0;
+  f.pFactor=propPfactor;
+
   // Feed in part of the additional lift needed for a steep turn.
   const turnComp=(attitudeAssist||fighterManual||!f.ground)&&Math.cos(f.bank)>.20&&Math.abs(input.roll)<.35?
     limit(mass*g/(Math.max(q,1)*aircraft.wingArea*liftSlope)*(1/Math.max(.32,Math.cos(f.bank))-1),0,.16)*(1-Math.abs(input.pitch))*(fighterManual?1:.72):0;
@@ -248,19 +298,35 @@ function stepTrainer(f, input, dt=simTick){
   // Actual lateral lift stays finite at 90 degrees; tan(bank) does not.
   const coordinatedYaw=attitudeAssist?Math.tan(limit(f.bank,-1.2,1.2))*g/Math.max(20,speed):
     limit(lift*Math.sin(f.bank)/(mass*Math.max(20,speed)),-1.3,1.3);
-  const targetYaw=f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40):
-    coordinatedYaw+input.rudder*(fighterManual?.37:.25)*(attitudeAssist?1:Math.cos(f.bank))+beta*.35;
+  const targetYaw=(f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40):
+    coordinatedYaw+input.rudder*(fighterManual?.37:.25)*(attitudeAssist?1:Math.cos(f.bank))+beta*.35) + propPfactor;
   const yawMoment=(targetYaw+asymmetricYaw-f.yawRate)*8800*aircraft.inertia[2]/2850;
   f.pitchRate+=pitchMoment/aircraft.inertia[0]*dt;
   f.yawRate+=yawMoment/aircraft.inertia[2]*dt;
   f.pitch=limit(f.pitch+f.pitchRate*dt,-.62,.66);
   f.bank=wrapAngle(f.bank+f.bankRate*dt);
   if((f.pitch===-.62&&f.pitchRate<0)||(f.pitch===.66&&f.pitchRate>0)) f.pitchRate=0;
+
+  // Aerodynamic stall & G-buffet vibration
+  const stallBuffet=(!f.ground && alpha>stallAngle*0.84) ? limit((alpha-stallAngle*0.84)/(stallAngle*0.16),0,1) : 0;
+  const gLimit=aircraft.role==='fighter'?7.5:2.5;
+  const currentG=f.gForce||1.0;
+  const gBuffet=(!f.ground && Math.abs(currentG-1.0)>gLimit) ? limit((Math.abs(currentG-1.0)-gLimit)/2.0,0,1) : 0;
+  const buffet=Math.max(stallBuffet,gBuffet);
+  f.buffet=buffet;
+  if(buffet>0 && !f.ground){
+    const buffetShake=Math.sin(f.elapsed*55.0)*0.002*buffet;
+    f.pitch=limit(f.pitch+buffetShake,-.62,.66);
+  }
+
   f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/6,0,1):1));
   if(f.ground){
     f.lateralAcceleration=0;
     f.bank=f.bankRate=0;
     f.pitch=Math.max(0,f.pitch);
+    f.gForce=1.0;
+    f.maxG=Math.max(f.maxG??1.0, 1.0);
+    f.minG=Math.min(f.minG??1.0, 1.0);
     const rollSpeed=Math.hypot(f.vx,f.vz);
     const braking=input.brake||f.parkingBrake||f.noseDoor||f.sideDoor||f.service?.door||f.service?.pushing||Boolean(payload?.problems.length);
     const force=(f.reverse?-thrust*.40:thrust)-drag-(braking?(aircraft.brakeForce||5900)+((payload?.mass||0)*4.8):(aircraft.rollingResistance||170));
@@ -282,6 +348,10 @@ function stepTrainer(f, input, dt=simTick){
     const upForce=vertical+thrust*Math.sin(f.pitch)-airY*d;
     const rightForce=side-(airX*c+airZ*s)*d;
     f.lateralAcceleration=(rightForce*Math.cos(f.bank)-upForce*Math.sin(f.bank))/mass;
+    const loadG=limit((vertical*Math.cos(f.bank)+thrust*Math.sin(f.pitch))/(mass*g),-4.0,10.0);
+    f.gForce=loadG;
+    f.maxG=Math.max(f.maxG??1.0, loadG);
+    f.minG=Math.min(f.minG??1.0, loadG);
     f.vy+=(upForce/mass-g)*dt;
     f.vz+=(-c*axial+s*side-airZ*d)/mass*dt;
   }
@@ -301,5 +371,17 @@ function stepTrainer(f, input, dt=simTick){
   f.speed=speed;
   f.vs=f.vy;
 }
-if(typeof module!=='undefined') module.exports={trainer,runway10,simTick,localRunway,worldRunway,groundHeight,createTrainer,stepTrainer,wrapAngle,flightSpeeds,atmosphere,cruiseControls,climbCruiseControls,flightMass,knotsPerMps};
+const physicsModule = {
+  trainer,runway10,simTick,localRunway,worldRunway,groundHeight,createTrainer,stepTrainer,
+  wrapAngle,flightSpeeds,atmosphere,cruiseControls,climbCruiseControls,flightMass,knotsPerMps,
+  calculateUpdraft
+};
+if(typeof module!=='undefined') module.exports=physicsModule;
+if(typeof window!=='undefined'){
+  Object.assign(window, physicsModule);
+  window.physicsModule = physicsModule;
+}
+if(typeof global!=='undefined'){
+  Object.assign(global, physicsModule);
+}
 

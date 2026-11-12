@@ -85,16 +85,19 @@ function makeGlassReadouts(canvas){
     const vertical=(rising?'▲ ':'▼ ')+Math.abs(f.vy).toFixed(1)+' m/s';
     const tas='TAS '+displayKmh(speeds.tas),gs='GS '+displayKmh(speeds.gs);
     const mach='M '+speeds.mach.toFixed(2),power=(f.aircraft.helicopter?'總距 ':'油門 ')+Math.round(f.power*100)+'%';
+    const gText = f.gForce !== undefined ? (f.gForce >= 0 ? '+' : '') + f.gForce.toFixed(1) + 'G' : '';
+    const geText = f.groundEffect?.active ? ' · GE' : '';
     if(width>=365&&innerWidth>innerHeight){
       const iasX=center-tapeOffset-44*unit,right=center+tapeOffset+44*unit;
       const infoY=y-height*.21;
       [tas,gs,mach].forEach((text,i)=>label(text,iasX,infoY+i*13*unit,10,'right'));
       label(power,iasX,infoY+41*unit,11,'right','#ffdb87');
+      if(gText) label(gText + geText, iasX, infoY+54*unit, 11, 'right', (f.gForce > 3.0 || f.gForce < 0.2) ? '#ff9955' : '#73f5ff');
       [vertical,f.aircraft.helicopter?'旋翼 '+Math.round((f.rotorRPM??0)*100)+'%':f.gear?'起落架放下':'起落架收起',f.hold||f.hover?'輔助開啟':'輔助關閉',view]
         .forEach((text,i)=>label(text,right,infoY+i*13*unit,10,'left'));
     }else{
-      label(tas+'   '+gs+'   '+mach,center,height-20*unit,11);
-      label(vertical+'   '+power+'   '+(f.hold?'輔助開':'輔助關'),center,height-7*unit,10);
+      label(tas+'   '+gs+'   '+mach + (gText ? '   ' + gText : ''),center,height-20*unit,11);
+      label(vertical+'   '+power+'   '+(f.hold?'輔助開':'輔助關') + geText,center,height-7*unit,10);
     }
   }
   return {draw};
