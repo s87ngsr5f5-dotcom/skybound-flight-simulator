@@ -450,6 +450,9 @@ const multiplayer = (() => {
             peer.mesh = buildBenchmarkAirframe(profile, scene);
           }
           if (peer.mesh) {
+            if (typeof aircraftSkins !== 'undefined' && typeof THREE !== 'undefined') {
+              aircraftSkins.applyLivery(peer.mesh, profile, THREE);
+            }
             peer.mesh.name = `Multiplayer_${peer.callsign}`;
             scene.add(peer.mesh);
           }

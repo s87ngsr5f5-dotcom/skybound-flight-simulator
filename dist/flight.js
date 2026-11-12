@@ -925,6 +925,7 @@ function initialize(){
     if(models.has(profile.id)) return models.get(profile.id);
     const model=profile.helicopter?buildHelicopter(profile,scene):profile.role?buildBenchmarkAirframe(profile,scene):makeAircraft(profile,fleet.indexOf(profile));
     if(profile.role==='fighter')refineFighter(model,profile);
+    if(typeof aircraftSkins!=='undefined') aircraftSkins.applyLivery(model,profile,THREE);
     model.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
     if(profile.id==='sa380'||profile.id==='b773'){
       airlinerDetails[profile.id]=refineAirliner(model,{twin:profile.id==='b773'});

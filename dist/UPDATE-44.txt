@@ -1,0 +1,37 @@
+=======================================================
+SKYBOUND GLOBAL - UPDATE v0.44: NEXT-GEN AIRCRAFT PROCEDURAL SKINS & PBR LIVERIES
+版本更新公告 v0.44：飛機次世代程式化貼膜、航空彩繪水貼與 PBR 蒙皮升級
+=======================================================
+
+【更新概要】
+徹底告別過去單色積木塑膠感！SKYBOUND GLOBAL 在 v0.44 正式推出次世代飛機外觀優化與程式化貼膜塗裝引擎（Aircraft Skins & Procedural Livery System）。無論是制空戰機的低視度空優迷彩與隊徽、民航廣體巨鳥的流線雙色彩繪腰線與鏡面拋光鋁合金機腹，或是通用航空經典運動拉花，全機隊外觀質感達到前所未有的擬真精細度！
+
+【核心升級項目】
+
+1. 奈米級航空蒙皮刻線與鉚釘矩陣凹凸貼圖（Aerodynamic Panel Lines & Rivet Bump Map）
+   - 藉由程式化畫布即時烘焙 1024×1024 凹凸法線與高光粗糙度貼圖（`bumpMap` & `roughnessMap`）。
+   - 包含縱向氣動蒙皮接縫、橫向翼肋結構線、圓形維修檢查艙門以及每隔 14 像素精準排列的雙排緊固鉚釘頭，在太陽入射角與跑道強光下呈現逼真的 3D 微凹凸物理立體陰影。
+
+2. 制空戰機全套戰術塗裝與水貼標記（Tactical Fighter Livery & Decals）
+   - **空優雙色幽靈迷彩（Ghost Gray Camo）**：戰機主體套用低可視度戰術灰藍迷彩，消除單純純色感。
+   - **空軍國徽圓標水貼（Tactical Roundel Decal）**：機翼左右兩側（上左/下右）與機身兩側精準貼附低可視度 12 道光芒圓標。
+   - **垂直尾翼隊徽彩繪（Tail Flash & Stencil）**：尾翼兩側繪製阿美族太陽神（馬拉道 Maladao）紅金圖騰、聯隊代碼（401 TFW）與標準戰機序號噴漆。
+   - **金屬高溫噴管燒灼層（Nozzle Heat Gradient）**：發動機後燃器尾噴管呈現鈦合金與鎳鉻合金高溫漸層色澤。
+
+3. 民航客機流線雙色腰線與鏡面拋光機腹（Commercial Airliner Liveries）
+   - **雙色動態彩繪腰線（Sweeping Cheatline）**：從機首一路流線向上延展至垂直尾翼的深海軍藍（Deep Navy）與天空天藍（Vibrant Cyan）雙重彩繪。
+   - **客艙舷窗反光貼膜（Window Belt Glare）**：高精細客艙舷窗排，具備暗色偏光防紫外線窗框、內部座艙暖色燈光漸層與外部天空反光倒影。
+   - **拋光鉻合金鏡面反射（Polished Chrome Aluminum）**：提高金屬度（`metalness: 0.52`）與鏡面清漆塗層（`clearcoat: 0.85`, `clearcoatRoughness: 0.12`），真實倒映地面與大氣天色。
+   - **品牌標識（Skybound Global PACIFIC AIRWAYS）**：機身兩側高解析向量字體標記。
+
+4. 通用航空與單發教練機經典運動塗裝（C172S Skyhawk Livery）
+   - 經典酒紅（Burgundy Red）與寶藍（Cobalt Blue）動態拉花貫穿機身兩側。
+   - 垂直尾翼印有標準民用航空編號「B-55588」。
+
+5. 跨模式與多人連線僚機全面支援
+   - 玩家座機、3D 機庫展廳預覽機以及多人連線房間內所有其他連線僚機，均自動套用高擬真外觀塗裝，在編隊飛行與空中交錯時視覺效果極具張力！
+
+【驗證與穩定性】
+- 新增 `verify-aircraft-skins.cjs`，全站 CI 自動化測試擴充至 23 項，100% 綠燈通過。
+- 透過 Playwright 於 Chromium/Edge 真實瀏覽器核心執行完整載入與飛行驗證，達到 0 Error 零異常！
+=======================================================
