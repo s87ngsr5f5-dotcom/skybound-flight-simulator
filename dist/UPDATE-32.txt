@@ -42,3 +42,13 @@ SKYBOUND GLOBAL 0.32 更新說明
   * 鏡頭畫面劇烈震盪（Intense Screen Shake with camera jitter）。
 - 聽覺反饋：
   * Web Audio API 即時物理合成低頻爆震、重擊金屬破片與破壞轟鳴（flightAudio.crashExplosion()）。
+
+5. 整體優化（Overall Simulator Optimization）
+- 機場跑道燈光與進場系統：
+  * 跑道全面鋪設 ICAO 標準嵌地中線燈（Centerline lights，每 30 公尺一盞白光嵌燈）。
+  * 跑道頭兩側設置 PAPI 4 燈進場坡度指示燈（Precision Approach Path Indicator，紅白燈組）。
+- 直升機燈光系統升級：
+  * 直升機機頂配置雙閃白色頻閃燈（Strobes）、機腹防撞紅色信標燈（Beacons）與機尾白光導航燈，與固定翼飛機航行照明節奏完全同步。
+- 攝影機防穿地與電影感墜機視角：
+  * 全面加裝地面防穿透偵測（Camera Ground Collision Clamping），追蹤視角在任何地形、爬升與俯衝下永久維持地表以上安全高度（>= 1.6m），徹底杜絕穿透地面破圖。
+  * 飛機墜毀（f.ended）時自動切換為殘骸電影視角（Cinematic Crash Cam），鏡頭懸於空中並動態鎖定燃燒殘骸火球黑煙與震動。

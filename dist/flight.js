@@ -467,6 +467,18 @@ function initialize(){
       for(let z=-half+38;z<half;z+=60) box(group,lampMaterial,.31,.13,.31,side*(width/2+.45),.09,z);
     }
     for(let z=-half+160;z<half-155;z+=65) box(group,white,1.18,.035,34,0,.08,z);
+    for(let z=-half+50;z<half-50;z+=30) box(group,lampMaterial,.28,.04,.28,0,.088,z);
+    const papiDark=material('#262a2e');
+    const papiWhite=new THREE.MeshBasicMaterial({color:0xffffff});
+    const papiRed=new THREE.MeshBasicMaterial({color:0xff2222});
+    for(const end of [-1,1]){
+      const papiZ=end*(half-320);
+      for(let p=0;p<4;p++){
+        const px=-sideOfApron*(width/2+12+p*4.2);
+        box(group,papiDark,1.1,.55,1.1,px,.28,papiZ);
+        box(group,p<2?papiWhite:papiRed,.65,.22,.15,px,.38,papiZ-end*.48);
+      }
+    }
     for(const [direction,text] of [[1,airport.designator],[-1,airport.reciprocal]]){
       const marking=new THREE.Mesh(new THREE.PlaneGeometry(width*.67,24),new THREE.MeshBasicMaterial({
         map:labelTexture(text,'#ffffff'),transparent:true,depthWrite:false
@@ -3302,7 +3314,7 @@ function initialize(){
       }
       const aileron=replay||f.tow?0:(f.manualControls?.roll??0);
       model.userData.surfaces.forEach((part,i)=>part.rotation.x=-f.flaps*.16+aileron*(i===0?-.22:.22));
-      if(cameraMode===0){
+      if(cameraMode===0||f.ended){
         camera.up.set(0,1,0);
         if(tug.visible){
           chaseHeading=null;
@@ -3311,6 +3323,13 @@ function initialize(){
           camera.position.z+=Math.sin(f.heading)*15;
           camera.position.y+=5.8;
           camera.lookAt(tug.position.x-dir.x*4,tug.position.y+1.7,tug.position.z-dir.z*4);
+        }else if(f.ended){
+          const crashDist=profile.geometry[0]*2.8+18;
+          const cx=pos.x-Math.sin(chaseHeading??heading)*crashDist;
+          const cz=pos.z+Math.cos(chaseHeading??heading)*crashDist;
+          const groundAtCam=renderedGround(cx,cz);
+          camera.position.set(cx,Math.max(pos.y+8.5,groundAtCam+4.8),cz);
+          camera.lookAt(pos.x,pos.y+1.5,pos.z);
         }else{
           if(chaseHeading===null||!continuous||replay) chaseHeading=heading;
           chaseHeading+=wrapAngle(heading-chaseHeading)*(1-Math.exp(-dt*5.5));
@@ -3365,6 +3384,9 @@ function initialize(){
         const eye=new THREE.Vector3(.23,.92,18).applyQuaternion(model.quaternion).add(pos);
         camera.position.copy(eye);camera.up.set(0,1,0);
         camera.lookAt(pos.clone().addScaledVector(dir,11).add(new THREE.Vector3(0,.44,0)));
+      }
+      if(cameraMode===0||f.ended){
+        camera.position.y=Math.max(camera.position.y,renderedGround(camera.position.x,camera.position.z)+1.6);
       }
       const speeds=flightSpeeds(f);
       const knots=Math.round(speeds.ias*knotsPerMps), live=!f.regional||f.battery;

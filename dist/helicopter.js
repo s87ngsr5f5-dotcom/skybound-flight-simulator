@@ -325,8 +325,14 @@ function buildHelicopter(profile, scene){
     for(let i = 0; i < 4; i++){ const b = box(tailRotor, dark, .055, .17, 1.5, 0, 0, 0); b.rotation.x = i * Math.PI / 2; }
   }
 
-  const navLights = [];
+  const navLights = [], strobes = [], beacons = [];
   for(const side of [-1, 1]) navLights.push(mesh(root, new THREE.SphereGeometry(.06, 9, 6), new THREE.MeshBasicMaterial({ color: side < 0 ? 0xff5347 : 0x57e9ac }), side * .91, .28, .9));
+  const heliStrobe = mesh(root, new THREE.SphereGeometry(.07, 9, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 1.45, -.15);
+  const heliBeacon = mesh(root, new THREE.SphereGeometry(.07, 9, 6), new THREE.MeshBasicMaterial({ color: 0xff2222 }), 0, -.48, .12);
+  const tailLight = mesh(root, new THREE.SphereGeometry(.05, 9, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, .85, 5.65);
+  strobes.push(heliStrobe);
+  beacons.push(heliBeacon);
+  navLights.push(tailLight);
 
   const panelCanvas = document.createElement('canvas'); panelCanvas.width = 768; panelCanvas.height = 320;
   const ink = panelCanvas.getContext('2d'), panelTexture = new THREE.CanvasTexture(panelCanvas); panelTexture.colorSpace = THREE.SRGBColorSpace;
@@ -372,7 +378,7 @@ function buildHelicopter(profile, scene){
     panelTexture.needsUpdate = true;
   }
 
-  root.userData = { gear, blades: [], surfaces: [], navLights, cabin, rotor, tailRotor, updateHelicopter: update };
+  root.userData = { gear, blades: [], surfaces: [], navLights, strobes, beacons, cabin, rotor, tailRotor, updateHelicopter: update };
 
   if(typeof allAirports !== 'undefined'){
     const airport = allAirports.find(a => a.code === 'RCSS'), pad = airportPoint(airport, 385, airport.apron + 46);
