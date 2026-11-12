@@ -3,6 +3,15 @@ const byId = id => document.getElementById(id);
 const airports=allAirports;
 const rad = Math.PI / 180;
 const clamp = (value,low,high) => Math.max(low,Math.min(high,value));
+let pillTimer = null;
+function showPill(text){
+  const radioPill = byId('mpRadioPill'), radioPillText = byId('mpRadioPillText');
+  if(!radioPill || !radioPillText) return;
+  radioPillText.textContent = text;
+  radioPill.hidden = false;
+  clearTimeout(pillTimer);
+  pillTimer = setTimeout(()=>{ if(radioPill) radioPill.hidden = true; }, 5000);
+}
 let seed = 682;
 function random(){
   seed = (Math.imul(seed,1664525)+1013904223) >>> 0;
@@ -908,6 +917,7 @@ function initialize(){
 
   const crashVFX=createCrashVFX(scene);
   const contrailVFX=createContrailSystem(scene);
+  const transonicVFX=typeof visualFX!=='undefined'?visualFX.createTransonicVFX(THREE,scene):{update:()=>{}};
   let crashShake=0;
   let stormRainMesh=null;
   const models=new Map(),airlinerDetails={};
@@ -2657,16 +2667,6 @@ function initialize(){
     const roomInput=byId('mpRoomInput'), callsignInput=byId('mpCallsignInput');
     const badge=byId('mpStatusBadge'), statusText=byId('mpStatusText');
     const peerBox=byId('mpPeerBox'), peerList=byId('mpPeerList'), peerCount=byId('mpPeerCount');
-    const radioPill=byId('mpRadioPill'), radioPillText=byId('mpRadioPillText');
-    let pillTimer=null;
-
-    function showPill(text){
-      if(!radioPill||!radioPillText) return;
-      radioPillText.textContent=text;
-      radioPill.hidden=false;
-      clearTimeout(pillTimer);
-      pillTimer=setTimeout(()=>{radioPill.hidden=true;},5000);
-    }
 
     if(callsignInput&&!callsignInput.value){
       callsignInput.value='SKY-'+Math.floor(100+Math.random()*900);
@@ -4358,6 +4358,7 @@ function initialize(){
     }else if(!renderer.instrumentOnly) atmosphericSky.update(camera,dt,renderingQuality());
     crashVFX.update(dt,renderedGround);
     if(flight) contrailVFX.update(flight,dt,now);
+    if(flight&&typeof transonicVFX!=='undefined') transonicVFX.update(flight,dt,flightSpeeds(flight));
     tacticalView.render(flight,dt,now,qualitySelect.value==='low'||touchControls.mode.value==='mobile');
     if(typeof weatherStorm!=='undefined'){
       if(!stormRainMesh&&typeof THREE!=='undefined'){
