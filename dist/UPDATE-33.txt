@@ -1,0 +1,53 @@
+SKYBOUND GLOBAL 0.33 更新說明
+
+1. 畫質表現全方位提升（Graphics & Visuals）
+- 色彩空間線性工作流（Linear sRGB Workflow）：
+  * 渲染器正式啟用 `renderer.outputColorSpace = THREE.SRGBColorSpace;`，徹底消除舊版本在 ACESFilmic 色調映射下的畫面發灰暗沉感。
+  * 配合 `renderer.toneMappingExposure = 1.02`，使機身物理材質（PBR Clearcoat）、高空日光、台灣地景地貌色彩呈現生動飽和的真實質感。
+- 高性能 GPU 優先排程：
+  * `rendererOptions` 首項加入 `powerPreference: 'high-performance'`，優先引導具備雙顯卡的桌機與筆記型電腦啟用獨立 GPU。
+- 動態柔和陰影升級：
+  * High 畫質檔位全面啟用實時柔和陰影（2048 解析度），Ultra 檔位提升至 4096 電影級解析度。
+  * 精確調優 `normalBias = 0.08` 與 `bias = -0.00015`，徹底消除起落架與地面接觸處的懸浮陰影（Peter Panning）。
+- 海洋動態波浪光澤（Specular Sun Glint & Ocean Shimmer）：
+  * 地形著色器（Terrain Shader）中加入動態微波高光算法，依據陽光入射角與海水深度動態渲染深邃蔚藍與沿岸淺海的浪花微光反射。
+- 大氣天空與體積雲光學升級（Atmospheric Sky & Clouds）：
+  * 強化 Mie 太陽大氣散射光暈係數，在不同視角下呈現柔和自然的日光擴散光環。
+  * 升級晨昏日出日落暮色金紅、紫橙漸層階梯（Twilight Sky Gradients）。
+  * 雲層側光與背光處加入「銀邊高光（Silver Lining Specularity）」，飛行在高空雲海中極具震撼力。
+
+2. 地圖顯示與航電系統優化（Map & Avionics Display）
+- 導航地圖（Radar Canvas）Retina HiDPI 超高清自適應：
+  * 動態依據 `devicePixelRatio` 縮放畫布解析度，徹底消除 Retina 螢幕與智慧型手機螢幕上的像素拉伸模糊，向量線條與字體達到高階玻璃座艙顯示水準。
+- 同心距半透明距離環（Range Rings）：
+  * 導航雷達以本機為中心繪製 5km、15km、30km 半透明距離刻度圈與距離文字標示，精確掌控空域間距。
+- 五邊進場跑道延長中線導引（Extended Runway Centerline / Localizer Feather）：
+  * 目標機場跑道向外延伸 15 公里的羽狀進場中線虛線導引，輔助玩家在空中提前對準跑道五邊下滑道。
+- 地面機場移動地圖（Airport Surface Map）：
+  * 飛機處於地面階段（Taxiing）時自動呈現機場高解析移動地圖，清楚標示主跑道、平行滑行道與停機坪。
+- 全台俯瞰 3D 地圖（Taiwan Overview 3D Map）升級：
+  * 本機標記升級為動態 3D 航向指針箭頭（Heading Needle），即時指示機頭朝向。
+  * 標註全台主要機場 3D 菱形符號，並以高亮金黃色實時凸顯任務目的地機場。
+  * 動態繪製任務航路折線光軌（Flight Route Polyline）。
+  * 支援多人連線隊友 3D 機體位置與朝向指針（顯示青藍色隊友箭頭）。
+- 航線規劃地圖（Flight Planner Map）增強：
+  * Retina HiDPI 畫布渲染。
+  * 包含國際航線（成田、香港、沖繩）在內的台灣衛星圖與海外空域輪廓顯示，並標註各航段磁航向與海浬距離（Heading & Nautical Miles）。
+
+3. 操控與遊玩功能優化（Controls & Gameplay）
+- 主鍵盤數字鍵油門階梯切換（Throttle Steps Detents）：
+  * 支援鍵盤主鍵盤數字鍵快速調節油門：
+    * `Digit0`：0% 慢車（Idle）
+    * `Digit1`～`Digit9`：10%～90% 目標推力
+    * 大幅簡化手動調節油門的操作門檻，巡航爬升更輕鬆。
+- 一鍵導航地圖開關（KeyM 快捷鍵）：
+  * 自由飛行時按下 `KeyM` 鍵可快速展開或收合航電導航地圖，無需滑鼠點選。
+- 手機模式觸覺震動回饋（Haptic Feedback）：
+  * 深度整合 HTML5 `navigator.vibrate` API：
+    * 起落架收放（Gear Switch）：25ms 觸覺脈衝
+    * 襟翼調節（Flaps Switch）：35ms 觸覺脈衝
+    * 機砲連射與空戰發射（Gun & Missile Fire）：特製短促震動
+    * 輪胎接地瞬間（Touchdown）：擬真輕微觸地雙震
+    * 墜機事故（Crash Event）：多段劇烈碰撞震動
+- 手動配平與操作平滑度升級：
+  * 放開俯仰桿時維持自然平滑配平，消除鍵盤瞬間釋放造成的俯仰劇烈抖動。

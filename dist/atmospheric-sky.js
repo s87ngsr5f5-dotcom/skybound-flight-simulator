@@ -55,11 +55,13 @@ function createAtmosphericSky(scene){
         vec3 d=normalize(ray);
         float up=max(0.,d.y);
         float glare=max(0.,dot(sun,d));
+        float mie=pow(glare,6.)*.22+pow(glare,24.)*.35;
         vec3 horizon=mix(vec3(.024,.035,.070),vec3(.54,.70,.83),daylight);
         vec3 zenith=mix(vec3(.004,.010,.033),vec3(.046,.25,.57),daylight);
         vec3 sky=mix(horizon,zenith,pow(up,.48));
-        sky+=vec3(.61,.21,.046)*twilight*pow(glare,5.)*exp(-up*4.);
-        sky+=vec3(1.,.81,.53)*daylight*(pow(glare,16.)*.17+smoothstep(.99991,.99997,glare)*6.);
+        sky+=vec3(.85,.32,.07)*twilight*pow(glare,4.)*exp(-up*3.2);
+        sky+=vec3(.48,.14,.26)*twilight*exp(-up*5.5);
+        sky+=vec3(1.,.86,.62)*daylight*(pow(glare,14.)*.20+smoothstep(.99988,.99997,glare)*6.5)+vec3(.65,.75,1.)*mie*daylight;
         float night=(1.-smoothstep(.02,.40,daylight))*(1.-mist*.9);
         if(night>.01&&d.y>0.){
           vec2 grid=vec2(atan(d.x,-d.z)*103.,asin(d.y)*135.);
@@ -90,9 +92,11 @@ function createAtmosphericSky(scene){
               opacity+=weight;
             }
           }
-          vec3 cloudColor=mix(vec3(.039,.053,.086),vec3(.45,.50,.58),daylight)*opacity;
-          cloudColor+=vec3(.45,.42,.35)*light*daylight;
-          cloudColor+=vec3(.40,.15,.052)*light*twilight;
+          vec3 cloudColor=mix(vec3(.039,.053,.086),vec3(.46,.52,.60),daylight)*opacity;
+          cloudColor+=vec3(.48,.44,.36)*light*daylight;
+          cloudColor+=vec3(.55,.18,.055)*light*twilight;
+          float silver=pow(glare,7.)*light*(1.-opacity*.6);
+          cloudColor+=vec3(1.05,.96,.82)*silver*daylight*.4;
           float distanceFade=exp(-start/28000.)*smoothstep(.028,.16,abs(d.y));
           sky=mix(sky,cloudColor+sky*(1.-opacity),distanceFade);
         }
