@@ -17,6 +17,7 @@ const multiplayer = (() => {
   const listeners = new Set();
   const radioMessages = [];
   const killFeed = [];
+  const leaderboardScores = new Map();
   let localHp = 100;
   let localKills = 0;
   let localDeaths = 0;
@@ -138,6 +139,53 @@ const multiplayer = (() => {
     }
   }
 
+  function recordKillEvent(killer, victim) {
+    if (!killer || !victim) return;
+    const k = leaderboardScores.get(killer) || { callsign: killer, kills: 0, deaths: 0 };
+    k.kills++;
+    leaderboardScores.set(killer, k);
+
+    const v = leaderboardScores.get(victim) || { callsign: victim, kills: 0, deaths: 0 };
+    v.deaths++;
+    leaderboardScores.set(victim, v);
+
+    notify('leaderboard', getLeaderboard());
+  }
+
+  function getLeaderboard() {
+    if (callsign) {
+      const self = leaderboardScores.get(callsign) || { callsign, kills: localKills, deaths: localDeaths };
+      self.kills = Math.max(self.kills, localKills);
+      self.deaths = Math.max(self.deaths, localDeaths);
+      leaderboardScores.set(callsign, self);
+    }
+    const list = Array.from(leaderboardScores.values());
+    list.sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    return list.map((item, idx) => ({
+      rank: idx + 1,
+      callsign: item.callsign,
+      kills: item.kills,
+      deaths: item.deaths,
+      kd: (item.kills / Math.max(1, item.deaths)).toFixed(2)
+    }));
+  }
+
+  function speakTacticalRadio(phrase) {
+    if (!phrase) return;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(phrase);
+        utter.rate = 1.15;
+        utter.pitch = 1.05;
+        utter.volume = 0.9;
+        utter.lang = 'en-US';
+        window.speechSynthesis.speak(utter);
+      } catch {}
+    }
+    notify('tactical_radio_callout', phrase);
+  }
+
   function handleCombatMessage(msg) {
     if (!msg || msg.roomId !== roomId) return;
     if (msg.action === 'hit') {
@@ -155,6 +203,9 @@ const multiplayer = (() => {
             weapon: msg.weapon || '飛彈'
           });
           notify('player_killed', { killer: msg.callsign, weapon: msg.weapon });
+          speakTacticalRadio('Mayday! Mayday! Aircraft destroyed, ejecting!');
+        } else {
+          speakTacticalRadio('Warning! We took a direct hit!');
         }
       } else {
         const peer = peers.get(msg.targetId);
@@ -163,9 +214,12 @@ const multiplayer = (() => {
         }
       }
     } else if (msg.action === 'kill') {
+      const killer = msg.killerCallsign || msg.callsign || '機長';
+      const victim = msg.victimCallsign || '敵機';
+      recordKillEvent(killer, victim);
       killFeed.unshift({
-        killer: msg.killerCallsign || msg.callsign,
-        victim: msg.victimCallsign || '機長',
+        killer,
+        victim,
         weapon: msg.weapon || '飛彈',
         time: Date.now()
       });
@@ -173,9 +227,15 @@ const multiplayer = (() => {
       if (msg.killerId === localId) {
         localKills++;
         notify('player_scored_kill', { victim: msg.victimCallsign, weapon: msg.weapon });
+        speakTacticalRadio('Splash one! Target destroyed!');
+      } else if (msg.victimId !== localId) {
+        speakTacticalRadio(`Target down! ${killer} splashed ${victim}!`);
       }
       notify('kill_feed', killFeed);
     } else if (msg.action === 'fire_missile') {
+      if (msg.targetId === localId) {
+        speakTacticalRadio('Warning! Missile launch detected! Chaff flare!');
+      }
       notify('enemy_fire_missile', msg);
     } else if (msg.action === 'fire_gun') {
       notify('enemy_fire_gun', msg);
@@ -266,6 +326,7 @@ const multiplayer = (() => {
     clearInterval(pingTimer);
     peers.forEach(peer => destroyPeer3D(peer));
     peers.clear();
+    leaderboardScores.clear();
     isConnected = false;
     roomId = '';
     notify('disconnect', {});
@@ -305,10 +366,19 @@ const multiplayer = (() => {
       ...data
     };
     sendRaw(msg);
-    if (action === 'kill') {
+    if (action === 'fire_missile') {
+      speakTacticalRadio('Fox 2! Missile away!');
+    } else if (action === 'fire_gun') {
+      speakTacticalRadio('Guns, guns, guns!');
+    } else if (action === 'flare') {
+      speakTacticalRadio('Deploying countermeasures!');
+    } else if (action === 'kill') {
+      const killer = data.killerCallsign || callsign;
+      const victim = data.victimCallsign || '敵機';
+      recordKillEvent(killer, victim);
       killFeed.unshift({
-        killer: data.killerCallsign || callsign,
-        victim: data.victimCallsign || '敵機',
+        killer,
+        victim,
         weapon: data.weapon || 'AIM-9X',
         time: Date.now()
       });
@@ -561,6 +631,9 @@ const multiplayer = (() => {
     getRoomUrl,
     parseUrlRoom,
     switchRoom: (r, c) => joinRoom(r, c),
+    getLeaderboard,
+    speakTacticalRadio,
+    recordKillEvent,
     defaultRoom,
     defaultCallsign
   };

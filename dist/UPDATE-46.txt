@@ -1,0 +1,32 @@
+=======================================================
+SKYBOUND GLOBAL - UPDATE v0.46: MULTIPLAYER COMBAT LEADERBOARD & TACTICAL RADIO CALLOUTS
+版本更新公告 v0.46：多人空戰擊墜戰績排行榜、即時語音無線電通報與王牌榮譽榜
+=======================================================
+
+【更新概要】
+為了讓多人空戰（DOGFIGHT）與自由空域更具競技熱血感，SKYBOUND GLOBAL 推出 v0.46 空戰即時排行榜與戰術語音通報系統（Combat Leaderboard & Voice Radio Callouts）。玩家現在可於空中隨時透過 Tab 鍵展開全房戰績面板，檢視擊墜數（Kills）、被擊墜數（Deaths）與 K/D 戰損比，並享有軍用戰術無線電即時語音播報！
+
+【核心升級項目】
+
+1. 空中即時戰績排行榜（In-Flight Combat Leaderboard）
+   - 按下鍵盤 `Tab` 鍵即可隨時呼叫／關閉玻璃擬態戰績面版。
+   - 記錄同房間內所有機長之：
+     * Rank 名次
+     * Callsign 呼號
+     * 擊墜數（Kills）與被擊毀數（Deaths）
+     * K/D 精準戰損比
+   - 當前排名第一之玩家獲得「👑 王牌機師（Top Ace）」金色榮譽標記。
+   - 切換房間時自動重設戰績，保持各空域房間獨立公平競爭。
+
+2. 戰術語音無線電通報（Tactical Speech Radio Callouts）
+   - 整合 Web Speech Synthesis 引擎與軍用無線電戰術術語，即時合成飛行員語音：
+     * 發射 AIM-9X 飛彈時：「Fox 2! Missile away!」
+     * 扣動火神機砲連射時：「Guns, guns, guns!」
+     * 擊墜敵機時：「Splash one! Target destroyed!」
+     * 遭遇敵機飛彈鎖定與迎頭襲擊時：「Warning! Missile launch detected! Chaff flare!」
+     * 飛機遭擊毀跳傘時：「Mayday! Mayday! Aircraft destroyed, ejecting!」
+     * 施放熱焰彈／干擾絲時：「Deploying countermeasures!」
+
+【驗證與穩定性】
+- 新增 `verify-combat-leaderboard.cjs`，全站 CI 自動化測試擴充至 25 項，100% 綠燈通過。
+=======================================================

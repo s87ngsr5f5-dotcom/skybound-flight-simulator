@@ -2842,10 +2842,53 @@ function initialize(){
       hudSwitchBtn.onclick=doSwitch;
       hudSwitchInput.onkeydown=e=>{if(e.key==='Enter')doSwitch();};
     }
+    const hudLeaderboard=byId('hudLeaderboard');
+    const hudLbClose=byId('hudLbClose');
+    const hudLbBody=byId('hudLbBody');
+
+    function renderLeaderboard(){
+      if(!hudLbBody||typeof multiplayer==='undefined') return;
+      const list=multiplayer.getLeaderboard();
+      const selfCallsign=multiplayer.getCallsign();
+      hudLbBody.replaceChildren();
+      if(list.length===0){
+        const row=document.createElement('tr');
+        row.innerHTML='<td colspan="5" style="text-align:center;color:#78919b;padding:12px;">尚無空戰擊墜記錄</td>';
+        hudLbBody.appendChild(row);
+        return;
+      }
+      list.forEach((item,idx)=>{
+        const row=document.createElement('tr');
+        if(idx===0&&item.kills>0) row.classList.add('top-ace');
+        if(item.callsign===selfCallsign) row.classList.add('is-self');
+        row.innerHTML=`<td class="rank">${item.rank}</td><td>${item.callsign}</td><td>${item.kills}</td><td>${item.deaths}</td><td>${item.kd}</td>`;
+        hudLbBody.appendChild(row);
+      });
+    }
+
+    if(hudLbClose&&hudLeaderboard){
+      hudLbClose.onclick=()=>{hudLeaderboard.hidden=true;};
+    }
+
+    if(typeof multiplayer!=='undefined'){
+      multiplayer.addListener(type=>{
+        if(type==='leaderboard'||type==='kill_feed'||type==='player_scored_kill'||type==='player_killed'){
+          renderLeaderboard();
+        }
+      });
+    }
+
     addEventListener('keydown',e=>{
       if(e.code==='KeyU'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
         if(hudMpDropdown&&flight){
           hudMpDropdown.hidden=!hudMpDropdown.hidden;
+        }
+      }
+      if(e.code==='Tab'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
+        if(hudLeaderboard&&flight){
+          e.preventDefault();
+          hudLeaderboard.hidden=!hudLeaderboard.hidden;
+          if(!hudLeaderboard.hidden) renderLeaderboard();
         }
       }
     });
