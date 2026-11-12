@@ -35,6 +35,7 @@ jobs:
       - run: node verify-carrier-ops.cjs
       - run: node verify-weather-windshear.cjs
       - run: node verify-fdr-analysis.cjs
+      - run: node verify-air-refueling.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

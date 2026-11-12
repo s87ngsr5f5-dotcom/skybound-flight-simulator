@@ -2045,6 +2045,23 @@ function initialize(){
             z:rctp.z+Math.cos(rway)*4200
           };
         }
+      }else if(preset==='refueling'&&typeof airRefueling!=='undefined'){
+        const distBehind=650;
+        const sinH=Math.sin(airRefueling.tanker.heading);
+        const cosH=Math.cos(airRefueling.tanker.heading);
+        const posX=airRefueling.tanker.x+sinH*distBehind;
+        const posZ=airRefueling.tanker.z-cosH*distBehind;
+        const posY=airRefueling.tanker.y-10;
+        const targetSpeed=airRefueling.tanker.speed+8;
+        Object.assign(flight,{
+          x:posX,y:posY,z:posZ,
+          heading:airRefueling.tanker.heading,
+          speed:targetSpeed,
+          vx:Math.sin(airRefueling.tanker.heading)*targetSpeed,
+          vy:0,
+          vz:-Math.cos(airRefueling.tanker.heading)*targetSpeed,
+          power:0.65,fuel:2200,gear:false,flaps:0,tailhook:false,ground:false
+        });
       }
       beginFlight();
       if(savesMission){
@@ -2451,6 +2468,20 @@ function initialize(){
       byId('waypoints').value='';
       drawPlan();
       start(true,false,'stormApproach');
+      button.blur();
+      return;
+    }
+    if(preset==='refueling'){
+      byId('lesson').value='free';
+      byId('aircraft').value='f16v';
+      byId('departure').value='RCSS';
+      byId('destination').value='RCSS';
+      byId('startType').value='air';
+      byId('time').value='14:30';
+      byId('weather').value='0';
+      byId('waypoints').value='';
+      drawPlan();
+      start(false,false,'refueling');
       button.blur();
       return;
     }
@@ -3648,6 +3679,7 @@ function initialize(){
   ]),new THREE.LineBasicMaterial({color:0x71e9ff,transparent:true,depthWrite:false}));
   scene.add(airportLabel,runwayMarker,markerStem);
   if(typeof carrierOps!=='undefined') carrierOps.buildCarrier3D(scene);
+  if(typeof airRefueling!=='undefined') airRefueling.buildTanker3D(THREE, scene);
   let lastAirportLabel='';
   function drawAirportLabel(f){
     const r=f?.destination;
@@ -3804,6 +3836,46 @@ function initialize(){
               if(wsEl&&!wsEl.hidden) wsEl.hidden=true;
             }
             if(typeof flightRecorder!=='undefined') flightRecorder.step(f,simTick);
+            if(typeof airRefueling!=='undefined'){
+              airRefueling.stepRefueling(f,simTick,showPill);
+              const pdiHud=byId('aarPdiHud');
+              if(pdiHud){
+                const nearTanker=Math.hypot(f.x-airRefueling.tanker.x,f.z-airRefueling.tanker.z)<1800;
+                pdiHud.hidden=!nearTanker;
+                if(nearTanker){
+                  const g=airRefueling.state.guidance;
+                  const rngEl=byId('aarRangeText'); if(rngEl) rngEl.textContent=g.range+'m';
+                  const clsEl=byId('aarClosureText'); if(clsEl) clsEl.textContent=(g.closureRate>=0?'+':'')+g.closureRate+' m/s';
+                  const badge=byId('aarStatusBadge');
+                  if(badge){
+                    if(airRefueling.state.connected){
+                      badge.className='aar-badge-contact';
+                      badge.textContent='CONTACT';
+                    } else {
+                      badge.className='aar-badge-ready';
+                      badge.textContent='READY';
+                    }
+                  }
+                  const pdiUp=byId('pdiUp'),pdiLevel=byId('pdiLevel'),pdiDown=byId('pdiDown');
+                  if(pdiUp&&pdiLevel&&pdiDown){
+                    pdiUp.className='pdi-indicator'+(airRefueling.state.lights.up?' alert':'');
+                    pdiDown.className='pdi-indicator'+(airRefueling.state.lights.down?' alert':'');
+                    pdiLevel.className='pdi-indicator'+(!airRefueling.state.lights.up&&!airRefueling.state.lights.down?' active':'');
+                  }
+                  const pdiFore=byId('pdiFore'),pdiCenter=byId('pdiCenter'),pdiAft=byId('pdiAft');
+                  if(pdiFore&&pdiCenter&&pdiAft){
+                    pdiFore.className='pdi-indicator'+(airRefueling.state.lights.fore?' alert':'');
+                    pdiAft.className='pdi-indicator'+(airRefueling.state.lights.aft?' alert':'');
+                    pdiCenter.className='pdi-indicator'+(!airRefueling.state.lights.fore&&!airRefueling.state.lights.aft?' active':'');
+                  }
+                  const fill=byId('aarFuelFill');
+                  if(fill){
+                    const pct=Math.min(100,Math.round((f.fuel/(f.fuelCapacity||f.fuelStart||8000))*100));
+                    fill.style.width=pct+'%';
+                  }
+                }
+              }
+            }
           }
           if(f.service) updatePassengerService(f,simTick);
           if(f.tactical) stepTactical(f,simTick);
