@@ -81,14 +81,14 @@ function stepHelicopter(f, input, dt = simTick){
     }
   }
 
-  if(input.brake && !f.ground){ pitch = limit(-forward * .10, -1, 1); roll = limit(-right * .10, -1, 1); }
+  if(input.brake && !f.ground){ pitch = limit(-forward * .18, -1, 1); roll = limit(-right * .18, -1, 1); }
 
-  // Forward pitch authority: more forward cyclic response for high-speed cruising
-  const pTarget = -pitch * (pitch > 0 ? .45 : .28);
-  const bTarget = roll * .32;
+  // Forward pitch authority: responsive cyclic control for agile handling and cruising
+  const pTarget = -pitch * (pitch > 0 ? .46 : .34);
+  const bTarget = roll * .42;
   f.commandPitch = pTarget; f.commandBank = bTarget;
   f.pitchRate += ((pTarget - f.pitch) * 16 - f.pitchRate * 7) * dt;
-  f.bankRate += ((bTarget - f.bank) * 14 - f.bankRate * 6) * dt;
+  f.bankRate += ((bTarget - f.bank) * 15 - f.bankRate * 6) * dt;
   f.pitch = limit(f.pitch + f.pitchRate * dt, -.60, .52);
   f.bank = limit(f.bank + f.bankRate * dt, -.55, .55);
 

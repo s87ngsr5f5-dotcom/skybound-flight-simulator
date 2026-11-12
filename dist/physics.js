@@ -217,12 +217,14 @@ function stepTrainer(f, input, dt=simTick){
   const maneuver=input.maneuver??1;
   const highSpeedAuthority=gameAirborne?limit(1.65-mach*.65,.40,1):1;
   // Feed in part of the additional lift needed for a steep turn.
-  const turnLift=fighterManual&&(attitudeAssist||Math.cos(f.bank)>.35&&Math.abs(input.roll)<.1)?limit(mass*g/(Math.max(q,1)*aircraft.wingArea*liftSlope)*
-    (1/Math.max(.32,Math.cos(f.bank))-1),0,.15)*(1-Math.abs(input.pitch)):0;
+  const turnComp=(attitudeAssist||fighterManual||!f.ground)&&Math.cos(f.bank)>.20&&Math.abs(input.roll)<.35?
+    limit(mass*g/(Math.max(q,1)*aircraft.wingArea*liftSlope)*(1/Math.max(.32,Math.cos(f.bank))-1),0,.16)*(1-Math.abs(input.pitch))*(fighterManual?1:.72):0;
+  const turnLift=turnComp;
   const trimBlend=gameAirborne&&!f.hold?limit((q-9000)/12000,0,1):0;
   const normalPitch=.015+f.trim+f.flaps*.008+turnLift;
   const centerPitch=trimBlend>0?normalPitch+trimBlend*(fastLevelPitch(f,q,speed,0,fighterManual?1.4:1)+f.trim*.25-normalPitch):normalPitch;
-  const pitchTarget=limit(centerPitch+input.pitch*(attitudeAssist?1:Math.cos(f.bank))*(fighterManual?.50*highSpeedAuthority:.24*maneuver*(f.hold?1:highSpeedAuthority)),
+  const bankPitchFactor=attitudeAssist?1:(Math.sign(Math.cos(f.bank))*Math.max(.68,Math.abs(Math.cos(f.bank))));
+  const pitchTarget=limit(centerPitch+input.pitch*bankPitchFactor*(fighterManual?.50*highSpeedAuthority:.24*maneuver*(f.hold?1:highSpeedAuthority)),
     fighterManual?-.48:-.36,fighterManual?.54:.38);
   const bankTarget=input.roll*(fighterManual?1.25*highSpeedAuthority:.57*maneuver);
   f.commandPitch=pitchTarget;

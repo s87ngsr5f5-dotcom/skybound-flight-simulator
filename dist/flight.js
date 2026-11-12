@@ -2370,6 +2370,117 @@ function initialize(){
   }
   addEventListener('resize',resize);resize();
   touchControls.mode.addEventListener('change',resize);
+
+  function setupMultiplayerUI(){
+    const joinBtn=byId('mpJoinBtn'), randomBtn=byId('mpRandomBtn'), leaveBtn=byId('mpLeaveBtn');
+    const roomInput=byId('mpRoomInput'), callsignInput=byId('mpCallsignInput');
+    const badge=byId('mpStatusBadge'), statusText=byId('mpStatusText');
+    const peerBox=byId('mpPeerBox'), peerList=byId('mpPeerList'), peerCount=byId('mpPeerCount');
+    const radioPill=byId('mpRadioPill'), radioPillText=byId('mpRadioPillText');
+    let pillTimer=null;
+
+    function showPill(text){
+      if(!radioPill||!radioPillText) return;
+      radioPillText.textContent=text;
+      radioPill.hidden=false;
+      clearTimeout(pillTimer);
+      pillTimer=setTimeout(()=>{radioPill.hidden=true;},5000);
+    }
+
+    if(callsignInput&&!callsignInput.value){
+      callsignInput.value='SKY-'+Math.floor(100+Math.random()*900);
+    }
+
+    if(randomBtn){
+      randomBtn.onclick=()=>{
+        const prefixes=['AIR','SKY','TW','FLY','WING','ACE'];
+        roomInput.value=prefixes[Math.floor(Math.random()*prefixes.length)]+Math.floor(10+Math.random()*90);
+      };
+    }
+
+    if(joinBtn){
+      joinBtn.onclick=()=>{
+        const r=roomInput.value||'8888';
+        const c=callsignInput.value||('SKY-'+Math.floor(100+Math.random()*900));
+        multiplayer.joinRoom(r,c);
+      };
+    }
+
+    if(leaveBtn){
+      leaveBtn.onclick=()=>multiplayer.leaveRoom();
+    }
+
+    document.querySelectorAll('.mp-radio-btn').forEach(btn=>{
+      btn.onclick=()=>multiplayer.sendRadio(btn.dataset.radio);
+    });
+
+    const sendCustomBtn=byId('mpSendCustomBtn'), customInput=byId('mpCustomMsg');
+    if(sendCustomBtn&&customInput){
+      sendCustomBtn.onclick=()=>{
+        if(customInput.value.trim()){
+          multiplayer.sendRadio(customInput.value.trim());
+          customInput.value='';
+        }
+      };
+      customInput.onkeydown=e=>{
+        if(e.key==='Enter'&&customInput.value.trim()){
+          multiplayer.sendRadio(customInput.value.trim());
+          customInput.value='';
+        }
+      };
+    }
+
+    function renderPeerList(){
+      if(!peerList||!peerCount||typeof multiplayer==='undefined') return;
+      const peers=multiplayer.getPeers();
+      peerCount.textContent=peers.length;
+      peerList.replaceChildren();
+      if(peers.length===0){
+        const empty=document.createElement('div');
+        empty.style.color='#97aeb2';
+        empty.style.fontSize='12px';
+        empty.textContent='房間內暫無其他連線機長（等待其他玩家加入中…）';
+        peerList.appendChild(empty);
+        return;
+      }
+      peers.forEach(p=>{
+        const item=document.createElement('div');
+        item.className='mp-peer-item';
+        const dist=flight?Math.hypot(p.state.x-flight.x,p.state.z-flight.z)/1000:0;
+        item.innerHTML=`<span class="callsign">✈ ${p.callsign}</span><span class="details">${(p.aircraftId||'').toUpperCase()} · ${Math.round(p.state.y||0)}m · ${dist>0?dist.toFixed(1)+'km':'--'}</span>`;
+        peerList.appendChild(item);
+      });
+    }
+
+    if(typeof multiplayer!=='undefined'){
+      multiplayer.addListener((event,data)=>{
+        if(event==='connect'){
+          if(badge){badge.classList.remove('offline');statusText.textContent=`已連線 (${data.roomId})`;}
+          if(joinBtn) joinBtn.hidden=true;
+          if(leaveBtn) leaveBtn.hidden=false;
+          if(peerBox) peerBox.hidden=false;
+          showPill(`🟢 已進入房間 [${data.roomId}] 呼號 ${data.callsign}`);
+        }else if(event==='disconnect'){
+          if(badge){badge.classList.add('offline');statusText.textContent='未連線';}
+          if(joinBtn) joinBtn.hidden=false;
+          if(leaveBtn) leaveBtn.hidden=true;
+          if(peerBox) peerBox.hidden=true;
+          showPill('⚪ 已退出連線房間');
+        }else if(event==='peer_joined'){
+          showPill(`✈ 機長 [${data.callsign}] 加入了房間！`);
+          renderPeerList();
+        }else if(event==='peer_left'){
+          showPill(`✈ 機長 [${data.callsign}] 離開了房間。`);
+          renderPeerList();
+        }else if(event==='radio'){
+          showPill(`📻 [${data.sender}]: ${data.text}`);
+        }
+      });
+    }
+
+    setInterval(renderPeerList,2500);
+  }
+  setupMultiplayerUI();
   const forward=heading=>new THREE.Vector3(Math.sin(heading),0,-Math.cos(heading));
   const axis=(positive,negative)=>Number(keys.has(positive))-Number(keys.has(negative));
   const padAxis=value=>gamepadAxis(value,settings.deadzone);
@@ -2385,14 +2496,16 @@ function initialize(){
     const [up,down]=throttleKeys();
     const touch=touchControls.input,touchAxes=touchControls.axes();
     const controlAxes=touchAxes!==touch&&byId('hud').dataset.mobilePanel?touch:touchAxes;
-    const touchGain=.28+settings.sensitivity*.72;
-    const rawRoll=axis('ArrowRight','ArrowLeft')+padAxis(pad?.axes[0])+(pointer.active?padAxis(pointer.x):0)+gamepadAxis(controlAxes.roll,.10)*touchGain;
-    const rawPitch=axis('ArrowUp','ArrowDown')-padAxis(pad?.axes[1])+(pointer.active?padAxis(pointer.y):0)+gamepadAxis(controlAxes.pitch,.10)*touchGain;
+    const touchGain=Math.min(1.25,.80+settings.sensitivity*.45);
+    const rawRoll=axis('ArrowRight','ArrowLeft')+axis('Numpad6','Numpad4')+(throttleKeys().includes('KeyA')?0:axis('KeyD','KeyA'))+padAxis(pad?.axes[0])+(pointer.active?padAxis(pointer.x):0)+gamepadAxis(controlAxes.roll,.06)*touchGain;
+    const rawPitch=axis('ArrowUp','ArrowDown')+axis('Numpad8','Numpad2')-padAxis(pad?.axes[1])+(pointer.active?padAxis(pointer.y):0)+gamepadAxis(controlAxes.pitch,.06)*touchGain;
     const manual=manualAxes({pitch:rawPitch,roll:rawRoll,
-      rudder:axis('KeyE','KeyQ')+padAxis(pad?.axes[2])+gamepadAxis(touch.rudder,.08)*touchGain},settings);
+      rudder:axis('KeyE','KeyQ')+axis('NumpadEnter','Numpad0')+padAxis(pad?.axes[2])+gamepadAxis(touch.rudder,.06)*touchGain},settings);
     let {roll,pitch}=manual;
     let assistedRudder;
-    let throttle=clamp((axis(up,down)+Number(Boolean(buttons[5]?.pressed))-Number(Boolean(buttons[4]?.pressed)))*.48,-.48,.48);
+    const auxThrottleUp=keys.has('ShiftLeft')||keys.has('ShiftRight')||keys.has('PageUp')||keys.has('NumpadAdd');
+    const auxThrottleDown=keys.has('ControlLeft')||keys.has('ControlRight')||keys.has('PageDown')||keys.has('NumpadSubtract');
+    let throttle=clamp((axis(up,down)+Number(auxThrottleUp)-Number(auxThrottleDown)+Number(Boolean(buttons[5]?.pressed))-Number(Boolean(buttons[4]?.pressed)))*.52,-.52,.52);
     if(f.hold&&(!f.battery||f.ended||(f.ground&&!(f.hold.nav&&f.landed)))) stopNavigation(f);
     if(f.hold?.climb&&(f.ground||!f.battery||f.flaps||f.gear||f.spoilers||!f.engines.every(Boolean)||f.fuel===0)){
       f.hold=null;
@@ -2424,7 +2537,7 @@ function initialize(){
     return {autoLevel:!settings.keepBank||Boolean(f.levelWings),response:settings.sensitivity,yokeDamping:settings.mouse&&!f.hold&&!f.tactical?.aimAssist&&Math.abs(manual.pitch)<.07,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
       rudder:assistedRudder??clamp(manual.rudder+(f.ground?roll:0),-1,1),
       throttle,
-      trim:axis('KeyX','KeyZ')*.22,brake:touch.brake||keys.has('Space')||Boolean(buttons[0]?.pressed)};
+      trim:axis('KeyX','KeyZ')*.22,brake:touch.brake||keys.has('Space')||keys.has('NumpadDecimal')||Boolean(buttons[0]?.pressed)};
   }
   const trail=[];
   let trailFrame=0;
@@ -2484,6 +2597,18 @@ function initialize(){
     radar.save();radar.translate(ownX,ownY);radar.rotate(f.heading);
     radar.beginPath();radar.moveTo(0,-9);radar.lineTo(6,7);radar.lineTo(0,4);radar.lineTo(-6,7);radar.closePath();
     radar.fillStyle='#ffcf5e';radar.fill();radar.strokeStyle='#122b31';radar.lineWidth=1.5;radar.stroke();radar.restore();
+    if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+      for(const peer of multiplayer.getPeers()){
+        if(!peer.state) continue;
+        const [px,py]=project(peer.state);
+        if(px<-15||px>width+15||py<-15||py>height+15) continue;
+        radar.save();radar.translate(px,py);radar.rotate(peer.state.heading||0);
+        radar.beginPath();radar.moveTo(0,-7);radar.lineTo(5,5);radar.lineTo(0,3);radar.lineTo(-5,5);radar.closePath();
+        radar.fillStyle='#00e5ff';radar.fill();radar.strokeStyle='#0b1a24';radar.lineWidth=1.2;radar.stroke();radar.restore();
+        radar.font='bold 10px system-ui';radar.fillStyle='#7affbe';
+        radar.fillText(peer.callsign,px+7,py-3);
+      }
+    }
     radar.font='bold 12px system-ui';radar.textBaseline='middle';
     radar.fillStyle='#102638';radar.fillRect(width-32,5,26,21);
     radar.fillStyle='#eef9ff';radar.fillText('北 ↑',width-31,16);
@@ -3195,6 +3320,10 @@ function initialize(){
       taxiLamp.target.position.copy(pos).addScaledVector(dir,62);
       taxiLamp.target.position.y=f.y-5;
       model.position.copy(pos);model.rotation.set(pitch,-heading,-bank,'YXZ');
+      if(typeof multiplayer!=='undefined'){
+        multiplayer.broadcastFlight(f,profile);
+        multiplayer.updatePeers3D(dt,now,f,scene,camera);
+      }
       const airport=f.landed?f.destination:f.departure;
       if(f.ground&&airport&&Math.hypot(f.x-airport.x,f.z-airport.z)<airport.length*.5+450){
         placeGroundShadow(aircraftShadow,f.x,f.z,airport.elevation,f.heading,

@@ -1,0 +1,169 @@
+/* SKYBOUND GLOBAL - Multiplayer Glass UI */
+.mp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(15, 30, 44, 0.85);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: #7affbe;
+}
+.mp-badge.offline {
+  border-color: rgba(160, 175, 190, 0.3);
+  color: #97aeb2;
+}
+.mp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7affbe;
+  box-shadow: 0 0 8px #7affbe;
+}
+.mp-badge.offline .mp-dot {
+  background: #758a99;
+  box-shadow: none;
+}
+.mp-panel-card {
+  background: rgba(14, 25, 35, 0.90);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+.mp-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.mp-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: #a4c2cb;
+}
+.mp-form-grid input {
+  background: #09131a;
+  border: 1px solid #1f4254;
+  border-radius: 8px;
+  color: #ffffff;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.mp-form-grid input:focus {
+  border-color: #00e5ff;
+  outline: none;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+}
+.mp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.mp-btn-primary {
+  background: linear-gradient(135deg, #0088aa, #00b4d8);
+  color: #ffffff !important;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.mp-btn-primary:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 14px rgba(0, 180, 216, 0.6);
+}
+.mp-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #234b5c;
+  color: #b7d9c8 !important;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.mp-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.mp-peer-list {
+  margin-top: 14px;
+  max-height: 160px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}
+.mp-peer-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.mp-peer-item .callsign {
+  font-weight: bold;
+  color: #7affbe;
+}
+.mp-peer-item .details {
+  color: #97aeb2;
+  font-family: monospace;
+}
+/* Floating In-flight Radio Pill */
+#mpRadioPill {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 18, 28, 0.92);
+  border: 1px solid #00e5ff;
+  box-shadow: 0 4px 24px rgba(0, 229, 255, 0.25);
+  padding: 8px 18px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 9999;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  pointer-events: none;
+  animation: mpFadeIn 0.3s ease-out;
+}
+@keyframes mpFadeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+/* Quick Radio Drawer */
+.mp-radio-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.mp-radio-btn {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  color: #b7effe;
+  cursor: pointer;
+}
+.mp-radio-btn:hover {
+  background: rgba(0, 229, 255, 0.28);
+  color: #ffffff;
+}
