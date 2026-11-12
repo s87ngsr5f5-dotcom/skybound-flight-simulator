@@ -51,50 +51,79 @@ function createTaipeiCity(scene,ground,airports){
   const officeNight=document.createElement('canvas');officeNight.width=officeNight.height=256;
   const ni=officeNight.getContext('2d');ni.fillStyle='#000';ni.fillRect(0,0,256,256);
   const roughCanvas=document.createElement('canvas');roughCanvas.width=roughCanvas.height=256;
-  const ri=roughCanvas.getContext('2d');ri.fillStyle='#bababa';ri.fillRect(0,0,256,256);
-  oi.fillStyle='#8c9a9f';oi.fillRect(0,0,256,256);
+  const ri=roughCanvas.getContext('2d');ri.fillStyle='#999';ri.fillRect(0,0,256,256);
+  oi.fillStyle='#1c2429';oi.fillRect(0,0,256,256);
   for(let row=0;row<4;row++)for(let col=0;col<4;col++){
-    const x=col*64+3,y=row*64+4;
-    const reflection=oi.createLinearGradient(x,y,x+58,y+55);
-    reflection.addColorStop(0,['#546f81','#668494','#4d6c7b','#718692'][(row+col)%4]);
-    reflection.addColorStop(.56,'#263e50');reflection.addColorStop(1,'#7b929e');
-    oi.fillStyle=reflection;oi.fillRect(x,y,58,55);
-    oi.fillStyle='#aeb5b4';oi.fillRect(x+28,y,1.2,55);
-    ri.fillStyle='#737373';ri.fillRect(x,y,58,55);
-    if((row*5+col*7)%9<3){ni.fillStyle=(row+col)%3?'#c7b28a':'#b9d0d5';ni.fillRect(x+3,y+5,52,45);}
+    const x=col*64,y=row*64;
+    oi.fillStyle='#27333b';oi.fillRect(x+2,y+2,60,8);
+    ri.fillStyle='#777';ri.fillRect(x+2,y+2,60,8);
+    const reflection=oi.createLinearGradient(x+3,y+12,x+61,y+60);
+    reflection.addColorStop(0,['#4b6e82','#5c8296','#436376','#648b9f'][(row+col)%4]);
+    reflection.addColorStop(.48,'#1c3445');
+    reflection.addColorStop(.52,'#244254');
+    reflection.addColorStop(1,'#6b8fa1');
+    oi.fillStyle=reflection;oi.fillRect(x+3,y+12,58,48);
+    oi.fillStyle='#222b31';oi.fillRect(x+31,y+12,2,48);
+    oi.fillStyle='#4c5d67';oi.fillRect(x+32,y+12,.8,48);
+    ri.fillStyle='#292929';ri.fillRect(x+3,y+12,58,48);
+    if((row*5+col*7)%9<4){
+      const warm=(row+col)%3!==0;
+      ni.fillStyle=warm?'#fce0b0':'#d2e8f7';
+      ni.fillRect(x+5,y+14,54,44);
+      ni.fillStyle=warm?'#fff4d8':'#f0f8ff';
+      ni.fillRect(x+7,y+20,50,4);
+      ni.fillRect(x+7,y+32,50,4);
+      ni.fillRect(x+7,y+44,50,4);
+    }
   }
   function repeatTexture(canvas,color=false){const t=new THREE.CanvasTexture(canvas);t.wrapS=t.wrapT=THREE.RepeatWrapping;if(color)t.colorSpace=THREE.SRGBColorSpace;return t;}
-  const officeGlass=new THREE.MeshPhysicalMaterial({map:repeatTexture(officeCanvas,true),roughnessMap:repeatTexture(roughCanvas),
-    color:0x3e6074,metalness:.72,roughness:.68,clearcoat:.25,clearcoatRoughness:.22,envMapIntensity:.8,
-    emissiveMap:repeatTexture(officeNight),emissive:0xffe6bb,emissiveIntensity:0,side:THREE.DoubleSide});
   const reflectedCity=document.createElement('canvas');reflectedCity.width=1024;reflectedCity.height=512;
   const reflected=reflectedCity.getContext('2d'),sky=reflected.createLinearGradient(0,0,0,512);
-  sky.addColorStop(0,'#517fa6');sky.addColorStop(.44,'#adc4d1');sky.addColorStop(.58,'#c5c5b6');sky.addColorStop(1,'#515c60');
+  sky.addColorStop(0,'#1c4270');sky.addColorStop(.36,'#497fa9');sky.addColorStop(.52,'#98bfd4');
+  sky.addColorStop(.56,'#c8dbe4');sky.addColorStop(.60,'#4c5d68');sky.addColorStop(1,'#2c373d');
   reflected.fillStyle=sky;reflected.fillRect(0,0,1024,512);
-  for(let i=0;i<54;i++){
-    const x=i*19,h=25+(i*47%113);reflected.fillStyle=['#697c88','#81939e','#5d707e'][i%3];
-    reflected.fillRect(x,288-h,15,h+120);
-    reflected.fillStyle='#bac9cc';for(let y=296-h;y<365;y+=10)reflected.fillRect(x+3,y,9,2);
+  reflected.fillStyle='#3e4e58';
+  reflected.beginPath();reflected.moveTo(0,307);
+  for(let x=0;x<=1024;x+=32){reflected.lineTo(x,295-Math.sin(x*.02)*18-Math.cos(x*.007)*14);}
+  reflected.lineTo(1024,350);reflected.lineTo(0,350);reflected.fill();
+  for(let i=0;i<64;i++){
+    const x=i*16,h=28+(i*53%135);reflected.fillStyle=['#556874','#6d808c','#485a65','#7a8e9b'][i%4];
+    reflected.fillRect(x,300-h,13,h+120);
+    reflected.fillStyle='#c8dbe2';for(let y=308-h;y<360;y+=8)reflected.fillRect(x+2,y,9,1.8);
   }
   const reflectedMap=new THREE.CanvasTexture(reflectedCity);reflectedMap.colorSpace=THREE.SRGBColorSpace;
-  reflectedMap.mapping=THREE.EquirectangularReflectionMapping;officeGlass.envMap=reflectedMap;
+  reflectedMap.mapping=THREE.EquirectangularReflectionMapping;
+  const officeGlass=new THREE.MeshPhysicalMaterial({map:repeatTexture(officeCanvas,true),roughnessMap:repeatTexture(roughCanvas),
+    color:0x36586c,metalness:.82,roughness:.22,clearcoat:1.0,clearcoatRoughness:.09,envMap:reflectedMap,envMapIntensity:1.15,
+    emissiveMap:repeatTexture(officeNight),emissive:0xffdfab,emissiveIntensity:0,side:THREE.DoubleSide});
   const landmarks=new THREE.Group();landmarks.name='Taipei landmarks';root.add(landmarks);
   const landmarkSites=[
     {name:'臺北101',lat:25.03396,lon:121.56450,radius:53,height:508,type:'101'},
     {name:'新光摩天大樓',lat:25.04625,lon:121.51520,radius:44,height:245,type:'tower'},
     {name:'臺北大巨蛋',lat:25.04242,lon:121.55940,radius:151,height:74.5,type:'dome'},
     {name:'臺北小巨蛋',lat:25.05190,lon:121.55074,radius:115,height:42,type:'arena'},
-    {name:'圓山大飯店',lat:25.07846,lon:121.52648,radius:83,height:87,type:'hotel'}
-    ,{name:'臺北車站',lat:25.0478,lon:121.5170,radius:115,height:49,type:'station'}
-    ,{name:'中正紀念堂',lat:25.0346,lon:121.5219,radius:55,height:70,type:'memorial'}
+    {name:'圓山大飯店',lat:25.07846,lon:121.52648,radius:83,height:87,type:'hotel'},
+    {name:'臺北車站',lat:25.0478,lon:121.5170,radius:115,height:49,type:'station'},
+    {name:'中正紀念堂',lat:25.0346,lon:121.5219,radius:55,height:70,type:'memorial'},
+    {name:'臺北南山廣場',lat:25.03540,lon:121.56630,radius:55,height:272,type:'nanshan'},
+    {name:'富邦信義A25',lat:25.03920,lon:121.56750,radius:46,height:266,type:'fubon'},
+    {name:'國泰置地廣場',lat:25.04070,lon:121.56680,radius:48,height:212,type:'cathay'},
+    {name:'陶朱隱園',lat:25.03780,lon:121.57140,radius:42,height:100,type:'taozhu'},
+    {name:'美麗華百樂園摩天輪',lat:25.08330,lon:121.55740,radius:65,height:100,type:'miramar'},
+    {name:'台北流行音樂中心',lat:25.05190,lon:121.59750,radius:68,height:45,type:'tmc'},
+    {name:'板橋百揚大樓',lat:25.01250,lon:121.46550,radius:52,height:220,type:'megatower'}
   ];
-  const glass=new THREE.MeshStandardMaterial({color:0x6eaaa3,metalness:.38,roughness:.28,map:facade,
-    emissiveMap:lights,emissive:0xffd6a2,emissiveIntensity:0});
+  const glass=new THREE.MeshStandardMaterial({color:0x5e9e99,metalness:.48,roughness:.20,map:facade,
+    envMap:reflectedMap,emissiveMap:lights,emissive:0xffd6a2,emissiveIntensity:0});
   const stone=new THREE.MeshStandardMaterial({color:0xc1c1ae,roughness:.82});
-  const darkGlass=new THREE.MeshStandardMaterial({color:0x517b88,roughness:.29,metalness:.35,map:facade});
+  const darkGlass=new THREE.MeshStandardMaterial({color:0x416572,roughness:.22,metalness:.58,map:facade,envMap:reflectedMap});
   const metal=new THREE.MeshStandardMaterial({color:0xa5aeb0,roughness:.4,metalness:.35});
   const red=new THREE.MeshStandardMaterial({color:0xa14735,roughness:.78});
   const gold=new THREE.MeshStandardMaterial({color:0xe1b866,roughness:.65});
+  const whiteFrame=new THREE.MeshStandardMaterial({color:0xf0f3f5,roughness:.32,metalness:.25});
+  const greenGarden=new THREE.MeshStandardMaterial({color:0x3b6e3f,roughness:.86});
+  const ferrisGreen=new THREE.MeshStandardMaterial({color:0x22c55e,roughness:.35,metalness:.2,emissive:0x16a34a,emissiveIntensity:.65});
+  const beaconMat=new THREE.MeshStandardMaterial({color:0xff1818,emissive:0xff2222,emissiveIntensity:1.2,roughness:.3});
   function add(parent,geometry,mat,x,y,z){
     const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
   }
@@ -119,11 +148,13 @@ function createTaipeiCity(scene,ground,airports){
       box(group,glass,35,28,35,0,434,0);
       box(group,metal,22,12,22,0,454,0);
       add(group,new THREE.CylinderGeometry(1,4,48,12),metal,0,484,0);
+      box(group,beaconMat,2.5,2.5,2.5,0,508,0);
     }else if(site.type==='tower'){
       box(group,stone,67,26,68,0,13,0);
       box(group,darkGlass,52,171,49,0,111.5,0);
       box(group,metal,45,22,43,0,208,0);
       add(group,new THREE.CylinderGeometry(12,28,26,4,1,false,Math.PI/4),metal,0,232,0);
+      box(group,beaconMat,2,2,2,0,245,0);
     }else if(site.type==='dome'||site.type==='arena'){
       const big=site.type==='dome',w=big?260:177,d=big?208:136,h=big?74.5:42;
       box(group,stone,w,18,d,0,9,0);
@@ -141,7 +172,7 @@ function createTaipeiCity(scene,ground,airports){
     }else if(site.type==='memorial'){
       box(group,stone,88,11,88,0,5.5,0);box(group,stone,50,39,50,0,30.5,0);
       for(let level=0;level<2;level++)add(group,new THREE.CylinderGeometry(13-level*5,38-level*6,12,8,1,false,Math.PI/8),darkGlass,0,54+level*10,0);
-    }else{
+    }else if(site.type==='hotel'){
       box(group,stone,124,65,56,0,32.5,0);
       for(let floor=0;floor<12;floor++){
         box(group,red,129,1.3,61,0,6+floor*5,0);
@@ -149,6 +180,121 @@ function createTaipeiCity(scene,ground,airports){
       }
       const top=add(group,new THREE.CylinderGeometry(42,77,18,4,1,false,Math.PI/4),red,0,76,0);
       top.scale.z=.57;box(group,gold,111,2,5,0,86,0);
+    }else if(site.type==='nanshan'){
+      group.rotation.y=-0.12;
+      box(group,stone,76,38,64,0,19,-10);
+      box(group,officeGlass,78,14,66,0,7,-10);
+      box(group,officeGlass,32,26,30,22,13,26);
+      add(group,new THREE.CylinderGeometry(14,22,26,6),officeGlass,22,13,26);
+      box(group,officeGlass,54,82,42,0,79,-10);
+      for(const sx of [-27,27])for(const sz of [-31,11])box(group,metal,1.5,82,1.5,sx,79,sz);
+      box(group,darkGlass,52,6,40,0,123,-10);
+      box(group,officeGlass,48,72,38,0,159,-10);
+      for(const sx of [-24,24])for(const sz of [-29,9])box(group,metal,1.3,72,1.3,sx,159,sz);
+      box(group,officeGlass,44,55,34,0,222.5,-10);
+      box(group,metal,40,2,30,0,251,-10);
+      const crown1=add(group,new THREE.CylinderGeometry(16,22,20,4,1,false,Math.PI/4),officeGlass,0,261,-10);
+      crown1.scale.set(1.1,1,0.8);
+      box(group,metal,14,10,12,0,266,-10);
+      box(group,beaconMat,2.5,2.5,2.5,0,272,-10);
+    }else if(site.type==='fubon'){
+      group.rotation.y=-0.12;
+      box(group,officeGlass,52,18,40,0,9,0);
+      box(group,officeGlass,44,222,32,0,129,0);
+      for(const sx of [-23,23])for(const sz of [-17,17]){
+        box(group,whiteFrame,2.5,248,2.5,sx,124,sz);
+      }
+      for(let f=1;f<=5;f++){
+        box(group,whiteFrame,47,2,35,0,f*44,0);
+        box(group,whiteFrame,1.2,1.2,34,-23,f*44-22,0);
+        box(group,whiteFrame,1.2,1.2,34,23,f*44-22,0);
+      }
+      box(group,whiteFrame,46,26,2,0,253,-17);
+      box(group,whiteFrame,46,26,2,0,253,17);
+      box(group,whiteFrame,2,26,34,-23,253,0);
+      box(group,whiteFrame,2,26,34,23,253,0);
+      box(group,darkGlass,28,18,20,0,249,0);
+      box(group,beaconMat,2.5,2.5,2.5,0,266,0);
+    }else if(site.type==='cathay'){
+      group.rotation.y=-0.12;
+      box(group,stone,78,38,62,0,19,0);
+      box(group,officeGlass,80,14,64,0,7,0);
+      box(group,officeGlass,52,72,38,0,74,0);
+      for(const sx of [-26,26])box(group,metal,1.4,160,1.4,sx,118,0);
+      box(group,officeGlass,48,55,34,0,137.5,0);
+      box(group,metal,50,2,36,0,110,0);
+      box(group,officeGlass,44,33,30,0,181.5,0);
+      box(group,metal,46,2,32,0,165,0);
+      box(group,darkGlass,46,12,32,0,204,0);
+      box(group,metal,48,2,34,0,210,0);
+      box(group,beaconMat,2.5,2.5,2.5,0,212,0);
+    }else if(site.type==='taozhu'){
+      group.rotation.y=-0.12;
+      add(group,new THREE.CylinderGeometry(36,38,6,24),stone,0,3,0);
+      add(group,new THREE.CylinderGeometry(9,9,96,16),darkGlass,0,51,0);
+      for(let level=0;level<20;level++){
+        const y=8+level*4.4;
+        const angle=level*(Math.PI/40);
+        const wing=add(group,new THREE.BoxGeometry(44,3.2,14),officeGlass,0,y,0);
+        wing.rotation.y=angle;
+        const cos=Math.cos(angle),sin=Math.sin(angle);
+        const g1=add(group,new THREE.BoxGeometry(10,1.4,13.6),greenGarden,17*cos,y-0.6,-17*sin);
+        g1.rotation.y=angle;
+        const g2=add(group,new THREE.BoxGeometry(10,1.4,13.6),greenGarden,-17*cos,y-0.6,17*sin);
+        g2.rotation.y=angle;
+      }
+      const pergola=add(group,new THREE.BoxGeometry(46,3,16),whiteFrame,0,98,0);
+      pergola.rotation.y=Math.PI/2;
+      box(group,beaconMat,2,2,2,0,100,0);
+    }else if(site.type==='miramar'){
+      box(group,stone,96,28,70,0,14,0);
+      box(group,officeGlass,88,14,62,0,21,0);
+      box(group,stone,90,2,64,0,29,0);
+      box(group,whiteFrame,3,38,3,-18,48,0);
+      box(group,whiteFrame,3,38,3,18,48,0);
+      box(group,whiteFrame,38,3,3,0,46,0);
+      box(group,ferrisGreen,8,8,10,0,65,0);
+      const segments=16,rOuter=35,rInner=24;
+      for(let i=0;i<segments;i++){
+        const a1=i*(Math.PI*2/segments),a2=(i+1)*(Math.PI*2/segments);
+        const x1=rOuter*Math.cos(a1),y1=65+rOuter*Math.sin(a1);
+        const x2=rOuter*Math.cos(a2),y2=65+rOuter*Math.sin(a2);
+        const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx);
+        const rim=add(group,new THREE.BoxGeometry(len,1.4,1.4),ferrisGreen,(x1+x2)/2,(y1+y2)/2,0);
+        rim.rotation.z=ang;
+        const ix1=rInner*Math.cos(a1),iy1=65+rInner*Math.sin(a1);
+        const ix2=rInner*Math.cos(a2),iy2=65+rInner*Math.sin(a2);
+        const idx=ix2-ix1,idy=iy2-iy1,ilen=Math.hypot(idx,idy),iang=Math.atan2(idy,idx);
+        const irim=add(group,new THREE.BoxGeometry(ilen,1,1),whiteFrame,(ix1+ix2)/2,(iy1+iy2)/2,0);
+        irim.rotation.z=iang;
+        if(i%2===0){
+          const spoke=add(group,new THREE.BoxGeometry(rOuter,1,1),whiteFrame,x1/2,65+rOuter*Math.sin(a1)/2,0);
+          spoke.rotation.z=a1;
+        }
+        box(group,ferrisGreen,2.8,3,3.4,x1,y1,0);
+      }
+      box(group,beaconMat,2,2,2,0,101,0);
+    }else if(site.type==='tmc'){
+      box(group,stone,110,4,86,0,2,0);
+      box(group,officeGlass,80,12,64,0,8,0);
+      box(group,darkGlass,74,22,58,0,18,0);
+      const canopy=add(group,new THREE.CylinderGeometry(22,46,20,6),metal,0,28,0);
+      canopy.scale.set(1.2,1,0.9);
+      add(group,new THREE.ConeGeometry(18,16,5),metal,-12,38,-6);
+      add(group,new THREE.ConeGeometry(15,14,6),officeGlass,14,36,8);
+    }else if(site.type==='megatower'){
+      add(group,new THREE.CylinderGeometry(38,42,28,24),stone,0,14,0);
+      box(group,officeGlass,72,14,56,0,8,0);
+      const towerBody=add(group,new THREE.CylinderGeometry(28,32,162,24),officeGlass,0,109,0);
+      towerBody.scale.set(1.15,1,0.9);
+      for(let f=1;f<=6;f++){
+        const ring=add(group,new THREE.CylinderGeometry(28.4,28.4,1.8,24),metal,0,28+f*24,0);
+        ring.scale.set(1.15,1,0.9);
+      }
+      add(group,new THREE.CylinderGeometry(21,27,16,20),officeGlass,0,198,0);
+      add(group,new THREE.CylinderGeometry(13,19,12,16),metal,0,212,0);
+      add(group,new THREE.CylinderGeometry(1,3,10,8),metal,0,220,0);
+      box(group,beaconMat,2.5,2.5,2.5,0,223,0);
     }
     // One draw per material instead of hundreds of hotel columns/tower details.
     group.updateMatrixWorld(true);
@@ -326,8 +472,10 @@ function createTaipeiCity(scene,ground,airports){
     const at=latLon(x,z),near=at.lat>24.90&&at.lat<25.22&&at.lon>121.35&&at.lon<121.74;
     root.visible=near;if(!near)return;
     const mobile=touchControls.mode.value==='mobile',range=mobile?4800:quality==='ultra'?11000:quality==='high'?9000:6500;
-    wall.emissiveIntensity=(1-day)*.36;glass.emissiveIntensity=(1-day)*.55;officeGlass.emissiveIntensity=(1-day)*.72;
-    officeGlass.envMapIntensity=.13+day*.95;
+    wall.emissiveIntensity=(1-day)*.36;glass.emissiveIntensity=(1-day)*.55;
+    officeGlass.emissiveIntensity=Math.pow(1-day,1.4)*.95;officeGlass.envMapIntensity=.25+day*1.15;
+    beaconMat.emissiveIntensity=(1-day)*(Math.sin(clock*4.5)>0?1.8:.1);
+    ferrisGreen.emissiveIntensity=.4+(1-day)*.9;
     asphalt.roughness=wet?.32:.95;asphalt.metalness=wet?.15:0;
     traffic(dt,x,z,paused,mobile);
     if(!index&&!indexRequest&&clock>=nextScan){

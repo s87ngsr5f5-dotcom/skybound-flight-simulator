@@ -21,3 +21,8 @@ https://www.antonov.com/en/history/an-124-ruslan
 https://antonov-airlines.aero/methods/optg120
 Model references are not redistributed. Handling, cockpit panels, and loading
 animations use simplified simulator implementations.
+
+AgustaWestland AW101 Merlin Helicopter
+Source https://sketchfab.com/3d-models/helicopter-ef70283b1dea4ae8b18eec9231ce390e via https://github.com/srcejon/sdrangel-3d-models
+Author Gigantic Burger (https://sketchfab.com/gigantic.burger). License CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+The game adapts this model for high-resolution exterior rendering with dynamic main and tail rotors.
