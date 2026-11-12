@@ -2414,6 +2414,31 @@ function initialize(){
       btn.onclick=()=>multiplayer.sendRadio(btn.dataset.radio);
     });
 
+    const touchRadio=byId('touchRadio');
+    const quickCalls=['🛫 已進入跑道起飛','🛬 五邊進場，準備降落','✈ 編隊飛行跟隨中','👋 向你致敬 (Wing Wave)'];
+    let quickCallIdx=0;
+    if(touchRadio){
+      touchRadio.onclick=()=>{
+        if(typeof multiplayer!=='undefined'){
+          if(!multiplayer.isConnected()) multiplayer.joinRoom('8888',callsignInput?.value);
+          const msg=quickCalls[quickCallIdx%quickCalls.length];
+          quickCallIdx++;
+          multiplayer.sendRadio(msg);
+        }
+      };
+    }
+
+    const mobileMpBtn=byId('mobileMultiplayer');
+    if(mobileMpBtn){
+      mobileMpBtn.onclick=()=>{
+        const mpSection=byId('multiplayerSection');
+        if(mpSection){
+          mpSection.open=true;
+          mpSection.scrollIntoView({behavior:'smooth'});
+        }
+      };
+    }
+
     const sendCustomBtn=byId('mpSendCustomBtn'), customInput=byId('mpCustomMsg');
     if(sendCustomBtn&&customInput){
       sendCustomBtn.onclick=()=>{
