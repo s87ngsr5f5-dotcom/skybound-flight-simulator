@@ -16,6 +16,11 @@ const multiplayer = (() => {
   const peers = new Map();
   const listeners = new Set();
   const radioMessages = [];
+  const killFeed = [];
+  let localHp = 100;
+  let localKills = 0;
+  let localDeaths = 0;
+  let isCombatMode = false;
 
   const defaultRoom = '8888';
   const defaultCallsign = 'SKY-' + Math.floor(100 + Math.random() * 900);
@@ -133,6 +138,52 @@ const multiplayer = (() => {
     }
   }
 
+  function handleCombatMessage(msg) {
+    if (!msg || msg.roomId !== roomId) return;
+    if (msg.action === 'hit') {
+      if (msg.targetId === localId) {
+        const dmg = msg.damage || 35;
+        localHp = Math.max(0, localHp - dmg);
+        notify('damage_received', { damage: dmg, attacker: msg.callsign, weapon: msg.weapon, remainingHp: localHp });
+        if (localHp <= 0) {
+          localDeaths++;
+          sendCombatEvent('kill', {
+            killerId: msg.sender,
+            killerCallsign: msg.callsign,
+            victimId: localId,
+            victimCallsign: callsign,
+            weapon: msg.weapon || '飛彈'
+          });
+          notify('player_killed', { killer: msg.callsign, weapon: msg.weapon });
+        }
+      } else {
+        const peer = peers.get(msg.targetId);
+        if (peer) {
+          peer.hp = Math.max(0, (peer.hp ?? 100) - (msg.damage || 35));
+        }
+      }
+    } else if (msg.action === 'kill') {
+      killFeed.unshift({
+        killer: msg.killerCallsign || msg.callsign,
+        victim: msg.victimCallsign || '機長',
+        weapon: msg.weapon || '飛彈',
+        time: Date.now()
+      });
+      if (killFeed.length > 15) killFeed.pop();
+      if (msg.killerId === localId) {
+        localKills++;
+        notify('player_scored_kill', { victim: msg.victimCallsign, weapon: msg.weapon });
+      }
+      notify('kill_feed', killFeed);
+    } else if (msg.action === 'fire_missile') {
+      notify('enemy_fire_missile', msg);
+    } else if (msg.action === 'fire_gun') {
+      notify('enemy_fire_gun', msg);
+    } else if (msg.action === 'flare') {
+      notify('enemy_flare', msg);
+    }
+  }
+
   function handleIncomingMessage(msg) {
     if (!msg || msg.sender === localId || msg.roomId !== roomId) return;
     if (msg.type === 'state') {
@@ -146,7 +197,9 @@ const multiplayer = (() => {
           targetState: { ...msg.state },
           lastSeen: performance.now(),
           mesh: null,
-          billboard: null
+          billboard: null,
+          hp: msg.state?.hp ?? 100,
+          isCombat: Boolean(msg.state?.combat)
         };
         peers.set(msg.sender, peer);
         notify('peer_joined', peer);
@@ -154,6 +207,8 @@ const multiplayer = (() => {
         peer.callsign = msg.callsign || peer.callsign;
         peer.aircraftId = msg.aircraftId || peer.aircraftId;
         peer.targetState = { ...msg.state };
+        peer.hp = msg.state?.hp ?? peer.hp ?? 100;
+        peer.isCombat = Boolean(msg.state?.combat);
         peer.lastSeen = performance.now();
       }
     } else if (msg.type === 'leave') {
@@ -167,6 +222,8 @@ const multiplayer = (() => {
       radioMessages.unshift({ sender: msg.callsign || '機長', text: msg.text, time: Date.now() });
       if (radioMessages.length > 20) radioMessages.pop();
       notify('radio', { sender: msg.callsign || '機長', text: msg.text });
+    } else if (msg.type === 'combat') {
+      handleCombatMessage(msg);
     }
   }
 
@@ -236,6 +293,30 @@ const multiplayer = (() => {
     sendRaw(msg);
   }
 
+  function sendCombatEvent(action, data = {}) {
+    if (!isConnected || !roomId) return;
+    const msg = {
+      type: 'combat',
+      action,
+      sender: localId,
+      callsign,
+      roomId,
+      timestamp: Date.now(),
+      ...data
+    };
+    sendRaw(msg);
+    if (action === 'kill') {
+      killFeed.unshift({
+        killer: data.killerCallsign || callsign,
+        victim: data.victimCallsign || '敵機',
+        weapon: data.weapon || 'AIM-9X',
+        time: Date.now()
+      });
+      if (killFeed.length > 15) killFeed.pop();
+      notify('kill_feed', killFeed);
+    }
+  }
+
   function broadcastFlight(f, profile) {
     if (!isConnected || !roomId || !f) return;
     const now = performance.now();
@@ -260,7 +341,9 @@ const multiplayer = (() => {
         flaps: f.flaps || 0,
         gear: f.gear !== false,
         lights: Boolean(f.lights),
-        contrails: Boolean(f.y > 7200 && f.power > 0.6)
+        contrails: Boolean(f.y > 7200 && f.power > 0.6),
+        hp: localHp,
+        combat: Boolean(isCombatMode || f.combatMode || f.tactical?.armed)
       }
     };
     sendRaw(payload);
@@ -292,11 +375,11 @@ const multiplayer = (() => {
     const sprite = new THREE.Sprite(material);
     sprite.scale.set(32, 8.4, 1);
 
-    function updateLabel(altM, speedKmh, distKm) {
+    function updateLabel(altM, speedKmh, distKm, hp, isCombat) {
       ctx.clearRect(0, 0, 320, 84);
       // Background badge
       ctx.fillStyle = 'rgba(10, 22, 34, 0.85)';
-      ctx.strokeStyle = '#00e5ff';
+      ctx.strokeStyle = (isCombat || (hp !== undefined && hp < 100)) ? '#ff5252' : '#00e5ff';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.roundRect(4, 4, 312, 76, 12);
@@ -306,12 +389,16 @@ const multiplayer = (() => {
       // Pilot Callsign
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 26px sans-serif';
-      ctx.fillText(`✈ ${callsign}`, 18, 36);
+      const combatTag = isCombat ? ' ⚔' : '';
+      ctx.fillText(`✈ ${callsign}${combatTag}`, 18, 36);
 
       // Aircraft & Telemetry
-      ctx.fillStyle = '#6ee8b3';
-      ctx.font = 'bold 19px monospace';
-      ctx.fillText(`${aircraftId.toUpperCase()} · ${Math.round(altM)}m · ${Math.round(speedKmh)}km/h · ${distKm.toFixed(1)}km`, 18, 64);
+      const hpVal = Math.max(0, Math.min(100, Math.round(hp ?? 100)));
+      const hpColor = hpVal <= 30 ? '#ff4d4f' : hpVal <= 70 ? '#ffcf5e' : '#6ee8b3';
+      ctx.fillStyle = hpColor;
+      ctx.font = 'bold 18px monospace';
+      const hpText = (isCombat || hpVal < 100) ? ` · HP ${hpVal}%` : '';
+      ctx.fillText(`${aircraftId.toUpperCase()} · ${Math.round(altM)}m · ${Math.round(speedKmh)}km/h · ${distKm.toFixed(1)}km${hpText}`, 18, 64);
       texture.needsUpdate = true;
     }
 
@@ -402,7 +489,7 @@ const multiplayer = (() => {
         const scale = Math.max(14, Math.min(85, distKm * 4.5 + 16));
         peer.billboard.sprite.scale.set(scale, scale * 0.26, 1);
         peer.billboard.sprite.visible = distKm < 45; // Visible within 45 km
-        peer.billboard.updateLabel(s.y, s.speed * 3.6, distKm);
+        peer.billboard.updateLabel(s.y, s.speed * 3.6, distKm, peer.hp, peer.isCombat);
       }
     }
   }
@@ -411,13 +498,24 @@ const multiplayer = (() => {
     joinRoom,
     leaveRoom,
     sendRadio,
+    sendCombatEvent,
     broadcastFlight,
     updatePeers3D,
     getRoomId: () => roomId,
     getCallsign: () => callsign,
+    getLocalId: () => localId,
     isConnected: () => isConnected,
     getPeers: () => Array.from(peers.values()),
     getRadioMessages: () => [...radioMessages],
+    getKillFeed: () => [...killFeed],
+    getLocalHp: () => localHp,
+    setLocalHp: (val) => { localHp = Math.max(0, Math.min(100, val)); },
+    getLocalStats: () => ({ hp: localHp, kills: localKills, deaths: localDeaths }),
+    resetCombatStats: () => { localHp = 100; localKills = 0; localDeaths = 0; },
+    setCombatMode: (val) => { isCombatMode = Boolean(val); },
+    isCombatMode: () => isCombatMode,
+    handleIncomingMessage,
+    injectPeer: (peer) => { peers.set(peer.id, peer); },
     addListener: (fn) => listeners.add(fn),
     removeListener: (fn) => listeners.delete(fn),
     defaultRoom,

@@ -94,13 +94,39 @@ function makeTacticalFlight(airport,aircraft,kind,wind,guided,advanced){
     radar:false,automatic:true,aimAssist:false,mode:sea?'sea':'air',selected:null,lock:0,armed:false,ammo:ammoCount,gunsOnly:isGunsOnly,health:100,
     missiles:[],effects:[],events:[],frames:[],shots:0,hits:0,air:0,sea:0,neutral:0,
     gunBursts:0,gunHits:0,nextGun:0,
-    enemyShot:guided&&!advanced?24:10,enemyWarning:0,returning:false,notice:'',nextFrame:0,result:null};
+    enemyShot:10,enemyWarning:0,returning:false,notice:'',nextFrame:0,result:null};
   return f;
 }
 function tacticalContacts(f){
   const s=f.tactical;
+  if(!s||!s.radar) return [];
   const maxRange=s.kind==='headon'?25000:12500;
-  return s.radar?s.targets.filter(t=>t.alive&&t.domain===s.mode&&tacticalDistance(f,t)<maxRange):[];
+  const list=s.targets.filter(t=>t.alive&&t.domain===s.mode&&tacticalDistance(f,t)<maxRange);
+  if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()&&s.mode==='air'){
+    const peers=multiplayer.getPeers();
+    for(const p of peers){
+      if(!p.state||(p.hp!==undefined&&p.hp<=0)) continue;
+      const d=Math.hypot(f.x-p.state.x, f.y-p.state.y, f.z-p.state.z);
+      if(d<maxRange){
+        list.push({
+          id:p.id,
+          name:`機長 ${p.callsign}`,
+          team:'hostile',
+          domain:'air',
+          alive:true,
+          x:p.state.x,
+          y:p.state.y,
+          z:p.state.z,
+          vx:Math.sin(p.state.heading||0)*(p.state.speed||100),
+          vy:p.state.vy||0,
+          vz:-Math.cos(p.state.heading||0)*(p.state.speed||100),
+          heading:p.state.heading||0,
+          isPeer:true
+        });
+      }
+    }
+  }
+  return list;
 }
 function selectTacticalTarget(s,id){
   if(s.selected===id) return;
@@ -132,9 +158,22 @@ function tacticalGun(f){
   const target=tacticalTarget(f), point=tacticalGunLead(f,target);
   const aim=point&&tacticalAim(f,point);
   if(aim&&Math.abs(aim.bearing)<.028&&Math.abs(aim.elevation-f.pitch)<.028){
-    target.alive=false;s.air++;s.gunHits++;
-    s.effects.push({x:target.x,y:target.y,z:target.z,age:0,water:false});
-    s.notice='機砲命中 · '+target.name;
+    if(target.isPeer){
+      s.air++;s.gunHits++;
+      s.effects.push({x:target.x,y:target.y,z:target.z,age:0,water:false});
+      s.notice='機砲命中 · '+target.name;
+      if(typeof multiplayer!=='undefined'){
+        multiplayer.sendCombatEvent('hit', {
+          targetId: target.id,
+          damage: 25,
+          weapon: '20mm 旋轉機砲'
+        });
+      }
+    }else{
+      target.alive=false;s.air++;s.gunHits++;
+      s.effects.push({x:target.x,y:target.y,z:target.z,age:0,water:false});
+      s.notice='機砲命中 · '+target.name;
+    }
   }else s.notice='機砲未命中 · 對準金色前置圈';
   tacticalEvent(s,s.notice);
   tacticalFrame(f);
@@ -179,6 +218,16 @@ function tacticalFire(f){
     ...tacticalRack(f,s.shots-1),heading:f.heading,pitch:f.pitch,trail:[]});
   s.notice='飛彈已離架';
   tacticalEvent(s,'飛彈離架 · '+target.name);
+  if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+    multiplayer.sendCombatEvent('fire_missile', {
+      missileId: s.shots,
+      targetId: target.id,
+      targetName: target.name,
+      origin: { x: f.x, y: f.y, z: f.z },
+      heading: f.heading,
+      pitch: f.pitch
+    });
+  }
   tacticalFrame(f);
   return true;
 }
@@ -323,7 +372,7 @@ function stepTactical(f,dt){
   s.enemyWarning=Math.max(0,s.enemyWarning-dt);
   for(let i=s.missiles.length-1;i>=0;i--){
     const m=s.missiles[i];
-    const aim=m.target==='player'?f:s.targets.find(t=>t.id===m.target&&t.alive);
+    const aim=m.target==='player'?f:(contacts.find(t=>t.id===m.target)||s.targets.find(t=>t.id===m.target&&t.alive));
     m.age+=dt;
     const d=aim?tacticalDistance(m,aim):Infinity;
     const speed=m.owner==='player'?760:345;
@@ -331,10 +380,22 @@ function stepTactical(f,dt){
     if(impact){
       s.effects.push({x:aim.x,y:aim.y,z:aim.z,age:0,water:aim.domain==='sea'});
       if(m.owner==='player'){
-        aim.alive=false;s.hits++;
-        if(aim.team!=='hostile') s.neutral++;
-        else if(aim.domain==='sea') s.sea++;else s.air++;
-        s.notice='命中 · '+aim.name;
+        if(aim.isPeer){
+          s.hits++;s.air++;
+          s.notice='命中 · '+aim.name;
+          if(typeof multiplayer!=='undefined'){
+            multiplayer.sendCombatEvent('hit', {
+              targetId: aim.id,
+              damage: 45,
+              weapon: 'AIM-9X 響尾蛇飛彈'
+            });
+          }
+        }else{
+          aim.alive=false;s.hits++;
+          if(aim.team!=='hostile') s.neutral++;
+          else if(aim.domain==='sea') s.sea++;else s.air++;
+          s.notice='命中 · '+aim.name;
+        }
       }else if(aim===f){
         s.health=Math.max(0,s.health-34);
         s.notice='機體受損 · '+s.health+'%';

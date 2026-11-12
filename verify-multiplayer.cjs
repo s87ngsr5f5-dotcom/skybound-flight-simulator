@@ -25,7 +25,30 @@ assert.ok(messages.length > 0);
 assert.equal(messages[0].sender, 'TOPGUN-1');
 assert.equal(messages[0].text, '已抵達巡航高度 FL115');
 
-// 4. Leave room
+// 4. Combat events & PVP mechanics
+multiplayer.setCombatMode(true);
+assert.equal(multiplayer.isCombatMode(), true);
+assert.equal(multiplayer.getLocalHp(), 100);
+multiplayer.setLocalHp(65);
+assert.equal(multiplayer.getLocalHp(), 65);
+
+// Test combat kill feed
+multiplayer.sendCombatEvent('kill', {
+  killerCallsign: 'TOPGUN-1',
+  victimCallsign: 'BANDIT-02',
+  weapon: 'AIM-9X'
+});
+const feed = multiplayer.getKillFeed();
+assert.ok(feed.length > 0);
+assert.equal(feed[0].killer, 'TOPGUN-1');
+assert.equal(feed[0].victim, 'BANDIT-02');
+assert.equal(feed[0].weapon, 'AIM-9X');
+
+multiplayer.resetCombatStats();
+assert.equal(multiplayer.getLocalHp(), 100);
+assert.equal(multiplayer.getLocalStats().kills, 0);
+
+// 5. Leave room
 multiplayer.leaveRoom();
 assert.equal(multiplayer.isConnected(), false);
 assert.equal(multiplayer.getRoomId(), '');

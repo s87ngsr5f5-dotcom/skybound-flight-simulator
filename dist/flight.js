@@ -1860,6 +1860,12 @@ function initialize(){
         if(text) text.textContent=`🌐 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`;
       }
     }
+    const isFighterOrCombat = flight?.aircraft?.role === 'fighter' || Boolean(flight?.tactical) || byId('lesson')?.value === 'multiplayer';
+    const combatPill = byId('hudCombatPill');
+    const touchCombat = byId('touchCombatBar');
+    if (combatPill) combatPill.hidden = !isFighterOrCombat;
+    if (touchCombat) touchCombat.hidden = !isFighterOrCombat;
+    if (typeof multiplayer !== 'undefined') multiplayer.setCombatMode(isFighterOrCombat);
     changeView();
   }
   function start(approach,restart=false,preset=restart?flight?.quickPreset:null){
@@ -2007,6 +2013,12 @@ function initialize(){
     if(headerMp) headerMp.hidden=true;
     const hudMp=byId('hudMpDropdown');
     if(hudMp) hudMp.hidden=true;
+    const combatPill=byId('hudCombatPill');
+    if(combatPill) combatPill.hidden=true;
+    const touchCombat=byId('touchCombatBar');
+    if(touchCombat) touchCombat.hidden=true;
+    const hudKillFeed=byId('hudKillFeed');
+    if(hudKillFeed) hudKillFeed.innerHTML='';
     byId('hud').hidden=byId('menu').hidden=true;
     flightBar.hidden=flightAircraft.hidden=true;
     document.body.classList.remove('flight-ui');
@@ -2050,9 +2062,16 @@ function initialize(){
         setMobilePanel(hud.dataset.mobilePanel==='nav'?'':'nav');
       }
     }
-    if(code==='KeyK'&&!paused&&flight.tactical) {
-      tacticalView.command('gun');
+    if(code==='KeyK'&&!paused) {
+      if(flight.tactical) tacticalView.command('gun');
       if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(18);
+    }
+    if(code==='KeyX'&&!paused&&flight.aircraft.role==='fighter') {
+      if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+        multiplayer.sendCombatEvent('flare',{origin:{x:flight.x,y:flight.y,z:flight.z}});
+      }
+      showPill('✨ 已投放熱焰彈 (Flares Deployed)');
+      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([15,10,15]);
     }
     if(code==='KeyV'){flight.bankCommand=0;flight.levelWings=true;}
     if(code==='KeyN') cycleCockpitView();
@@ -2684,6 +2703,58 @@ function initialize(){
       });
     }
 
+    function updateCombatPill() {
+      const fill=byId('hudCombatHpFill');
+      const text=byId('hudCombatHpText');
+      if(fill&&text&&typeof multiplayer!=='undefined'){
+        const hp=multiplayer.getLocalHp();
+        fill.style.width=hp+'%';
+        text.textContent=hp+'%';
+        if(hp<=30) fill.style.background='#ff4d4f';
+        else if(hp<=70) fill.style.background='#ffcf5e';
+        else fill.style.background='linear-gradient(90deg, #ff4d4f, #52c41a)';
+      }
+    }
+
+    function renderKillFeed(feed) {
+      const box=byId('hudKillFeed');
+      if(!box) return;
+      box.innerHTML='';
+      for(const item of (feed||[]).slice(0,4)){
+        const div=document.createElement('div');
+        div.className='kill-feed-item';
+        div.innerHTML=`<span class="kill-feed-killer">${item.killer}</span><span class="kill-feed-weapon">${item.weapon}</span><span class="kill-feed-victim">${item.victim}</span>`;
+        box.appendChild(div);
+      }
+    }
+
+    // Touch combat action button bindings
+    const btnMissile=byId('touchCombatMissile');
+    const btnGun=byId('touchCombatGun');
+    const btnLock=byId('touchCombatLock');
+    const btnFlare=byId('touchCombatFlare');
+    if(btnMissile) btnMissile.onclick=()=>{
+      if(flight?.tactical) tacticalView.command('fire');
+      else showPill('🚀 戰術飛彈架就緒');
+      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([20,15,30]);
+    };
+    if(btnGun) btnGun.onclick=()=>{
+      if(flight?.tactical) tacticalView.command('gun');
+      else showPill('💥 20mm 機砲短射');
+      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(18);
+    };
+    if(btnLock) btnLock.onclick=()=>{
+      if(flight?.tactical) tacticalView.command('next');
+      else showPill('🎯 切換雷達鎖定目標');
+    };
+    if(btnFlare) btnFlare.onclick=()=>{
+      if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+        multiplayer.sendCombatEvent('flare',{origin:{x:flight?.x||0,y:flight?.y||0,z:flight?.z||0}});
+      }
+      showPill('✨ 已投放熱焰彈');
+      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([15,10,15]);
+    };
+
     if(typeof multiplayer!=='undefined'){
       multiplayer.addListener((event,data)=>{
         if(event==='connect'){
@@ -2712,6 +2783,29 @@ function initialize(){
           renderPeerList();
         }else if(event==='radio'){
           showPill(`📻 [${data.sender}]: ${data.text}`);
+        }else if(event==='kill_feed'){
+          renderKillFeed(data);
+        }else if(event==='damage_received'){
+          updateCombatPill();
+          const flash=document.createElement('div');
+          flash.className='damage-flash';
+          document.body.appendChild(flash);
+          setTimeout(()=>flash.remove(),400);
+          showPill(`⚠️ 遭到 [${data.attacker}] 攻擊！受到 ${data.damage}% 損傷！`);
+          if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([40,20,60]);
+        }else if(event==='player_scored_kill'){
+          showPill(`🎯 成功擊落目標 [${data.victim}]！`);
+          if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([30,30,30,30,60]);
+        }else if(event==='player_killed'){
+          updateCombatPill();
+          showPill(`💥 被 [${data.killer}] 擊落！3 秒後重生...`);
+          setTimeout(()=>{
+            multiplayer.resetCombatStats();
+            updateCombatPill();
+            showPill('🛡️ 戰機已重生修復！');
+          },3000);
+        }else if(event==='enemy_flare'){
+          showPill(`✨ [${data.callsign}] 投放了熱焰干擾彈`);
         }
       });
     }

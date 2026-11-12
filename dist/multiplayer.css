@@ -327,3 +327,119 @@
 .hud-mp-send-box button:hover {
   background: #00b4d8;
 }
+
+/* PVP Combat HUD & Kill Feed */
+.hud-kill-feed {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 999;
+}
+.kill-feed-item {
+  background: rgba(12, 22, 34, 0.90);
+  border: 1px solid rgba(255, 77, 79, 0.55);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: feedSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes feedSlide {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.kill-feed-killer {
+  color: #00e5ff;
+  font-weight: 700;
+}
+.kill-feed-weapon {
+  color: #ffcf5e;
+  font-size: 11px;
+  background: rgba(255, 207, 94, 0.16);
+  border: 1px solid rgba(255, 207, 94, 0.35);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.kill-feed-victim {
+  color: #ff4d4f;
+  font-weight: 700;
+}
+
+/* Combat Mode HUD Status Pill */
+.hud-combat-pill {
+  position: fixed;
+  bottom: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 20, 28, 0.92);
+  border: 1px solid #ff4d4f;
+  box-shadow: 0 0 16px rgba(255, 77, 79, 0.4);
+  padding: 4px 14px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+  z-index: 100;
+  pointer-events: none;
+}
+.hud-combat-hp-bar {
+  width: 70px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+  display: inline-block;
+}
+.hud-combat-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff4d4f, #52c41a);
+  transition: width 0.2s ease;
+}
+
+/* Screen Damage Flash */
+.damage-flash {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle, transparent 40%, rgba(255, 0, 0, 0.45) 100%);
+  pointer-events: none;
+  z-index: 9999;
+  animation: flashFade 0.4s ease-out forwards;
+}
+@keyframes flashFade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Mobile Combat Quick Buttons */
+.mobile-combat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 4px;
+}
+.mobile-combat-btn {
+  background: rgba(220, 38, 38, 0.25) !important;
+  border: 1px solid rgba(239, 68, 68, 0.6) !important;
+  color: #fecaca !important;
+  font-weight: bold;
+  border-radius: 6px;
+  padding: 6px 4px;
+  font-size: 11px;
+  touch-action: none;
+}
+.mobile-combat-btn:active {
+  background: rgba(220, 38, 38, 0.7) !important;
+}

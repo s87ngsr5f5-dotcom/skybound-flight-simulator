@@ -1,0 +1,25 @@
+SKYBOUND GLOBAL - UPDATE 35 (v0.35)
+=====================================
+Release Date: 2026-11-12
+Title: Multiplayer Dogfight PVP & Real-time Combat Network (多人即時空戰對戰系統)
+
+1. Multiplayer Dogfight & Missile Duel Network (多人空戰對決系統)
+- 打通戰術雷達與多人網路：雷達自動探索並標定半徑 12.5km / 25km 範圍內之在線真人機長。
+- 飛彈鎖定與軌跡廣播：雷達鎖定連線玩家後發射響尾蛇飛彈，自動即時跟蹤目標玩家姿態與位置。
+- 機砲即時射擊與命中：20mm 機砲短射前置量瞄準，命中真人玩家立即同步扣減 HP。
+- 飛機受損與被擊落機制：被命中產生畫面紅光閃爍、強烈震動與機身黑煙火光；HP 歸零觸發被擊落爆炸與 3 秒重生。
+- 熱焰干擾彈（Flares）：按鍵 KeyX 或手機熱焰彈按鈕投放熱焰彈，干擾並誘騙敵方飛彈。
+
+2. In-flight Live Kill Feed & Telemetry (即時擊殺快訊與遙測名牌升級)
+- 右上角戰鬥快訊浮窗（HUD Kill Feed）：即時廣播「[攻擊者] 擊落 [目標] [武器]」。
+- 3D 浮動遙測名牌加入實時血量（HP 100% ~ 0%）與交戰圖示（⚔）。
+- 底部戰鬥狀態膠囊：即時顯示目前玩家 HP 漸層血條與百分比。
+
+3. Mobile Touch Combat Controls (手機端專屬空戰觸控介面)
+- 手機飛行底部新增 4 格專屬空戰按鈕列：
+  [🚀 飛彈] [💥 機砲] [🎯 鎖定] [✨ 熱焰]
+- 全面支援觸覺震動回饋與手勢操作。
+
+4. Quality Assurance & Automated CI Testing
+- 新增 `verify-multiplayer-combat.cjs` 單元測試腳本。
+- 全站 14 項 CI 測試腳本 100% 綠燈通過。
