@@ -58,30 +58,142 @@ function* buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBou
   const road=new THREE.Mesh(new THREE.BufferGeometry(),asphalt);
   const lines=new THREE.Mesh(new THREE.BufferGeometry(),stripe);
   scene.add(road,lines);
-  const facade=document.createElement('canvas');facade.width=facade.height=96;
+  const facade=document.createElement('canvas');facade.width=facade.height=256;
   const ctx=facade.getContext('2d');
-  ctx.fillStyle='#f4f0e9';ctx.fillRect(0,0,96,96);
-  ctx.fillStyle='#86939b';
-  for(let row=0;row<6;row++) for(let col=0;col<5;col++) ctx.fillRect(4+col*18,4+row*15,9,7);
+  ctx.fillStyle='#ece7dd';ctx.fillRect(0,0,256,256);
+  ctx.fillStyle='#ded8cc';
+  for(let y=0;y<256;y+=8) ctx.fillRect(0,y,256,1);
+  for(let y=0;y<256;y+=8){
+    const shift=(y%16===0)?0:12;
+    for(let x=shift;x<256;x+=24) ctx.fillRect(x,y,1,8);
+  }
+  for(let row=0;row<8;row++){
+    const y=8+row*31;
+    ctx.fillStyle='#bcb7ab';ctx.fillRect(0,y+24,256,3);
+    for(let col=0;col<6;col++){
+      const x=6+col*41;
+      ctx.fillStyle='#2c3236';ctx.fillRect(x,y,30,22);
+      ctx.fillStyle=(row*3+col*5)%4===0?'#688290':'#4f6775';
+      ctx.fillRect(x+2,y+2,12,18);ctx.fillRect(x+16,y+2,12,18);
+      ctx.fillStyle='#22262a';ctx.fillRect(x+14,y+2,2,18);
+      ctx.fillStyle='#65737d';
+      ctx.fillRect(x+1,y+13,28,1);ctx.fillRect(x+1,y+18,28,1);
+      for(let g=4;g<28;g+=5) ctx.fillRect(x+g,y+13,1,7);
+      if((row*7+col*11)%3!==0){
+        ctx.fillStyle='#eef1f4';ctx.fillRect(x+17,y+15,11,8);
+        ctx.fillStyle='#363c40';ctx.fillRect(x+23,y+17,4,4);
+        ctx.fillStyle='#1e2225';ctx.fillRect(x+17,y+23,11,1);
+      }
+    }
+  }
   const facadeTexture=new THREE.CanvasTexture(facade);
   facadeTexture.colorSpace=THREE.SRGBColorSpace;
-  const litWindows=document.createElement('canvas');litWindows.width=litWindows.height=96;
+  const litWindows=document.createElement('canvas');litWindows.width=litWindows.height=256;
   const ink=litWindows.getContext('2d');
-  ink.fillStyle='#000';ink.fillRect(0,0,96,96);
-  for(let row=0;row<6;row++) for(let col=0;col<5;col++){
-    if((row*3+col*7)%7<2) continue;
-    ink.fillStyle=(row+col)%3===0?'#e3bd83':'#7b8a96';
-    ink.fillRect(4+col*18,4+row*15,9,7);
+  ink.fillStyle='#000';ink.fillRect(0,0,256,256);
+  for(let row=0;row<8;row++){
+    const y=8+row*31;
+    for(let col=0;col<6;col++){
+      if((row*3+col*7)%5<2) continue;
+      const x=6+col*41;
+      ink.fillStyle=(row+col)%3===0?'#ffda8b':(row+col)%2===0?'#f5e6ba':'#8ba2b5';
+      ink.fillRect(x+2,y+2,12,18);
+      ink.fillRect(x+16,y+2,12,18);
+    }
   }
   const windowLights=new THREE.CanvasTexture(litWindows);
   windowLights.colorSpace=THREE.SRGBColorSpace;
+  const roofCanvas=document.createElement('canvas');roofCanvas.width=roofCanvas.height=256;
+  const rctx=roofCanvas.getContext('2d');
+  rctx.fillStyle='#3f7556';rctx.fillRect(0,0,256,256);
+  rctx.fillStyle='#356548';
+  for(let i=0;i<12;i++) rctx.fillRect((i*47)%220,(i*67)%220,35,35);
+  rctx.fillStyle='#5a5750';
+  rctx.fillRect(0,0,256,12);rctx.fillRect(0,244,256,12);
+  rctx.fillRect(0,0,12,256);rctx.fillRect(244,0,12,256);
+  rctx.fillStyle='rgba(0,0,0,0.32)';
+  rctx.fillRect(12,12,232,6);rctx.fillRect(12,12,6,232);
+  rctx.fillStyle='#c8c4bc';rctx.fillRect(160,28,72,56);
+  rctx.fillStyle='#9e9990';rctx.fillRect(158,26,76,4);rctx.fillRect(158,26,4,60);
+  rctx.fillStyle='#3a3f44';rctx.fillRect(174,68,16,16);
+  rctx.fillStyle='rgba(0,0,0,0.35)';rctx.fillRect(156,84,78,10);
+  function drawWaterTank(cx,cy,r){
+    rctx.fillStyle='rgba(0,0,0,0.38)';
+    rctx.beginPath();rctx.ellipse(cx+r*0.2,cy+r*0.25,r*1.05,r*0.9,0,0,Math.PI*2);rctx.fill();
+    const grad=rctx.createRadialGradient(cx-r*0.35,cy-r*0.35,r*0.1,cx,cy,r);
+    grad.addColorStop(0,'#ffffff');
+    grad.addColorStop(0.3,'#e2e6eb');
+    grad.addColorStop(0.7,'#9aa3ad');
+    grad.addColorStop(1,'#626b75');
+    rctx.fillStyle=grad;
+    rctx.beginPath();rctx.arc(cx,cy,r,0,Math.PI*2);rctx.fill();
+    rctx.strokeStyle='#505860';rctx.lineWidth=1.5;
+    rctx.beginPath();rctx.arc(cx,cy,r*0.65,0,Math.PI*2);rctx.stroke();
+    rctx.beginPath();rctx.arc(cx,cy,r*0.35,0,Math.PI*2);rctx.stroke();
+    rctx.fillStyle='#cbd2d8';
+    rctx.beginPath();rctx.arc(cx,cy,r*0.18,0,Math.PI*2);rctx.fill();
+  }
+  drawWaterTank(60,70,26);
+  drawWaterTank(115,65,22);
+  drawWaterTank(75,130,20);
+  const roofTexture=new THREE.CanvasTexture(roofCanvas);
+  roofTexture.colorSpace=THREE.SRGBColorSpace;
   const wall=new THREE.MeshStandardMaterial({color:0xffffff,map:facadeTexture,roughness:.88,emissive:0xffe0ac,emissiveMap:windowLights,emissiveIntensity:0});
-  const roof=new THREE.MeshStandardMaterial({color:0xb6b4a9,roughness:.95});
+  const roof=new THREE.MeshStandardMaterial({color:0xffffff,map:roofTexture,roughness:.82});
   const buildings=new THREE.InstancedMesh(new THREE.BoxGeometry(),[wall,wall,roof,roof,wall,wall],65000);
   buildings.name='Regional city volumes';
   buildings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   buildings.count=0;
   scene.add(buildings);
+
+  // Kaohsiung 85 Sky Tower (高雄 85 大樓 · 347.5m / 378m)
+  const p85=geoPoint(22.61106,120.30350), g85=ground(p85.x,p85.z);
+  const tower85=new THREE.Group();tower85.name='高雄85大樓';tower85.position.set(p85.x,g85,p85.z);
+  const k85Glass=new THREE.MeshStandardMaterial({color:0x2b6468,roughness:.16,metalness:.72,emissive:0xffdfa8,emissiveIntensity:0});
+  const k85Stone=new THREE.MeshStandardMaterial({color:0xb2b6b8,roughness:.72});
+  const k85Metal=new THREE.MeshStandardMaterial({color:0x717980,roughness:.38,metalness:.55});
+  const k85Beacon=new THREE.MeshBasicMaterial({color:0xff2222});
+  function kbox(parent,mat,w,h,d,x,y,z){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+    m.position.set(x,y,z);parent.add(m);return m;
+  }
+  function kcyl(parent,mat,rt,rb,h,seg,x,y,z){
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat);
+    m.position.set(x,y,z);parent.add(m);return m;
+  }
+  kbox(tower85,k85Stone,98,34,64,0,17,0);
+  for(const side of [-1,1]){
+    kbox(tower85,k85Glass,32,122,54,side*27,34+61,0);
+    for(const cz of [-26,26]) kbox(tower85,k85Stone,3.5,122,3.5,side*27,34+61,cz);
+    for(const cx of [-15,15]) kbox(tower85,k85Stone,3.5,122,3.5,side*27+cx,34+61,0);
+  }
+  kbox(tower85,k85Stone,86,14,56,0,156+7,0);
+  kbox(tower85,k85Glass,48,142,48,0,163+71,0);
+  kbox(tower85,k85Glass,52,136,44,0,234,0);
+  kbox(tower85,k85Glass,44,136,52,0,234,0);
+  kbox(tower85,k85Stone,40,16,40,0,305+8,0);
+  kbox(tower85,k85Glass,32,14,32,0,321+7,0);
+  kcyl(tower85,k85Stone,6,28,15,4,0,335+7.5,0).rotation.y=Math.PI/4;
+  kcyl(tower85,k85Metal,.9,2.8,32,8,0,348+16,0);
+  kbox(tower85,k85Beacon,2.2,2.2,2.2,0,381,0);
+  for(const side of [-1,1]){
+    kbox(tower85,k85Beacon,1.6,1.6,1.6,side*27,156,26);
+    kbox(tower85,k85Beacon,1.6,1.6,1.6,side*27,156,-26);
+  }
+  scene.add(tower85);
+
+  // Chang-Gu 50 Tower (長谷世貿聯合國大樓 · 222m)
+  const p50=geoPoint(22.64302,120.31483), g50=ground(p50.x,p50.z);
+  const tower50=new THREE.Group();tower50.name='長谷世貿50層大樓';tower50.position.set(p50.x,g50,p50.z);
+  const cgGlass=new THREE.MeshStandardMaterial({color:0x39655e,roughness:.20,metalness:.68});
+  const cgGranite=new THREE.MeshStandardMaterial({color:0xb44c3c,roughness:.75});
+  kcyl(tower50,cgGranite,24,26,42,8,0,21,0);
+  kcyl(tower50,cgGlass,20,24,140,8,0,42+70,0);
+  kcyl(tower50,cgGranite,14,20,32,8,0,182+16,0);
+  kcyl(tower50,cgGlass,6,14,14,8,0,214+7,0);
+  kcyl(tower50,k85Metal,.6,1.8,16,8,0,228+8,0);
+  kbox(tower50,k85Beacon,1.8,1.8,1.8,0,238,0);
+  scene.add(tower50);
   const boxMatrix=new THREE.Object3D(),color=new THREE.Color();
   const palette=[0xa6a3a1,0xc9c2ad,0x9fa9af,0xada299,0x9dada7,0xc7c8c2,0xa3a7b0];
   const carBody=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({color:0xffffff}),180);
@@ -149,6 +261,8 @@ function* buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBou
   }
   function update(x,z,quality,dt,daylight=1,traffic=true){
     wall.emissiveIntensity=(1-daylight)*.85;
+    k85Glass.emissiveIntensity=(1-daylight)*.85;
+    k85Beacon.color.setHex((Math.floor(Date.now()/550)%2===0)?0xff1111:0x440000);
     carBody.visible=carCabin.visible=traffic;
     if(traffic) updateTraffic(x,z,dt,quality);
     const col=Math.floor(x/tileSize),row=Math.floor(z/tileSize),key=tileKey(col,row)+':'+quality;

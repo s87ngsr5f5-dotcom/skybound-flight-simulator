@@ -1,0 +1,44 @@
+SKYBOUND GLOBAL 0.32 更新說明
+
+1. 全台灣 3D 建築與擬真外觀（向台北市看齊）
+- 全台 65,000 棟建築全面升級擬真台灣街屋／公寓外觀：
+  * 立面：台灣特色二丁掛磁磚（Ivory / Terracotta running bond）、橫條鋁門窗、窗台與陽台防盜鐵窗、外掛冷氣室外機（AC compressor units with fan louvers & shadows）。
+  * 屋頂：外圍女兒牆收邊、台灣標誌性 PU 綠色防水塗料（Waterproof green roof）、銀白不銹鋼圓筒水塔（Stainless steel water storage tanks with corrugated seams & specular shine）、屋突／梯屋（Stairwell penthouse）。
+  * 商業高樓（>35m）：採用現代深藍／墨綠玻璃帷幕立面反射。
+- 高雄地標專屬 3D 建模：
+  * 高雄 85 大樓（Tuntex Sky Tower，347.5m / 378m 天線）：忠實呈現「高」字型雙塔分立基座、35-45 樓中央挑空天井、中央主塔合龍、金字塔冠頂與高聳通訊天線，並配置紅光航空障礙警示燈。
+  * 長谷世貿聯合國大樓（50 層大樓，222m，高雄三民區）：八角階梯塔身與高層收邊。
+
+2. 國際地圖與航線（成田、香港赤鱲角、沖繩那霸）
+- 正式納入周邊國際樞紐機場：
+  * 東京成田國際機場（RJAA · 34L/16R, 4,000m × 60m 跑道）
+  * 香港赤鱲角國際機場（VHHH · 07L/25R, 3,800m × 60m 跑道）
+  * 沖繩那霸機場（ROAH · 18R/36L, 3,000m × 45m 跑道）
+- 跨海航線與導航點：
+  * 支援從成田、香港、沖繩與台灣各機場出發與抵達之雙向航線與航路預覽地圖。
+  * 自由飛行與自訂航點地圖自動感應跨海長途範圍縮放。
+
+3. 飛機視覺品質提升（Aircraft Visual Quality）
+- 機身材質全面升級 PBR MeshPhysicalMaterial：
+  * 烤漆清漆（Clearcoat 0.85, ClearcoatRoughness 0.12），呈現鏡面高光與高空天空反射。
+  * 駕駛艙風擋玻璃：升級抗反光深色物理玻璃，具備深色半透明與高光反射效果。
+- 航行燈光系統：
+  * 機翼左右航行燈（左紅右綠）與機尾白色導航燈。
+  * 翼尖雙閃高亮白光防撞頻閃燈（Strobes，40Hz 雙閃節奏）。
+  * 機頂與機腹紅色防撞信標燈（Beacons，1Hz 脈衝旋轉節奏）。
+- 高空噴射凝結尾雲（Contrails）：
+  * 飛行高度超過 7,200 公尺（約 24,000 呎）且發動機運轉時，各發動機後方自動拉出擴散白霧凝結尾雲。
+- 戰機後燃器超音速馬赫環（Shock diamonds / Mach diamonds）：
+  * 戰機開啟 Boost 加力推力時，噴射尾焰內部呈現超音速等距震波環光暈。
+
+4. 爆炸墜機效果（Crash & Explosion Effects）
+- 觸發條件：撞地、撞山、建築撞擊或接地重摔摧毀（f.ended）。
+- 視覺反饋：
+  * 火球膨脹動畫（Yellow -> Orange -> Crimson -> Smoke 膨脹至 25m+）。
+  * 擴散衝擊波光環（Shockwave ring expanding to 60m）。
+  * 四散燃燒殘骸金屬破片（28 塊燃燒殘骸依重力拋射、彈跳與翻滾）。
+  * 升騰滾滾黑煙柱（Billowing rising dark smoke plume）。
+  * 地面焦黑痕跡貼地圓盤（Charred crash crater）。
+  * 鏡頭畫面劇烈震盪（Intense Screen Shake with camera jitter）。
+- 聽覺反饋：
+  * Web Audio API 即時物理合成低頻爆震、重擊金屬破片與破壞轟鳴（flightAudio.crashExplosion()）。

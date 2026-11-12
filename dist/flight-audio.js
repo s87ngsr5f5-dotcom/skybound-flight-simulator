@@ -129,6 +129,29 @@ function makeFlightAudio(){
     source.connect(filter).connect(gain).connect(master);
     source.start(time);source.stop(time+.31);
   }
+  function crashExplosion(){
+    if(!context||context.state!=='running') return;
+    const now=context.currentTime;
+    const sub=context.createOscillator(),subGain=context.createGain();
+    sub.type='sine';
+    sub.frequency.setValueAtTime(160,now);
+    sub.frequency.exponentialRampToValueAtTime(25,now+.65);
+    subGain.gain.setValueAtTime(Math.min(1,.85*level),now);
+    subGain.gain.exponentialRampToValueAtTime(.0001,now+1.2);
+    sub.connect(subGain).connect(master);
+    sub.start(now);sub.stop(now+1.25);
+    if(noiseBuffer){
+      const blast=context.createBufferSource(),bFilter=context.createBiquadFilter(),bGain=context.createGain();
+      blast.buffer=noiseBuffer;
+      bFilter.type='lowpass';
+      bFilter.frequency.setValueAtTime(1400,now);
+      bFilter.frequency.exponentialRampToValueAtTime(80,now+1.8);
+      bGain.gain.setValueAtTime(Math.min(1,.95*level),now);
+      bGain.gain.exponentialRampToValueAtTime(.0001,now+2.1);
+      blast.connect(bFilter).connect(bGain).connect(master);
+      blast.start(now);blast.stop(now+2.2);
+    }
+  }
   function callout(message,urgent=false){
     if(!window.speechSynthesis||!window.SpeechSynthesisUtterance||!level) return;
     if(speaking&&!urgent) return;
@@ -142,6 +165,6 @@ function makeFlightAudio(){
   function stopSpeech(){
     if(speaking){speaking=false;window.speechSynthesis.cancel();}
   }
-  return {start,update,effect,radarTone,volume,gateChime,touchdown,callout,stopSpeech};
+  return {start,update,effect,radarTone,volume,gateChime,touchdown,crashExplosion,callout,stopSpeech};
 }
 

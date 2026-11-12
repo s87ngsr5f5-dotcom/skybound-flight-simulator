@@ -20,6 +20,12 @@ const taiwanAirports=[
   {...airport('RCLY','蘭嶼',22+(1+43/60)/60,121+(32+1.85/60)/60,309.96,1132,30,12.95,'31','13',51),
     shortField:true,parkingAlong:-261},
 ];
+const internationalAirports=[
+  airport('RJAA','成田',35+(45+31.88/60)/60,140+(22+46.255/60)/60,329.51,4000,60,41,'34L','16R',-205),
+  airport('VHHH','香港赤鱲角',22+(18+29/60)/60,113+(55+6/60)/60,71.0,3800,60,9,'07L','25R',185),
+  airport('ROAH','沖繩那霸',26+(11+45/60)/60,127+(38+45/60)/60,183.0,3000,45,3.5,'18R','36L',-170)
+];
+var allAirports=[...taiwanAirports,...internationalAirports];
 function runwayCoordinates(x,z,r){
   const dx=x-r.x,dz=z-r.z,s=Math.sin(r.heading),c=Math.cos(r.heading);
   return {along:dx*s-dz*c,cross:dx*c+dz*s};
@@ -38,6 +44,43 @@ function regionalRoute(from,to){
   const finish=[{name:'進場定位點',...airportPoint(to,-6600,0)},
     {name:to.name+' '+to.designator+' 跑道',...airportPoint(to,-to.length/2+200,0)}];
   if(from.code==='RCSS'&&to.code==='RCYU') return [...regionalWaypoints,...finish];
+  if(to.code==='RJAA') return [
+    {name:'東海航段',...geoPoint(27.55,126.30)},
+    {name:'琉球東方航段',...geoPoint(29.68,131.37)},
+    {name:'四國南方航段',...geoPoint(31.97,135.30)},
+    {name:'房總外海下降點',...geoPoint(34.83,140.65)},
+    ...finish
+  ];
+  if(to.code==='VHHH') return [
+    {name:'海峽西南航段',...geoPoint(23.20,118.80)},
+    {name:'東沙北航段',...geoPoint(22.60,116.20)},
+    {name:'大嶼山進場點',...geoPoint(22.25,114.15)},
+    ...finish
+  ];
+  if(to.code==='ROAH') return [
+    {name:'宮古島北航段',...geoPoint(25.30,125.20)},
+    {name:'慶良間諸島航段',...geoPoint(26.05,127.20)},
+    ...finish
+  ];
+  if(from.code==='RJAA') return [
+    {name:'房總外海航段',...geoPoint(34.83,140.65)},
+    {name:'四國南方航段',...geoPoint(31.97,135.30)},
+    {name:'琉球東方航段',...geoPoint(29.68,131.37)},
+    {name:'彭佳嶼東北下降點',...geoPoint(26.00,122.50)},
+    ...finish
+  ];
+  if(from.code==='VHHH') return [
+    {name:'大嶼山出發航段',...geoPoint(22.25,114.15)},
+    {name:'東沙北航段',...geoPoint(22.60,116.20)},
+    {name:'海峽西南航段',...geoPoint(23.20,118.80)},
+    ...finish
+  ];
+  if(from.code==='ROAH') return [
+    {name:'慶良間諸島航段',...geoPoint(26.05,127.20)},
+    {name:'宮古島北航段',...geoPoint(25.30,125.20)},
+    {name:'宜蘭外海下降點',...geoPoint(24.85,122.30)},
+    ...finish
+  ];
   return finish;
 }
 const regionalGridStep=240;
@@ -120,6 +163,6 @@ function regionalHeight(x,z){
   }
   return height;
 }
-if(typeof module!=='undefined') Object.assign(globalThis,{geoPoint,latLon,taiwanAirports,airportPoint,parkingPoint,runwayCoordinates,regionalRoute,regionalHeight});
+if(typeof module!=='undefined') Object.assign(globalThis,{geoPoint,latLon,taiwanAirports,internationalAirports,allAirports,airportPoint,parkingPoint,runwayCoordinates,regionalRoute,regionalHeight});
 
 

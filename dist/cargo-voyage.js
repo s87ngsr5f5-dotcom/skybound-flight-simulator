@@ -1,6 +1,6 @@
 'use strict';
-const naritaAirport=airport('RJAA','成田',35+(45+31.88/60)/60,140+(22+46.255/60)/60,329.51,4000,60,41,'34L','16R',-205);
-const allAirports=[...taiwanAirports,naritaAirport];
+const naritaAirport=typeof internationalAirports!=='undefined'?allAirports.find(a=>a.code==='RJAA'):airport('RJAA','成田',35+(45+31.88/60)/60,140+(22+46.255/60)/60,329.51,4000,60,41,'34L','16R',-205);
+allAirports=typeof internationalAirports!=='undefined'?[...taiwanAirports,...internationalAirports]:[...taiwanAirports,naritaAirport];
 const cargoVoyageKey='skybound.narita.replay.v1';
 const cargoVoyageRoute=[
   {name:'東海航段',...geoPoint(27.55,126.30)},

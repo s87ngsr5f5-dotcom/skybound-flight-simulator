@@ -10,13 +10,13 @@ function buildBenchmarkAirframe(profile,scene){
   const fuselageHeight=antonov?1.12:noseLoader?1.06:1.18;
   const detailed=profile.role==='passenger'&&engineCount===2;
   const color=fighter?0x778798:freight?0xd9e2e4:0xf2f5f7;
-  const surface=new THREE.MeshStandardMaterial({color,roughness:detailed?.39:.57,metalness:fighter?.19:.08});
+  const surface=new THREE.MeshPhysicalMaterial({color,roughness:detailed?.30:.44,metalness:fighter?.30:.12,clearcoat:.85,clearcoatRoughness:.12});
   const stockColor=profile.trimColor??(fighter?0x556571:freight?0x173d5d:0x146a80);
-  const paint=new THREE.MeshStandardMaterial({color:stockColor,roughness:.48});
+  const paint=new THREE.MeshPhysicalMaterial({color:stockColor,roughness:.32,clearcoat:.85,clearcoatRoughness:.12});
   const rubber=new THREE.MeshStandardMaterial({color:0x151a1e,roughness:.94});
-  const metal=new THREE.MeshStandardMaterial({color:0x667886,roughness:.33,metalness:.59});
+  const metal=new THREE.MeshStandardMaterial({color:0x667886,roughness:.28,metalness:.68});
   const dark=new THREE.MeshStandardMaterial({color:0x14212b,roughness:.66});
-  const glazing=new THREE.MeshPhysicalMaterial({color:0x193944,roughness:.19,metalness:.3,clearcoat:.8});
+  const glazing=new THREE.MeshPhysicalMaterial({color:0x152932,roughness:.06,metalness:.85,clearcoat:1.0,clearcoatRoughness:.05,transparent:true,opacity:.88});
   const light=new THREE.MeshBasicMaterial({color:0xe4f9ff});
   const green=new THREE.MeshBasicMaterial({color:0x6ee8b3});
   function mesh(parent,geometry,material,x=0,y=0,z=0){
@@ -309,7 +309,7 @@ function buildBenchmarkAirframe(profile,scene){
     geometry.rotateX(-Math.PI/2);
     return mesh(parent,geometry,material);
   }
-  const surfaces=[], flaps=[], lamps=[], fans=[], airBrakes=[], exhaustPlumes=[];
+  const surfaces=[], flaps=[], lamps=[], fans=[], airBrakes=[], exhaustPlumes=[], strobes=[], beacons=[];
   if(fighter){
     const twin=profile.sideIntakes&&!profile.delta;
     const nozzleZ=half*(twin?1.01:1)+.035;
@@ -329,6 +329,13 @@ function buildBenchmarkAirframe(profile,scene){
         fire.rotation.x=Math.PI/2;
         fire.position.z=length/2;
         plume.add(fire);
+      }
+      for(let d=1;d<=4;d++){
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(nozzle*.32*(1-d*.12),.028,8,20),new THREE.MeshBasicMaterial({
+          color:0xa5f3fc,transparent:true,opacity:.88,toneMapped:false
+        }));
+        ring.position.z=d*.55;
+        plume.add(ring);
       }
       plume.visible=false;
       group.add(plume);
@@ -388,7 +395,9 @@ function buildBenchmarkAirframe(profile,scene){
     }
     const lamp=mesh(group,new THREE.SphereGeometry(fighter?.085:.19,12,8),
       new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,wingY+.62,tip+(profile.rakedTip?2.2:0));
-    lamps.push(lamp);
+    const strobe=mesh(group,new THREE.SphereGeometry(fighter?.095:.21,12,8),
+      new THREE.MeshBasicMaterial({color:0xffffff}),side*span,wingY+.62,tip+(profile.rakedTip?2.2:0)+.15);
+    lamps.push(lamp);strobes.push(strobe);
     if(!fighter&&engineCount>=2){
       for(const factor of engineCount===4?[.33,.65]:[.38]){
         const engine=new THREE.Group();
@@ -526,9 +535,14 @@ function buildBenchmarkAirframe(profile,scene){
       for(const slot of palletStations) palletMeshes.push(block(cabin,seat,3.35,1.35,3.8,0,-.01,slot.arm));
     }
   }
+  const beaconTop=mesh(group,new THREE.SphereGeometry(fighter?.09:.22,12,8),new THREE.MeshBasicMaterial({color:0xff2222}),0,radius*(antonov?1.15:upperDeck?1.12:1.06)+.12,-half*.05);
+  const beaconBottom=mesh(group,new THREE.SphereGeometry(fighter?.09:.22,12,8),new THREE.MeshBasicMaterial({color:0xff2222}),0,-radius*1.04-.12,-half*.05);
+  const tailLight=mesh(group,new THREE.SphereGeometry(fighter?.07:.15,12,8),new THREE.MeshBasicMaterial({color:0xffffff}),0,tailHeight*.25+radius*.4,half*.98);
+  beacons.push(beaconTop,beaconBottom);
+  lamps.push(tailLight);
   cabin.visible=false;
   scene.add(group,cabin);
-  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,airBrakes,exhaustPlumes,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
+  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,strobes,beacons,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,airBrakes,exhaustPlumes,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
   return group;
 }
 

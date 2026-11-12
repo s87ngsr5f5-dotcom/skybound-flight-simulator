@@ -46,7 +46,7 @@ function pilot(f){
     pitch=clampValue((attitude-.015-f.flaps*.008)/.24,-1,1);
     roll=clampValue(wrapAngle(heading-f.heading)*2.7,-1,1);
   }
-  return {pitch,roll,rudder:f.ground?clampValue(wrapAngle(heading-f.heading)*3,-1,1):0,trim:0,brake,
+  return {pitch,roll,rudder:f.ground?clampValue(wrapAngle(heading-f.heading)*3,-1,1):0,trim:0,brake,attitudeAssist:true,
     throttle:Math.abs(f.power-power)<.006?0:Math.sign(power-f.power)};
 }
 function verifyFlight(from,to,aircraft){
