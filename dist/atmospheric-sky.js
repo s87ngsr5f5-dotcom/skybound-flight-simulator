@@ -160,8 +160,8 @@ function createAtmosphericSky(scene){
       uniforms.moon.value.set(Math.sin(moonAngle),.41,-Math.cos(moonAngle)).normalize();
       uniforms.daylight.value=day;
       uniforms.twilight.value=Math.max(0,1-Math.min(Math.abs(hours-6),Math.abs(hours-18))/1.45);
-      uniforms.coverage.value=weather==='wet'?.30:weather==='clouds'?.40:weather==='fog'?.39:.51;
-      uniforms.mist.value=weather==='fog'?.89:weather==='wet'?.23:0;
+      uniforms.coverage.value=weather==='storm'?.78:weather==='wet'?.30:weather==='clouds'?.40:weather==='fog'?.39:.51;
+      uniforms.mist.value=weather==='storm'?.65:weather==='fog'?.89:weather==='wet'?.23:0;
     },
     update(camera,dt,quality){
       dome.position.copy(camera.position);

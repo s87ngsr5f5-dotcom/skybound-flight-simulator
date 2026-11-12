@@ -909,6 +909,7 @@ function initialize(){
   const crashVFX=createCrashVFX(scene);
   const contrailVFX=createContrailSystem(scene);
   let crashShake=0;
+  let stormRainMesh=null;
   const models=new Map(),airlinerDetails={};
   function aircraftModel(profile){
     if(models.has(profile.id)) return models.get(profile.id);
@@ -1038,7 +1039,7 @@ function initialize(){
     resetLook();
     changeView();
   }
-  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH','KeyK','KeyO']);
+  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH','KeyK','KeyO','KeyT']);
   const radar=byId('radar').getContext('2d');
   const planMap=byId('planMap').getContext('2d');
   const flightRate=byId('flightRate'),flightRateStatus=byId('flightRateStatus');
@@ -1537,17 +1538,18 @@ function initialize(){
     const elevation=Math.sin(angle);
     const day=clamp((elevation+.13)/.53,0,1);
     const weather=byId('weather').value;
-    const wet=weather==='wet';
-    const strength=weather==='fog'?.42:wet?.62:weather==='clouds'?.85:1;
+    const wet=weather==='wet'||weather==='storm';
+    const storm=weather==='storm';
+    const strength=storm?.24:weather==='fog'?.42:wet?.62:weather==='clouds'?.85:1;
     const warmth=clamp(1-Math.min(Math.abs(hour-6),Math.abs(hour-18))/1.45,0,1);
     sunlight.intensity=.05+day*2.3*strength;
-    sunlight.color.set('#fff0d9').lerp(new THREE.Color('#ffad71'),warmth);
-    ambient.intensity=.16+day*1.14*(weather==='fog'?.83:1);
+    sunlight.color.set(storm?'#c8daf5':'#fff0d9').lerp(new THREE.Color('#ffad71'),warmth*(storm?0.3:1));
+    ambient.intensity=.16+day*1.14*(storm?.55:weather==='fog'?.83:1);
     sunDirection.set(Math.cos(angle)*760,elevation*820,-280);
     atmosphericSky.setWeather(hour,day,weather,sunDirection);
-    scene.background.set('#132740').lerp(new THREE.Color(weather==='fog'?'#c5ced1':wet?'#aabac5':'#b2ccdc'),day);
+    scene.background.set(storm?'#0b141e':'#132740').lerp(new THREE.Color(storm?'#1a2838':weather==='fog'?'#c5ced1':wet?'#aabac5':'#b2ccdc'),day);
     scene.fog.color.copy(scene.background);
-    scene.fog.density=weather==='fog'?.00064:wet?.000065:.000034;
+    scene.fog.density=storm?.00035:weather==='fog'?.00064:wet?.000065:.000034;
     lampMaterial.color.set(day>.07?0xc5d7e2:0xeffaff);
     asphalt.roughness=wet?.24:.90;asphalt.metalness=wet?.27:.02;
     concrete.roughness=wet?.31:.92;concrete.metalness=wet?.19:.02;
@@ -1877,7 +1879,7 @@ function initialize(){
       const savesMission=Boolean(regionalContracts[lesson]||lesson==='climbLesson'||lesson==='naritaCargo'||
         (lesson==='benchmark'&&['fighter','cargo'].includes(selectedAircraft().role)||lesson==='range'));
       const replacedId=restart?flight?.checkpointId:undefined;
-      const wind=lesson==='crosswind'?5.144:['fog','wet','clouds'].includes(weather)?0:Number(weather);
+      const wind=lesson==='crosswind'?5.144:['fog','wet','clouds','storm'].includes(weather)?0:Number(weather);
       replay=null;replayControls.hidden=true;
       if(lesson==='tactical'){
         if(approach) throw new Error('請按「開始飛行」載入戰術任務。');
@@ -2022,6 +2024,26 @@ function initialize(){
           tailhook: true,
           ground: false
         });
+      }else if(preset==='stormApproach'){
+        const rctp=airports.find(a=>a.code==='RCTP')||airports[0];
+        const rway=rctp.heading;
+        const appDist=8200;
+        const appX=rctp.x-Math.sin(rway)*appDist;
+        const appZ=rctp.z+Math.cos(rway)*appDist;
+        const appY=rctp.elevation+440;
+        const approachSpeed=70;
+        Object.assign(flight,{
+          x:appX,y:appY,z:appZ,heading:rway,speed:approachSpeed,
+          vx:Math.sin(rway)*approachSpeed,vy:-3.6,vz:-Math.cos(rway)*approachSpeed,
+          power:0.65,gear:true,flaps:3,tailhook:false,ground:false
+        });
+        if(typeof weatherStorm!=='undefined'){
+          weatherStorm.state.microburst.center={
+            x:rctp.x-Math.sin(rway)*4200,
+            y:220,
+            z:rctp.z+Math.cos(rway)*4200
+          };
+        }
       }
       beginFlight();
       if(savesMission){
@@ -2128,6 +2150,12 @@ function initialize(){
       flight.tailhook=!flight.tailhook;
       showPill(flight.tailhook?'🪝 尾鉤已放下 (HOOK DOWN)':'🪝 尾鉤已收起 (HOOK UP)');
       if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(22);
+    }
+    if(code==='KeyT'&&!paused) {
+      const m=typeof weatherStorm!=='undefined'?weatherStorm.cycleWipers():0;
+      const names=['關閉 (OFF)','慢速 (LO)','快速 (HI)'];
+      showPill('🌧️ 擋風玻璃雨刷：'+names[m]);
+      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(20);
     }
     if(code==='KeyR'&&!flight.service) start(flight.approach,true);
     if(!flight.regional) return;
@@ -2411,6 +2439,20 @@ function initialize(){
       button.blur();
       return;
     }
+    if(preset==='stormApproach'){
+      byId('lesson').value='free';
+      byId('aircraft').value='a320neo';
+      byId('departure').value='RCTP';
+      byId('destination').value='RCTP';
+      byId('startType').value='air';
+      byId('time').value='17:15';
+      byId('weather').value='storm';
+      byId('waypoints').value='';
+      drawPlan();
+      start(true,false,'stormApproach');
+      button.blur();
+      return;
+    }
     if(preset==='multiplayer'){
       byId('lesson').value='multiplayer';
       byId('aircraft').value='f16v';
@@ -2649,6 +2691,10 @@ function initialize(){
     const touchHook=byId('touchHook');
     if(touchHook){
       touchHook.onclick=()=>action('KeyO');
+    }
+    const touchWipers=byId('touchWipers');
+    if(touchWipers){
+      touchWipers.onclick=()=>action('KeyT');
     }
 
     const sendCustomBtn=byId('mpSendCustomBtn'), customInput=byId('mpCustomMsg');
@@ -3714,6 +3760,16 @@ function initialize(){
               carrierOps.stepCatapult(f,simTick,showPill);
               carrierOps.stepArrestor(f,simTick,showPill);
             }
+            if(typeof weatherStorm!=='undefined'&&byId('weather').value==='storm'){
+              const mbResult=weatherStorm.calculateMicroburst({x:f.x,y:f.y,z:f.z},{vx:f.vx,vy:f.vy,vz:f.vz},simTick);
+              f.windVector=mbResult.wind;
+              const wsEl=byId('windshearAlert');
+              if(wsEl) wsEl.hidden=!mbResult.warning;
+              if(mbResult.warning) weatherStorm.playWindshearAlert();
+            } else {
+              const wsEl=byId('windshearAlert');
+              if(wsEl&&!wsEl.hidden) wsEl.hidden=true;
+            }
           }
           if(f.service) updatePassengerService(f,simTick);
           if(f.tactical) stepTactical(f,simTick);
@@ -4176,7 +4232,7 @@ function initialize(){
     updateTaiwanOverview(flight);
     drawAirportLabel(flight);
     const weather=byId('weather').value;
-    scene.fog.density=weather==='fog'?.00064:weather==='wet'?.000065:
+    scene.fog.density=weather==='storm'?.00035:weather==='fog'?.00064:weather==='wet'?.000065:
       THREE.MathUtils.lerp(.000034,.000007,clamp(((flight?.y||0)-2400)/6600,0,1));
     if(renderer.instrumentOnly&&flight){
       camera.position.set(flight.x,flight.y+1.4,flight.z);
@@ -4186,6 +4242,37 @@ function initialize(){
     crashVFX.update(dt,renderedGround);
     if(flight) contrailVFX.update(flight,dt,now);
     tacticalView.render(flight,dt,now,qualitySelect.value==='low'||touchControls.mode.value==='mobile');
+    if(typeof weatherStorm!=='undefined'){
+      if(!stormRainMesh&&typeof THREE!=='undefined'){
+        stormRainMesh=weatherStorm.createRainMesh(THREE);
+        if(stormRainMesh) scene.add(stormRainMesh);
+      }
+      const inRain=(weather==='storm'||weather==='wet')&&!renderer.instrumentOnly&&!hangarMode;
+      if(stormRainMesh){
+        stormRainMesh.visible=inRain;
+        if(inRain) weatherStorm.updateRainMesh(stormRainMesh,camera.position,dt,flight?.speed||0);
+      }
+      if(weather==='storm'){
+        weatherStorm.stepLightning(dt,camera.position);
+        if(weatherStorm.state.lightning.flashActive){
+          ambient.intensity+=weatherStorm.state.lightning.flashIntensity*1.8;
+          scene.background.set('#0b141e').lerp(new THREE.Color('#d0e4ff'),weatherStorm.state.lightning.flashIntensity*.88);
+        }
+      }
+      const rainCanvas=byId('cockpitRainCanvas');
+      if(rainCanvas){
+        const showRainCanvas=cockpitActive()&&(weather==='storm'||weather==='wet');
+        rainCanvas.hidden=!showRainCanvas;
+        if(showRainCanvas){
+          if(rainCanvas.width!==window.innerWidth||rainCanvas.height!==window.innerHeight){
+            rainCanvas.width=window.innerWidth;
+            rainCanvas.height=window.innerHeight;
+          }
+          weatherStorm.stepWipers(dt);
+          weatherStorm.renderCockpitWindshield(rainCanvas,flight?flightSpeeds(flight).ias*1.94384:0,dt);
+        }
+      }
+    }
     if(overviewActive) taiwanOverview.draw(renderer,flight);
     else renderer.render(scene,camera);
   }

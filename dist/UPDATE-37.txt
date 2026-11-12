@@ -1,0 +1,27 @@
+SKYBOUND GLOBAL v0.37 UPDATE NOTES
+==================================
+
+[⚡ 動態雷暴極端天候、五邊微下衝氣流 (Windshear) 與座艙雨刷水珠系統]
+1. 動態雷暴極端天候與閃電轟鳴 (Thunderstorm & Lightning)：
+   - 天氣選單全新加入「⚡ 動態雷暴 · 微下衝風切」。
+   - 天際大氣散射與雲層厚度 (Coverage 0.78 / Mist 0.65) 全新調校，呈現墨黑 slate-blue 陰雲與幽暗氛圍。
+   - 實體 3D 雨幕粒子系統 (1,500 顆動態雨絲粒子) 環繞機身，隨航速與風向傾斜流動。
+   - 動態天際閃電雙重頻閃 (Multi-Strobe Lightning Flash)，天際與地表瞬間映亮。
+   - Web Audio API 物理合成遠近雷鳴 (Brownian Noise Filter + 35Hz 超重低音震盪)，真實模擬音速傳播聲學延遲。
+
+2. 五邊微下衝氣流與 EGPWS 風切警報 (Microburst & Low-Level Windshear)：
+   - 忠實重現真實微下衝物理氣象模型：
+     * 五邊進場先遭遇逆風急增 (+15~28 kt)，空速暴增引起浮升假象。
+     * 核心處遭遇極端下沉暴流 (高達 -9.6 m/s，約 -1,900 fpm)。
+     * 穿出核心時劇烈轉為順風 (-28 kt)，升力驟降引發致命墜地風險。
+   - 嚴格導入 NASA / FAA AC 120-48 風切危害指數 F-Factor 計算。
+   - 當 F-Factor ≥ 0.12 時即刻觸發 EGPWS 紅色強效風切警報：
+     * HUD 顯著警告燈箱：「⚠ WINDSHEAR AHEAD · PULL UP · MAX TOGA THRUST · 15° PITCH」。
+     * Web Speech API 語音警告：「Windshear! Windshear! Pull up!」與雙音調警笛。
+   - 首頁快捷選單新增「⚡ 雷暴微下衝進場」直接突入桃園 05L 五邊考驗。
+
+3. 座艙第一人稱動態擋風玻璃水珠與雙雨刷 (Cockpit Rain Drops & Wipers)：
+   - 座艙視角下擋風玻璃凝結 90 顆物理雨滴與高光光暈。
+   - 水珠依指示空速 (IAS) 動態向後方與上方拉伸拖曳滑移。
+   - 雙擺臂雨刷系統 (Dual Articulated Wiper Blades)，72° 圓弧刮除視野中的水滴，並呈現水滴漸進回結。
+   - 支援鍵盤快速鍵 [KeyT] 或手機觸控鍵 [🌧️ 雨刷] 切換三段轉速：關閉 (OFF) / 慢速 (LO) / 快速 (HI)。

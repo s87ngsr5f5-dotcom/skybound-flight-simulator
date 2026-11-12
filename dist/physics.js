@@ -31,7 +31,7 @@ function flightWind(f){
 function flightSpeeds(f){
   const wind=flightWind(f);
   const air=atmosphere(f.y,f.temperatureOffset);
-  const tas=Math.hypot(f.vx-wind.x,f.vy,f.vz-wind.z);
+  const tas=Math.hypot(f.vx-wind.x,f.vy-(wind.y||0),f.vz-wind.z);
   const mach=tas/air.sound;
   // Ideal pitot indication for subsonic flow. Use a dynamic-pressure approximation above Mach 1.
   const impact=air.pressure*(Math.pow(1+.2*mach*mach,3.5)-1);
@@ -155,7 +155,7 @@ function stepTrainer(f, input, dt=simTick){
   f.power=limit(f.power+input.throttle*dt*.55,0,1);
   f.trim=limit(f.trim+input.trim*dt*.08,-.12,.15);
   const wind=flightWind(f);
-  const airX=f.vx-wind.x, airY=f.vy, airZ=f.vz-wind.z;
+  const airX=f.vx-wind.x, airY=f.vy-(wind.y||0), airZ=f.vz-wind.z;
   const speed=Math.hypot(airX,airY,airZ);
   const track=Math.atan2(airX,-airZ);
   const pathAngle=Math.atan2(airY,Math.hypot(airX,airZ));
