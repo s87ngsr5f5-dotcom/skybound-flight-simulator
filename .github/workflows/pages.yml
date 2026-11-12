@@ -29,6 +29,7 @@ jobs:
       - run: node verify-island-fields.cjs
       - run: node verify-taipei-city.cjs
       - run: node verify-helicopter.cjs
+      - run: node verify-multiplayer.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
