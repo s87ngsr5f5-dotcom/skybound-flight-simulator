@@ -291,7 +291,7 @@ function stepTrainer(f, input, dt=simTick){
     if(!f.ground){
       const runway=f.destination||runway10;
       const {along,cross}=f.regional?runwayCoordinates(f.x,f.z,runway):localRunway(f.x,f.z);
-      f.touchdown={along,cross,verticalSpeed:f.vy,speed};
+      f.touchdown={along,cross,verticalSpeed:f.vy,speed,pitch:f.pitch,bank:f.bank,time:f.elapsed};
       f.landed=Math.abs(along)<=runway.length/2 && Math.abs(cross)<=runway.width/2 && f.gear!==false &&
         f.vy>-5 && Math.abs(f.bank)<.32 && Math.abs(wrapAngle(f.heading-runway.heading))<.40;
       f.ended=!f.landed;

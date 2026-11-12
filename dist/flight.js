@@ -1830,6 +1830,7 @@ function initialize(){
     setGlide(Boolean(flight.approach&&!flight.voyage));
     byId('landingCard').hidden=true;
     shownLanding=null;
+    if(typeof flightRecorder!=='undefined') flightRecorder.reset();
     gateProgress=null;
     previousCalloutHeight=null;
     sinkWarning=false;
@@ -3158,22 +3159,54 @@ function initialize(){
     yokeDot.setAttribute('cx',x);yokeDot.setAttribute('cy',y);
   }
   const landingCard=byId('landingCard'), landingGrade=byId('landingGrade'), landingDetails=byId('landingDetails');
-  let shownLanding=null, previousCalloutHeight=null, sinkWarning=false;
+  let shownLanding=null, previousCalloutHeight=null, sinkWarning=false, activeFdrTab='alt';
   const calloutHeights=[500,200,100,50,30,10];
   const calloutNames=['Five hundred','Two hundred','One hundred','Fifty','Thirty','Ten'];
   byId('closeLanding').onclick=()=>{landingCard.hidden=true;};
   byId('retryLanding').onclick=()=>start(true,true);
+  const exportFdrBtn=byId('exportFdrBtn');
+  if(exportFdrBtn){
+    exportFdrBtn.onclick=()=>{
+      if(typeof flightRecorder!=='undefined') flightRecorder.downloadCSV(flight);
+    };
+  }
+  const fdrTabBtns=document.querySelectorAll('.fdr-tab-btn');
+  fdrTabBtns.forEach(btn=>{
+    btn.onclick=()=>{
+      fdrTabBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFdrTab=btn.dataset.chart;
+      const canvas=byId('fdrChartCanvas');
+      if(canvas&&typeof flightRecorder!=='undefined'){
+        flightRecorder.drawChart(canvas,activeFdrTab);
+      }
+    };
+  });
   function drawLandingCard(f,speeds){
     const touchdown=f.touchdown;
     if(!f.approach||f.voyage||replay||!touchdown||shownLanding===touchdown||(!f.ended&&speeds.gs>40/knotsPerMps)) return;
     shownLanding=touchdown;
-    const descent=Math.round(-touchdown.verticalSpeed*196.85), offset=Math.abs(touchdown.cross);
-    // The ground model has rigid contact. Report an estimate for 45 cm of gear travel.
-    const impact=1+touchdown.verticalSpeed**2/(2*.45*9.80665);
-    const grade=descent<180&&offset<5?'S 級 · ★★★':descent<240&&offset<5?'A 級 · ★★★':
-      descent<460&&offset<14?'B 級 · ★★':'C 級 · ★';
-    landingGrade.textContent=f.ended?'降落失敗':grade;
-    landingDetails.textContent='接地 '+descent+' ft/min · 中線偏差 '+offset.toFixed(1)+' m · 接地推算 '+impact.toFixed(2)+' G';
+    if(typeof flightRecorder!=='undefined'){
+      const res=flightRecorder.evaluateLanding(touchdown,f.ended);
+      if(res){
+        landingGrade.textContent=res.grade;
+        landingGrade.style.color=res.color;
+        landingDetails.textContent=res.desc;
+        const vsEl=byId('fdrTouchVs'); if(vsEl) vsEl.textContent='-'+res.vsi+' ft/min';
+        const crossEl=byId('fdrTouchCross'); if(crossEl) crossEl.textContent=res.cross+' m';
+        const gEl=byId('fdrTouchG'); if(gEl) gEl.textContent=res.impactG+' G';
+        const pitchEl=byId('fdrTouchPitch'); if(pitchEl) pitchEl.textContent=res.pitchDeg+'°';
+        const canvas=byId('fdrChartCanvas');
+        if(canvas) flightRecorder.drawChart(canvas,activeFdrTab);
+      }
+    } else {
+      const descent=Math.round(-touchdown.verticalSpeed*196.85), offset=Math.abs(touchdown.cross);
+      const impact=1+touchdown.verticalSpeed**2/(2*.45*9.80665);
+      const grade=descent<180&&offset<5?'S 級 · ★★★':descent<240&&offset<5?'A 級 · ★★★':
+        descent<460&&offset<14?'B 級 · ★★':'C 級 · ★';
+      landingGrade.textContent=f.ended?'降落失敗':grade;
+      landingDetails.textContent='接地 '+descent+' ft/min · 中線偏差 '+offset.toFixed(1)+' m · 接地推算 '+impact.toFixed(2)+' G';
+    }
     landingCard.hidden=false;
   }
   function approachCallouts(f){
@@ -3770,6 +3803,7 @@ function initialize(){
               const wsEl=byId('windshearAlert');
               if(wsEl&&!wsEl.hidden) wsEl.hidden=true;
             }
+            if(typeof flightRecorder!=='undefined') flightRecorder.step(f,simTick);
           }
           if(f.service) updatePassengerService(f,simTick);
           if(f.tactical) stepTactical(f,simTick);

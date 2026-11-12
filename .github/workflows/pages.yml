@@ -34,6 +34,7 @@ jobs:
       - run: node verify-multiplayer-combat.cjs
       - run: node verify-carrier-ops.cjs
       - run: node verify-weather-windshear.cjs
+      - run: node verify-fdr-analysis.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
