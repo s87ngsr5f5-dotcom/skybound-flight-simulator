@@ -167,3 +167,163 @@
   background: rgba(0, 229, 255, 0.28);
   color: #ffffff;
 }
+
+/* Mode & Quick Button Highlight */
+.mp-mode-highlight, .mp-quick-highlight {
+  border-color: #00e5a3 !important;
+  color: #7affbe !important;
+}
+.mp-mode-highlight:hover, .mp-quick-highlight:hover {
+  background: rgba(0, 229, 163, 0.2) !important;
+  box-shadow: 0 0 12px rgba(0, 229, 163, 0.4) !important;
+}
+.mp-card-highlight {
+  border-color: #00e5a3 !important;
+  box-shadow: 0 0 24px rgba(0, 229, 163, 0.35) !important;
+}
+
+/* Header In-flight Multiplayer Pill */
+.header-mp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(9, 24, 38, 0.88);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: #7affbe;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0;
+  pointer-events: auto;
+}
+.header-mp-pill:hover {
+  background: rgba(14, 40, 62, 0.95);
+  border-color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+}
+.header-mp-pill .mp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00e5a3;
+  box-shadow: 0 0 6px #00e5a3;
+}
+
+/* In-flight HUD Multiplayer Window */
+.hud-mp-dropdown {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(350px, 92vw);
+  background: rgba(10, 24, 36, 0.94);
+  border: 1px solid #00e5ff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 229, 255, 0.25);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  pointer-events: auto;
+  z-index: 100;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+}
+.hud-mp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  font-size: 14px;
+  color: #7affbe;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 6px;
+}
+.hud-mp-head button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.hud-mp-head button:hover {
+  background: rgba(255, 80, 80, 0.3);
+}
+.hud-mp-room-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #a4c2cb;
+  margin-bottom: 8px;
+}
+.hud-mp-room-info strong {
+  color: #ffffff;
+}
+.hud-mp-peer-title {
+  font-size: 12px;
+  color: #8da9b3;
+  margin-bottom: 4px;
+}
+.hud-mp-peer-list {
+  max-height: 100px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 8px;
+}
+.hud-mp-radios {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.mp-hud-radio {
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: #c9f5ff;
+  border-radius: 5px;
+  padding: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.mp-hud-radio:hover {
+  background: rgba(0, 229, 255, 0.3);
+  color: #fff;
+}
+.hud-mp-send-box {
+  display: flex;
+  gap: 6px;
+}
+.hud-mp-send-box input {
+  flex: 1;
+  background: #08141d;
+  border: 1px solid #1f4254;
+  border-radius: 6px;
+  color: #fff;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.hud-mp-send-box input:focus {
+  border-color: #00e5ff;
+  outline: none;
+}
+.hud-mp-send-box button {
+  background: #008eb3;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.hud-mp-send-box button:hover {
+  background: #00b4d8;
+}

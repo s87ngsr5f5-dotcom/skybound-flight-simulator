@@ -1347,6 +1347,7 @@ function initialize(){
     if(isVoyage) byId('aircraft').value='sf748';
     const isClimb=lesson==='climbLesson';
     if(isClimb) byId('aircraft').value='b773';
+    const isMultiplayer=lesson==='multiplayer';
     const isCruise=isClimb||lesson==='cruiseTrial';
     const rangeLesson=lesson==='range';
     if(rangeLesson) byId('aircraft').value='sf16';
@@ -1354,14 +1355,27 @@ function initialize(){
     if(contract) byId('aircraft').value='a223';
     if(lesson==='airline'&&selectedAircraft().role!=='passenger') byId('aircraft').value='a223';
     byId('aircraft').disabled=isVoyage||isClimb||isCircuit||rangeLesson||Boolean(contract);
-    const custom=['free','cold','taxi','benchmark'].includes(lesson);
+    const custom=['free','cold','taxi','benchmark','multiplayer'].includes(lesson);
     byId('planRouteFields').hidden=!custom;
     byId('waypoints').closest('label').hidden=!custom;
-    byId('startType').closest('label').hidden=lesson!=='free'&&lesson!=='route';
-    byId('approach').hidden=isTactical||isCruise||lesson==='airline'||Boolean(contract)||lesson==='benchmark'||rangeLesson;
+    byId('startType').closest('label').hidden=lesson!=='free'&&lesson!=='route'&&!isMultiplayer;
+    byId('approach').hidden=isTactical||isCruise||lesson==='airline'||Boolean(contract)||lesson==='benchmark'||rangeLesson||isMultiplayer;
     for(const button of planModes) button.setAttribute('aria-pressed',String(button.dataset.planMode===lesson));
     byId('cruiseWeather').hidden=!isCruise;
     byId('voyageOptions').hidden=!isVoyage;
+    const mpCard=byId('multiplayerSection');
+    if(mpCard){
+      if(isMultiplayer){
+        mpCard.open=true;
+        mpCard.classList.add('mp-card-highlight');
+        byId('fly').textContent='🌐 開始多人連線飛行 →';
+        byId('fly').classList.add('mp-btn-primary');
+      }else{
+        mpCard.classList.remove('mp-card-highlight');
+        byId('fly').textContent='開始飛行 →';
+        byId('fly').classList.remove('mp-btn-primary');
+      }
+    }
     updateAirlinePlan();
     const model=selectedAircraft();
     try{
@@ -1825,6 +1839,19 @@ function initialize(){
     flightBar.hidden=flightAircraft.hidden=false;
     flightAircraft.textContent=flight.aircraft.name.split(' · ')[0];
     document.body.classList.add('flight-ui');
+    if(typeof multiplayer!=='undefined'){
+      const r=byId('mpRoomInput')?.value||'8888';
+      const c=byId('mpCallsignInput')?.value||('SKY-'+Math.floor(100+Math.random()*900));
+      if(!multiplayer.isConnected()){
+        multiplayer.joinRoom(r,c);
+      }
+      const headerMp=byId('headerMpBtn');
+      if(headerMp){
+        headerMp.hidden=false;
+        const text=byId('headerMpText');
+        if(text) text.textContent=`🌐 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`;
+      }
+    }
     changeView();
   }
   function start(approach,restart=false,preset=restart?flight?.quickPreset:null){
@@ -1901,7 +1928,7 @@ function initialize(){
         if(['passenger','cargo'].includes(chosen.role)&&!chosen.regionalGates&&[departure,destination].some(r=>r.width<55||r.length<3000)){
           throw new Error('此廣體機請選桃園、臺中或高雄的寬體起降場。');
         }
-        if(departure===destination&&!mission&&!circuit&&!chosen.helicopter) throw new Error('請選不同的起降機場，或使用松山起落航線訓練。');
+        if(departure===destination&&!mission&&!circuit&&!chosen.helicopter&&lesson!=='multiplayer') throw new Error('請選不同的起降機場，或使用松山起落航線訓練。');
         const mode=circuit?'runway':mission||['cold','taxi'].includes(lesson)?'cold':byId('startType').value;
         const route=circuit?trainingRoute(departure):mission?(chosen.role==='fighter'||!byId('waypoints').value.trim()?
           benchmarkRoute(chosen.role,departure,destination):[...selection.route.slice(0,-2),...regionalRoute(departure,destination).slice(-2)]):
@@ -1968,6 +1995,10 @@ function initialize(){
     saveCurrentMission(flight);
     replay=null;replayControls.hidden=true;updateReplayButton();
     flight=null;pointer.active=false;keys.clear();
+    const headerMp=byId('headerMpBtn');
+    if(headerMp) headerMp.hidden=true;
+    const hudMp=byId('hudMpDropdown');
+    if(hudMp) hudMp.hidden=true;
     byId('hud').hidden=byId('menu').hidden=true;
     flightBar.hidden=flightAircraft.hidden=true;
     document.body.classList.remove('flight-ui');
@@ -2302,6 +2333,20 @@ function initialize(){
     const button=event.target.closest('[data-quick]');
     if(!button) return;
     const preset=button.dataset.quick;
+    if(preset==='multiplayer'){
+      byId('lesson').value='multiplayer';
+      byId('aircraft').value='f16v';
+      byId('departure').value='RCSS';
+      byId('destination').value='RCTP';
+      byId('startType').value='air';
+      byId('time').value='15:00';
+      byId('weather').value='0';
+      byId('waypoints').value='';
+      drawPlan();
+      start(false,false,'multiplayer');
+      button.blur();
+      return;
+    }
     byId('lesson').value=preset==='duel'?'tactical':preset==='sunset'?'circuit':'free';
     if(preset!=='duel'||selectedAircraft().role!=='fighter') byId('aircraft').value=preset==='duel'?'f16v':preset==='mirage'?'m2000':'a223';
     byId('departure').value=preset==='mirage'?'RCTP':'RCSS';
@@ -2539,11 +2584,81 @@ function initialize(){
       };
     }
 
+    const headerMp=byId('headerMpBtn'), hudMpDropdown=byId('hudMpDropdown');
+    const hudMpClose=byId('hudMpClose');
+    if(headerMp&&hudMpDropdown){
+      headerMp.onclick=()=>{
+        hudMpDropdown.hidden=!hudMpDropdown.hidden;
+      };
+    }
+    if(hudMpClose&&hudMpDropdown){
+      hudMpClose.onclick=()=>{
+        hudMpDropdown.hidden=true;
+      };
+    }
+    addEventListener('keydown',e=>{
+      if(e.code==='KeyU'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
+        if(hudMpDropdown&&flight){
+          hudMpDropdown.hidden=!hudMpDropdown.hidden;
+        }
+      }
+    });
+
+    document.querySelectorAll('.mp-hud-radio').forEach(btn=>{
+      btn.onclick=()=>multiplayer.sendRadio(btn.dataset.radio);
+    });
+
+    const hudMpSend=byId('hudMpSend'), hudMpInput=byId('hudMpInput');
+    if(hudMpSend&&hudMpInput){
+      hudMpSend.onclick=()=>{
+        if(hudMpInput.value.trim()){
+          multiplayer.sendRadio(hudMpInput.value.trim());
+          hudMpInput.value='';
+        }
+      };
+      hudMpInput.onkeydown=e=>{
+        if(e.key==='Enter'&&hudMpInput.value.trim()){
+          multiplayer.sendRadio(hudMpInput.value.trim());
+          hudMpInput.value='';
+        }
+      };
+    }
+
     function renderPeerList(){
       if(!peerList||!peerCount||typeof multiplayer==='undefined') return;
       const peers=multiplayer.getPeers();
       peerCount.textContent=peers.length;
       peerList.replaceChildren();
+      const headerText=byId('headerMpText');
+      if(headerText&&typeof multiplayer!=='undefined'){
+        headerText.textContent=`🌐 ${multiplayer.getRoomId()||'8888'} (${peers.length}機)`;
+      }
+      const roomDisp=byId('hudMpRoomDisplay'), callDisp=byId('hudMpCallsignDisplay'), countDisp=byId('hudMpPeerCountDisplay');
+      if(roomDisp&&typeof multiplayer!=='undefined') roomDisp.textContent=multiplayer.getRoomId()||'--';
+      if(callDisp&&typeof multiplayer!=='undefined') callDisp.textContent=multiplayer.getCallsign()||'--';
+      if(countDisp) countDisp.textContent=peers.length;
+      const hudPeerList=byId('hudMpPeerListDisplay');
+      if(hudPeerList){
+        hudPeerList.replaceChildren();
+        if(peers.length===0){
+          const empty=document.createElement('div');
+          empty.style.color='#78919b';
+          empty.style.fontSize='11px';
+          empty.textContent='空域暫無其他機長';
+          hudPeerList.appendChild(empty);
+        }else{
+          peers.forEach(p=>{
+            const row=document.createElement('div');
+            row.style.display='flex';
+            row.style.justifyContent='space-between';
+            row.style.padding='3px 0';
+            row.style.borderBottom='1px solid rgba(255,255,255,0.06)';
+            const dist=flight?Math.hypot(p.state.x-flight.x,p.state.z-flight.z)/1000:0;
+            row.innerHTML=`<span style="color:#7affbe;font-weight:bold;">✈ ${p.callsign}</span><span style="color:#97aeb2;">${(p.aircraftId||'').toUpperCase()} · ${dist>0?dist.toFixed(1)+'km':'--'}</span>`;
+            hudPeerList.appendChild(row);
+          });
+        }
+      }
       if(peers.length===0){
         const empty=document.createElement('div');
         empty.style.color='#97aeb2';
@@ -2568,13 +2683,19 @@ function initialize(){
           if(joinBtn) joinBtn.hidden=true;
           if(leaveBtn) leaveBtn.hidden=false;
           if(peerBox) peerBox.hidden=false;
+          const headerText=byId('headerMpText');
+          if(headerText) headerText.textContent=`🌐 ${data.roomId} (${multiplayer.getPeers().length}機)`;
           showPill(`🟢 已進入房間 [${data.roomId}] 呼號 ${data.callsign}`);
+          renderPeerList();
         }else if(event==='disconnect'){
           if(badge){badge.classList.add('offline');statusText.textContent='未連線';}
           if(joinBtn) joinBtn.hidden=false;
           if(leaveBtn) leaveBtn.hidden=true;
           if(peerBox) peerBox.hidden=true;
+          const headerText=byId('headerMpText');
+          if(headerText) headerText.textContent='未連線';
           showPill('⚪ 已退出連線房間');
+          renderPeerList();
         }else if(event==='peer_joined'){
           showPill(`✈ 機長 [${data.callsign}] 加入了房間！`);
           renderPeerList();
