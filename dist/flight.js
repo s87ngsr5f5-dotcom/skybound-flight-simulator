@@ -930,6 +930,7 @@ function initialize(){
     if(profile.id==='sa380'||profile.id==='b773'){
       airlinerDetails[profile.id]=refineAirliner(model,{twin:profile.id==='b773'});
     }
+    if(typeof cockpitEnhancements!=='undefined') cockpitEnhancements.enhanceCockpit(model,profile,THREE);
     models.set(profile.id,model);
     return model;
   }
@@ -4473,6 +4474,9 @@ function initialize(){
           weatherStorm.stepWipers(dt);
           weatherStorm.renderCockpitWindshield(rainCanvas,flight?flightSpeeds(flight).ias*1.94384:0,dt);
         }
+      }
+      if(typeof cockpitEnhancements!=='undefined'&&model){
+        cockpitEnhancements.updateCockpitLighting(model,activeDay,time);
       }
     }
     if(overviewActive) taiwanOverview.draw(renderer,flight);

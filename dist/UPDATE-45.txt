@@ -1,0 +1,32 @@
+=======================================================
+SKYBOUND GLOBAL - UPDATE v0.45: COCKPIT PBR GAUGES, WINDSHIELD GLARE & PLACARDS
+版本更新公告 v0.45：座艙視角次世代高精細儀表板、風擋微刮痕反光與警示貼紙系統
+=======================================================
+
+【更新概要】
+延續機身貼膜之次世代質感提升，SKYBOUND GLOBAL 推出 v0.45 座艙深度升級模組（Cockpit Enhancements System）。當切換至第一人稱座艙視角（HUD / Panel View）時，玩家將身歷其境體驗現代戰機與民航客機的真實座艙物理質感，徹底重現太陽入射角下的風擋微米級刮痕炫光、高精細警示標牌銘牌以及夜航儀表自發光背光！
+
+【核心升級項目】
+
+1. 風擋微米刮痕與太陽入射偏光炫光層（Windshield Micro-Scratches & Solar Glare）
+   - 藉由程式化畫布即時渲染航空複層防彈風擋玻璃物理特性（`color: 0xa8d8ea, opacity: 0.12~0.30`）。
+   - 呈現雨刷扇形擺動遺留下的細微弧形刮痕、空氣微粒粉塵擦痕，以及在正對太陽時產生的漫射高光與邊緣藍紫抗反光偏光鍍膜色澤。
+
+2. 座艙限制標牌與緊急警示銘牌（Cockpit Warning Placards & Placard Decals）
+   - **戰機戰術銘牌**：
+     * `⚠ DANGER - EJECTION SEAT SYSTEM ARMED`：鮮紅底色之彈射椅警戒標籤。
+     * `MAX OPERATING LIMITS`：包含 Vmo 450 KIAS / Mmo 2.05、起落架 250 KIAS 與襟翼 220 KIAS 速度限制銘牌。
+     * `PULL TO JETTISON`：黃黑斜紋緊急拋蓋拉柄標籤。
+     * `CIRCUIT BREAKERS`：金屬底座密集排列的 36 顆雙極跳脫斷路器矩陣。
+   - **民航客機操作銘牌**：
+     * `OPERATING LIMITATIONS`：包含 Vmo 350 KIAS / Mmo 0.82、FLAPS 速度限制與最大巡航高度 41,000 FT。
+     * `CREW OXYGEN & APU GEN`：機組員氧氣壓力（1,850 PSI - NORM）與 APU 400Hz 供電銘牌。
+     * 駕駛艙頭頂頂板斷路器矩陣（Overhead Panel C/B）。
+
+3. 儀表金屬外框與夜航自發光背光（PBR Metal Bezels & Electroluminescent Glow）
+   - 儀表螢幕與備用機械儀表外圍金屬框提升金屬度（`metalness: 0.85`）與粗糙度（`roughness: 0.22`），消除原先塑膠邊緣感。
+   - 整合日夜動態過渡：當進入黃昏與夜間航行時，座艙儀表字體與刻度自動點亮航空綠／琥珀色夜光背光（`emissiveIntensity` 動態補償），夜航氛圍極具沉浸感！
+
+【驗證與穩定性】
+- 新增 `verify-cockpit-enhancements.cjs`，全站 CI 自動化測試擴充至 24 項，100% 綠燈通過。
+=======================================================

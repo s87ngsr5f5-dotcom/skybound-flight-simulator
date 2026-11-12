@@ -41,6 +41,7 @@ jobs:
       - run: node verify-visual-fx.cjs
       - run: node verify-custom-rooms.cjs
       - run: node verify-aircraft-skins.cjs
+      - run: node verify-cockpit-enhancements.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
