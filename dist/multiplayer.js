@@ -494,6 +494,41 @@ const multiplayer = (() => {
     }
   }
 
+  const PRESET_ROOMS = [
+    { id: '8888', name: '公共大廳', desc: '自由空域 · 全機型' },
+    { id: 'DOGFIGHT', name: '空戰纏鬥', desc: 'PVP 對決 · 飛彈機砲' },
+    { id: 'CARRIER', name: '福特號航艦', desc: 'CVN-78 彈射攔截' },
+    { id: 'REFUEL', name: '空中加油', desc: 'KC-135 編隊對接' },
+    { id: 'RCSS-01', name: '松山起落航線', desc: '五邊飛行 · 起降練習' },
+    { id: 'RCTP-HEAVY', name: '桃園客貨幹線', desc: '重型廣體 · 巡航練習' }
+  ];
+
+  function generateCustomRoomId() {
+    const prefixes = ['SKY', 'ACE', 'TOPGUN', 'AIR', 'VIPER', 'HAWK', 'EAGLE'];
+    const p = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const num = Math.floor(100 + Math.random() * 900);
+    return `${p}-${num}`;
+  }
+
+  function getRoomUrl(targetRoom) {
+    const r = targetRoom || roomId || defaultRoom;
+    if (typeof location !== 'undefined') {
+      return `${location.origin}${location.pathname}?room=${encodeURIComponent(r)}`;
+    }
+    return `?room=${encodeURIComponent(r)}`;
+  }
+
+  function parseUrlRoom() {
+    if (typeof location !== 'undefined' && location.search) {
+      try {
+        const params = new URLSearchParams(location.search);
+        const r = params.get('room');
+        if (r && r.trim()) return r.trim().toUpperCase();
+      } catch {}
+    }
+    return '';
+  }
+
   return {
     joinRoom,
     leaveRoom,
@@ -518,6 +553,11 @@ const multiplayer = (() => {
     injectPeer: (peer) => { peers.set(peer.id, peer); },
     addListener: (fn) => listeners.add(fn),
     removeListener: (fn) => listeners.delete(fn),
+    generateCustomRoomId,
+    getPresetRooms: () => [...PRESET_ROOMS],
+    getRoomUrl,
+    parseUrlRoom,
+    switchRoom: (r, c) => joinRoom(r, c),
     defaultRoom,
     defaultCallsign
   };

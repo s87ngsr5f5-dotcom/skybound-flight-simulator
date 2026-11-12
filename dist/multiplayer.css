@@ -443,3 +443,102 @@
 .mobile-combat-btn:active {
   background: rgba(220, 38, 38, 0.7) !important;
 }
+
+/* Preset Room Chips & Custom Room System */
+.mp-preset-rooms {
+  margin-bottom: 12px;
+}
+.mp-room-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+.mp-chip {
+  background: rgba(0, 180, 216, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 999px;
+  color: #c8f0fe;
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.mp-chip:hover {
+  background: rgba(0, 180, 216, 0.28);
+  border-color: #00e5ff;
+  color: #ffffff;
+}
+.mp-chip.active {
+  background: linear-gradient(135deg, #0088aa, #00b4d8);
+  border-color: #00e5ff;
+  color: #ffffff;
+  font-weight: bold;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+}
+.mp-btn-accent {
+  background: linear-gradient(135deg, #e67e22, #f39c12);
+  color: #ffffff !important;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.mp-btn-accent:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 12px rgba(243, 156, 18, 0.6);
+}
+
+/* HUD In-flight Room Switcher */
+.hud-mp-copy-btn {
+  background: rgba(0, 229, 255, 0.2);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  color: #7affbe;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: auto;
+}
+.hud-mp-copy-btn:hover {
+  background: rgba(0, 229, 255, 0.4);
+  color: #ffffff;
+}
+.hud-mp-room-switcher {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 4px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hud-mp-room-switcher input {
+  flex: 1;
+  background: #09131a;
+  border: 1px solid #1f4254;
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.hud-mp-room-switcher input:focus {
+  border-color: #00e5ff;
+  outline: none;
+}
+.hud-mp-room-switcher button {
+  background: #14384a;
+  border: 1px solid #00e5ff;
+  color: #7affbe;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.hud-mp-room-switcher button:hover {
+  background: #0088aa;
+  color: #ffffff;
+}
+

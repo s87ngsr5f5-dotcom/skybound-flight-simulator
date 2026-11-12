@@ -39,6 +39,7 @@ jobs:
       - run: node verify-advanced-physics.cjs
       - run: node verify-airways-nav.cjs
       - run: node verify-visual-fx.cjs
+      - run: node verify-custom-rooms.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

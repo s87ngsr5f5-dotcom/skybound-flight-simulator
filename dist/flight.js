@@ -1865,6 +1865,8 @@ function initialize(){
       const c=byId('mpCallsignInput')?.value||('SKY-'+Math.floor(100+Math.random()*900));
       if(!multiplayer.isConnected()){
         multiplayer.joinRoom(r,c);
+      }else if(multiplayer.getRoomId()!==r.toUpperCase()){
+        multiplayer.switchRoom(r,c);
       }
       const headerMp=byId('headerMpBtn');
       if(headerMp){
@@ -2663,7 +2665,7 @@ function initialize(){
   touchControls.mode.addEventListener('change',resize);
 
   function setupMultiplayerUI(){
-    const joinBtn=byId('mpJoinBtn'), randomBtn=byId('mpRandomBtn'), leaveBtn=byId('mpLeaveBtn');
+    const joinBtn=byId('mpJoinBtn'), leaveBtn=byId('mpLeaveBtn');
     const roomInput=byId('mpRoomInput'), callsignInput=byId('mpCallsignInput');
     const badge=byId('mpStatusBadge'), statusText=byId('mpStatusText');
     const peerBox=byId('mpPeerBox'), peerList=byId('mpPeerList'), peerCount=byId('mpPeerCount');
@@ -2672,11 +2674,63 @@ function initialize(){
       callsignInput.value='SKY-'+Math.floor(100+Math.random()*900);
     }
 
-    if(randomBtn){
-      randomBtn.onclick=()=>{
-        const prefixes=['AIR','SKY','TW','FLY','WING','ACE'];
-        roomInput.value=prefixes[Math.floor(Math.random()*prefixes.length)]+Math.floor(10+Math.random()*90);
+    const roomChips=document.querySelectorAll('#mpRoomChips .mp-chip');
+    function setActiveChip(roomId){
+      roomChips.forEach(c=>{
+        c.classList.toggle('active',c.dataset.room===roomId);
+      });
+    }
+    roomChips.forEach(chip=>{
+      chip.onclick=()=>{
+        const target=chip.dataset.room;
+        if(roomInput) roomInput.value=target;
+        setActiveChip(target);
+        if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+          const c=callsignInput?.value||multiplayer.getCallsign();
+          multiplayer.switchRoom(target,c);
+          showPill?.('已切換至房間 '+target);
+        }
       };
+    });
+
+    const customRoomBtn=byId('mpCustomRoomBtn');
+    if(customRoomBtn){
+      customRoomBtn.onclick=()=>{
+        const customId=typeof multiplayer!=='undefined'?multiplayer.generateCustomRoomId():('SKY-'+Math.floor(100+Math.random()*900));
+        if(roomInput) roomInput.value=customId;
+        setActiveChip('');
+        const feed=byId('mpFeedbackMsg');
+        if(feed) feed.textContent=`✨ 已建立專屬房號 ${customId}，點擊「複製邀請連結」發送給好友！`;
+        if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+          const c=callsignInput?.value||multiplayer.getCallsign();
+          multiplayer.switchRoom(customId,c);
+          showPill?.('已進入自建專屬房間 '+customId);
+        }
+      };
+    }
+
+    const copyUrlBtn=byId('mpCopyUrlBtn');
+    if(copyUrlBtn){
+      copyUrlBtn.onclick=async()=>{
+        const r=roomInput?.value||(typeof multiplayer!=='undefined'?multiplayer.getRoomId():'8888')||'8888';
+        const url=typeof multiplayer!=='undefined'?multiplayer.getRoomUrl(r):location.href;
+        try{
+          if(navigator.clipboard) await navigator.clipboard.writeText(url);
+        }catch{}
+        const feed=byId('mpFeedbackMsg');
+        if(feed) feed.textContent=`🔗 已複製邀請連結：${url}`;
+        showPill?.('🔗 已複製房間 '+r+' 邀請連結至剪貼簿！');
+      };
+    }
+
+    const urlRoom=typeof multiplayer!=='undefined'?multiplayer.parseUrlRoom():'';
+    if(urlRoom){
+      if(roomInput) roomInput.value=urlRoom;
+      setActiveChip(urlRoom);
+      const quickMp=byId('quickMultiplayer');
+      if(quickMp) quickMp.textContent=`🌐 進入房間 ${urlRoom}`;
+      const feed=byId('mpFeedbackMsg');
+      if(feed) feed.textContent=`🎯 已由邀請連結設定房間：${urlRoom}`;
     }
 
     if(joinBtn){
@@ -2756,6 +2810,35 @@ function initialize(){
       hudMpClose.onclick=()=>{
         hudMpDropdown.hidden=true;
       };
+    }
+
+    const hudCopyBtn=byId('hudMpCopyUrlBtn');
+    if(hudCopyBtn){
+      hudCopyBtn.onclick=async()=>{
+        const r=typeof multiplayer!=='undefined'?multiplayer.getRoomId()||'8888':'8888';
+        const url=typeof multiplayer!=='undefined'?multiplayer.getRoomUrl(r):location.href;
+        try{
+          if(navigator.clipboard) await navigator.clipboard.writeText(url);
+        }catch{}
+        showPill?.(`🔗 已複製房間 ${r} 邀請連結！`);
+      };
+    }
+
+    const hudSwitchBtn=byId('hudMpSwitchBtn'), hudSwitchInput=byId('hudMpSwitchInput');
+    if(hudSwitchBtn&&hudSwitchInput){
+      const doSwitch=()=>{
+        const nextRoom=hudSwitchInput.value.trim().toUpperCase();
+        if(nextRoom&&typeof multiplayer!=='undefined'){
+          const c=multiplayer.getCallsign();
+          multiplayer.switchRoom(nextRoom,c);
+          if(roomInput) roomInput.value=nextRoom;
+          setActiveChip(nextRoom);
+          hudSwitchInput.value='';
+          showPill?.(`已切換至房間 ${nextRoom}`);
+        }
+      };
+      hudSwitchBtn.onclick=doSwitch;
+      hudSwitchInput.onkeydown=e=>{if(e.key==='Enter')doSwitch();};
     }
     addEventListener('keydown',e=>{
       if(e.code==='KeyU'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
