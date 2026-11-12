@@ -41,18 +41,19 @@
     // Initialize 2D windshield droplets
     function initDroplets(count){
       state.droplets = [];
-      const total = count || 90;
+      const total = count || 180;
       for(let i = 0; i < total; i++){
         state.droplets.push({
           x: Math.random(),
           y: Math.random(),
-          r: 1.2 + Math.random() * 2.6,
+          r: 1.0 + Math.random() * 2.8,
           streak: 0,
-          wiped: 0
+          wiped: 0,
+          driftVx: (Math.random() - 0.5) * 0.03
         });
       }
     }
-    initDroplets(90);
+    initDroplets(180);
 
     // Wiper sweep animation step
     function stepWipers(dt){
@@ -281,19 +282,60 @@
       const armLen = Math.min(w * 0.42, h * 0.76);
       const bladeLen = armLen * 0.68;
 
-      const streakSpeed = Math.max(0, (ias - 25) * 0.0032);
+      // 1. Ambient windshield condensation mist
+      ctx.fillStyle = 'rgba(170, 210, 235, 0.09)';
+      ctx.fillRect(0, 0, w, h);
+
+      // 2. Clear sector under wiper sweep
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctx.globalCompositeOperation = 'destination-out';
+      [leftPivot, rightPivot].forEach(p => {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.arc(p.x, p.y, armLen * 1.03, -Math.PI * 0.82, -Math.PI * 0.18);
+        ctx.closePath();
+        ctx.fill();
+      });
+      ctx.restore();
+
+      // 3. Water bead accumulation boundary ridge
+      ctx.save();
+      ctx.strokeStyle = 'rgba(215, 240, 255, 0.35)';
+      ctx.lineWidth = 2.2;
+      [leftPivot, rightPivot].forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, armLen * 1.03, -Math.PI * 0.82, -Math.PI * 0.18);
+        ctx.stroke();
+      });
+      ctx.restore();
+
+      // 4. Aerodynamic airflow & gravity raindrop physics
+      const isAirborne = ias > 38;
+      const airflow = Math.max(0, (ias - 20) * 0.0038);
+
       for(let i = 0; i < state.droplets.length; i++){
         const d = state.droplets[i];
         if(d.wiped > 0){
-          d.wiped -= dt * 0.4;
+          d.wiped -= dt * 0.45;
           continue;
         }
 
-        // Droplet airflow streak
-        d.y -= streakSpeed * dt;
-        if(d.y < 0){
-          d.y = 1.0;
+        if(isAirborne){
+          // Upward streak + lateral streamline divergence
+          d.y -= (airflow * 0.92 + d.r * 0.02) * dt;
+          d.x += (d.x - 0.5) * airflow * 0.28 * dt;
+        } else {
+          // Ground gravity run-down
+          d.y += (0.045 + d.r * 0.02) * dt;
+          d.x += (d.driftVx || 0) * dt;
+        }
+
+        // Loop / respawn drops
+        if(d.y < 0 || d.y > 1 || d.x < 0 || d.x > 1){
+          d.y = isAirborne ? 1.0 : 0.0;
           d.x = Math.random();
+          d.r = 1.0 + Math.random() * 2.8;
         }
 
         const px = d.x * w;
@@ -303,38 +345,44 @@
         const dxL = px - leftPivot.x, dyL = leftPivot.y - py;
         const distL = Math.hypot(dxL, dyL);
         const angL = Math.atan2(dxL, dyL);
-        if(distL > armLen * 0.32 && distL < armLen * 1.05 && Math.abs(angL - (wiper.angle - 0.38)) < 0.16){
+        if(distL > armLen * 0.30 && distL < armLen * 1.05 && Math.abs(angL - (wiper.angle - 0.38)) < 0.16){
           d.wiped = 1.0;
           continue;
         }
         const dxR = px - rightPivot.x, dyR = rightPivot.y - py;
         const distR = Math.hypot(dxR, dyR);
         const angR = Math.atan2(dxR, dyR);
-        if(distR > armLen * 0.32 && distR < armLen * 1.05 && Math.abs(angR - (wiper.angle - 0.38)) < 0.16){
+        if(distR > armLen * 0.30 && distR < armLen * 1.05 && Math.abs(angR - (wiper.angle - 0.38)) < 0.16){
           d.wiped = 1.0;
           continue;
         }
 
-        // Draw droplet
+        // Render realistic droplet with shadow rim and specular glint
         const rad = d.r;
         ctx.beginPath();
-        ctx.arc(px, py, rad, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(185, 222, 245, 0.48)';
+        ctx.arc(px, py, rad + 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(20, 35, 50, 0.32)';
         ctx.fill();
 
-        // Droplet glint
         ctx.beginPath();
-        ctx.arc(px - rad * 0.3, py - rad * 0.3, rad * 0.35, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.arc(px, py, rad, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(195, 230, 250, 0.62)';
         ctx.fill();
 
-        // Tail streak
-        if(streakSpeed > 0.08){
+        // Droplet specular highlight
+        ctx.beginPath();
+        ctx.arc(px - rad * 0.35, py - rad * 0.35, rad * 0.36, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        // High-speed aerodynamic dynamic teardrop trail
+        if(isAirborne && airflow > 0.06){
           ctx.beginPath();
           ctx.moveTo(px, py + rad);
-          ctx.lineTo(px, py + rad + streakSpeed * 35);
-          ctx.strokeStyle = 'rgba(165, 210, 235, 0.32)';
-          ctx.lineWidth = rad * 0.75;
+          ctx.lineTo(px - (d.x - 0.5) * airflow * 12, py + rad + airflow * 42);
+          ctx.strokeStyle = 'rgba(180, 220, 245, 0.38)';
+          ctx.lineWidth = rad * 0.8;
+          ctx.lineCap = 'round';
           ctx.stroke();
         }
       }
