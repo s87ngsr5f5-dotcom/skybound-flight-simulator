@@ -56,10 +56,40 @@ function createTaiwanOverview(){
   const distantTerrain=overviewTerrain.clone();
   distantTerrain.position.y=-40;
 
+  // 3D Label Sprite Helper for Airports, VORs, and Multiplayer Callsigns
+  function createTagSprite(text, borderColor='#6ee7ff', textColor='#ffffff', bgColor='rgba(9, 23, 36, 0.86)'){
+    if(typeof document==='undefined') return null;
+    const canvas=document.createElement('canvas');
+    canvas.width=256;canvas.height=56;
+    const ctx=canvas.getContext('2d');
+    if(!ctx) return null;
+    ctx.font='bold 24px system-ui, -apple-system, sans-serif';
+    const textW=Math.min(220, ctx.measureText(text).width);
+    const boxW=Math.max(78, textW+26);
+    const x0=(256-boxW)/2;
+    ctx.fillStyle=bgColor;
+    ctx.strokeStyle=borderColor;
+    ctx.lineWidth=3;
+    if(ctx.roundRect){
+      ctx.beginPath();ctx.roundRect(x0,8,boxW,40,10);ctx.fill();ctx.stroke();
+    }else{
+      ctx.fillRect(x0,8,boxW,40);ctx.strokeRect(x0,8,boxW,40);
+    }
+    ctx.fillStyle=textColor;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(text,128,29);
+    const tex=new THREE.CanvasTexture(canvas);
+    tex.minFilter=THREE.LinearFilter;
+    const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,toneMapped:false});
+    const sprite=new THREE.Sprite(mat);
+    sprite.userData={text,boxW};
+    return sprite;
+  }
+
   // 3D Airport & Waypoint Markers
   const airportGroup=new THREE.Group();
   scene.add(airportGroup);
-  const airportGeo=new THREE.BufferGeometry();
   // Diamond shape for airports
   const diamondShape=new THREE.Shape();
   diamondShape.moveTo(0,1.2);
@@ -73,6 +103,7 @@ function createTaiwanOverview(){
   const destAirportMat=new THREE.MeshBasicMaterial({color:0xffcf5e,toneMapped:false});
 
   const airportMeshes=new Map();
+  const airportLabels=new Map();
   if(typeof allAirports!=='undefined'&&Array.isArray(allAirports)){
     for(const ap of allAirports){
       const mesh=new THREE.Mesh(diamondGeo,airportMat);
@@ -80,6 +111,37 @@ function createTaiwanOverview(){
       mesh.userData={code:ap.code,name:ap.name,x:ap.x,z:ap.z};
       airportGroup.add(mesh);
       airportMeshes.set(ap.code,mesh);
+
+      const label=createTagSprite(`${ap.code} ${ap.shortName||ap.name||''}`.trim(),'rgba(110, 231, 255, 0.7)','#eaf9ff');
+      if(label){
+        label.position.set(ap.x,9600,ap.z+3200);
+        airportGroup.add(label);
+        airportLabels.set(ap.code,label);
+      }
+    }
+  }
+
+  // VOR / Airways Beacons on Overview
+  const vorMeshes=[];
+  const vorLabels=[];
+  if(typeof airwaysNav!=='undefined'&&typeof airwaysNav.getVORStations==='function'){
+    airwaysNav.ensureVORCoordinates?.(geoPoint);
+    const vors=airwaysNav.getVORStations()||[];
+    const vorGeo=new THREE.RingGeometry(0.6,1.1,6);
+    vorGeo.rotateX(-Math.PI/2);
+    const vorMat=new THREE.MeshBasicMaterial({color:0x00e5a3,toneMapped:false,side:THREE.DoubleSide});
+    for(const v of vors){
+      if(!Number.isFinite(v.x)||!Number.isFinite(v.z)) continue;
+      const vm=new THREE.Mesh(vorGeo,vorMat);
+      vm.position.set(v.x,8400,v.z);
+      scene.add(vm);
+      vorMeshes.push(vm);
+      const vl=createTagSprite(`VOR ${v.id}`,'rgba(0, 229, 163, 0.65)','#7affbe','rgba(6, 26, 28, 0.82)');
+      if(vl){
+        vl.position.set(v.x,9400,v.z-2800);
+        scene.add(vl);
+        vorLabels.push(vl);
+      }
     }
   }
 
@@ -111,11 +173,28 @@ function createTaiwanOverview(){
   markerGroup.add(ringMesh);
   scene.add(markerGroup);
 
-  // Multiplayer Peer Markers
+  // Multiplayer Peer Markers & Labels
   const peerMarkers=new Map();
+  const peerLabels=new Map();
   const peerArrowMat=new THREE.MeshBasicMaterial({color:0x00e5ff,toneMapped:false});
 
   let currentScaleFactor=1;
+  let spriteScaleBase=1;
+  function updateSpriteScales(){
+    for(const lbl of airportLabels.values()){
+      lbl.scale.set(spriteScaleBase*32, spriteScaleBase*7, 1);
+    }
+    for(const vl of vorLabels){
+      vl.scale.set(spriteScaleBase*24, spriteScaleBase*5.2, 1);
+    }
+    for(const vm of vorMeshes){
+      vm.scale.setScalar(currentScaleFactor*0.85);
+    }
+    for(const pl of peerLabels.values()){
+      pl.scale.set(spriteScaleBase*34, spriteScaleBase*7.5, 1);
+    }
+  }
+
   function resize(w,h){
     const aspect=w/h,halfHeight=Math.max(265000,218000/aspect);
     camera.left=-halfHeight*aspect;
@@ -124,6 +203,7 @@ function createTaiwanOverview(){
     camera.bottom=-halfHeight;
     camera.updateProjectionMatrix();
     currentScaleFactor=7*2*halfHeight/h;
+    spriteScaleBase=(2*halfHeight)/h*2.6;
     markerGroup.scale.setScalar(currentScaleFactor*1.3);
     for(const mesh of airportMeshes.values()){
       mesh.scale.setScalar(currentScaleFactor*1.1);
@@ -131,17 +211,29 @@ function createTaiwanOverview(){
     for(const pMesh of peerMarkers.values()){
       pMesh.scale.setScalar(currentScaleFactor*1.1);
     }
+    updateSpriteScales();
     return 50000*w/(camera.right-camera.left);
   }
   function draw(renderer,f){
     markerGroup.position.set(f.x,9000,f.z);
     markerGroup.rotation.y=-f.heading;
 
+    // Pulse animation on aircraft beacon ring
+    const t=(typeof performance!=='undefined'?performance.now():Date.now())*0.004;
+    const pulse=1.0+0.35*Math.sin(t);
+    ringMesh.scale.setScalar(pulse);
+    ringMat.opacity=0.45+0.35*(0.5+0.5*Math.cos(t));
+
     // Highlight Destination Airport
     if(f.destination&&airportMeshes.has(f.destination.code)){
       for(const [code,mesh] of airportMeshes){
-        mesh.material=code===f.destination.code?destAirportMat:airportMat;
-        mesh.scale.setScalar(code===f.destination.code?currentScaleFactor*1.7:currentScaleFactor*1.1);
+        const isDest=code===f.destination.code;
+        mesh.material=isDest?destAirportMat:airportMat;
+        mesh.scale.setScalar(isDest?currentScaleFactor*1.8:currentScaleFactor*1.1);
+        const lbl=airportLabels.get(code);
+        if(lbl){
+          lbl.scale.set(spriteScaleBase*(isDest?40:30), spriteScaleBase*(isDest?8.8:6.6), 1);
+        }
       }
     }
 
@@ -165,7 +257,7 @@ function createTaiwanOverview(){
       routeLine.visible=false;
     }
 
-    // Multiplayer Peers
+    // Multiplayer Peers with Callsign Labels
     if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
       const activePeers=multiplayer.getPeers();
       const currentIds=new Set();
@@ -175,13 +267,25 @@ function createTaiwanOverview(){
         let pm=peerMarkers.get(peer.id);
         if(!pm){
           pm=new THREE.Mesh(arrowGeo,peerArrowMat);
-          pm.scale.setScalar(currentScaleFactor*1.1);
+          pm.scale.setScalar(currentScaleFactor*1.2);
           scene.add(pm);
           peerMarkers.set(peer.id,pm);
+
+          const pl=createTagSprite(`✈ ${peer.callsign||'PEER'}`,'#00e5ff','#7affbe','rgba(6, 20, 32, 0.90)');
+          if(pl){
+            pl.scale.set(spriteScaleBase*34, spriteScaleBase*7.5, 1);
+            scene.add(pl);
+            peerLabels.set(peer.id,pl);
+          }
         }
         pm.position.set(peer.state.x,8900,peer.state.z);
         pm.rotation.y=-(peer.state.heading||0);
         pm.visible=true;
+        const pl=peerLabels.get(peer.id);
+        if(pl){
+          pl.position.set(peer.state.x,9700,peer.state.z-3200);
+          pl.visible=true;
+        }
       }
       for(const [id,pm] of peerMarkers){
         if(!currentIds.has(id)){
@@ -190,15 +294,27 @@ function createTaiwanOverview(){
           peerMarkers.delete(id);
         }
       }
+      for(const [id,pl] of peerLabels){
+        if(!currentIds.has(id)){
+          pl.visible=false;
+          scene.remove(pl);
+          peerLabels.delete(id);
+        }
+      }
     }else{
       for(const pm of peerMarkers.values()){
         pm.visible=false;
         scene.remove(pm);
       }
       peerMarkers.clear();
+      for(const pl of peerLabels.values()){
+        pl.visible=false;
+        scene.remove(pl);
+      }
+      peerLabels.clear();
     }
 
     renderer.render(scene,camera);
   }
-  return {distantTerrain,resize,draw};
+  return {distantTerrain,resize,draw,airportLabels,peerLabels};
 }

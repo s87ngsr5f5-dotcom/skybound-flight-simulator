@@ -322,8 +322,13 @@
     ctx.restore();
   }
 
+  function getVORStations() {
+    return taiwanVORStations;
+  }
+
   const airwaysNavModule = {
     taiwanVORStations,
+    getVORStations,
     civilAirways,
     ensureVORCoordinates,
     tuneVOR,

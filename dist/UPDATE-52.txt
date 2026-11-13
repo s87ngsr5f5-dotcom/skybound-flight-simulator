@@ -1,0 +1,9 @@
+SKYBOUND GLOBAL v0.52 更新紀錄
+1. 緊急修復手機與桌機初始化中斷 Bug (flight.js / airways-nav.js)
+   - 修正 airwaysNav.getVORStations is not a function 導致首頁載入卡在「遊戲初始化中斷」的問題，補齊 export 與防禦性檢查。
+2. 航前地圖與全台 3D 總覽圖全面升級 (flight.js / taiwan-overview.js)
+   - #planMap 加入經緯導航網格、VOR 航路信標、直接點擊地圖機場切換目的地互動、與總航距 / 預估飛行時間 (ETE) 儀表框。
+   - 全台 3D 俯瞰新增所有機場代碼名稱 3D 標籤、VOR 六角光柱信標與標籤、本機脈衝呼吸環與多人機友 3D 空中呼號牌。
+3. 飛行 HUD 小雷達 (#radar) 升級
+   - 支援點擊小雷達切換縮放倍率 (AUTO / 15km / 45km / 120km)。
+   - 新增 VOR 信標、本機 45 秒航向預測延長向量線，以及在線機友即時距離與相對高度差標註。

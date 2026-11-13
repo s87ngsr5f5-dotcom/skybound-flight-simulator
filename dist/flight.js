@@ -1463,7 +1463,12 @@ function initialize(){
       }
       planMap.save();
       planMap.scale(planDpr,planDpr);
-      planMap.fillStyle='#12364d';planMap.fillRect(0,0,planW,planH);
+      planMap.fillStyle='#0c2538';planMap.fillRect(0,0,planW,planH);
+      // Aviation Graticule Grid lines
+      planMap.strokeStyle='rgba(100, 185, 230, 0.14)';
+      planMap.lineWidth=1;
+      for(let gx=40;gx<planW;gx+=45){planMap.beginPath();planMap.moveTo(gx,0);planMap.lineTo(gx,planH);planMap.stroke();}
+      for(let gy=40;gy<planH;gy+=45){planMap.beginPath();planMap.moveTo(0,gy);planMap.lineTo(planW,gy);planMap.stroke();}
       const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
       const minZ=Math.min(...points.map(p=>p.z)),maxZ=Math.max(...points.map(p=>p.z));
       const metersPerPixel=Math.max((maxX-minX)/350,(maxZ-minZ)/355,1);
@@ -1479,24 +1484,59 @@ function initialize(){
         planMap.lineWidth=1.5;
         planMap.strokeRect(10,10,planW-20,planH-20);
       }
+      // Draw VOR Stations Overlay
+      if(!overseas&&typeof airwaysNav!=='undefined'&&typeof airwaysNav.getVORStations==='function'){
+        airwaysNav.ensureVORCoordinates?.(geoPoint);
+        const vors=airwaysNav.getVORStations()||[];
+        planMap.save();
+        planMap.font='bold 9px monospace';
+        for(const v of vors){
+          if(!Number.isFinite(v.x)||!Number.isFinite(v.z)) continue;
+          const [vx,vy]=project(v);
+          planMap.strokeStyle='rgba(0, 229, 163, 0.72)';
+          planMap.lineWidth=1.2;
+          planMap.beginPath();
+          planMap.moveTo(vx,vy-4);planMap.lineTo(vx+4,vy+3);planMap.lineTo(vx-4,vy+3);planMap.closePath();
+          planMap.stroke();
+          planMap.fillStyle='rgba(122, 255, 190, 0.75)';
+          planMap.fillText(v.id,vx+6,vy+3);
+        }
+        planMap.restore();
+      }
       mapPath(planMap,points,project,'#6ceaff');
       planMap.font='bold 12px system-ui, sans-serif';planMap.fillStyle='#f4f9fd';
+      const hitTargets=[];
       for(const r of overseas?[departure,destination]:taiwanAirports){
         const [x,y]=project(r);
-        planMap.fillStyle=r===destination?'#ffd700':'#6ceaff';
-        planMap.fillRect(x-3,y-3,6,6);
+        hitTargets.push({airport:r,x,y});
+        const isDep=r===departure,isDest=r===destination;
+        planMap.fillStyle=isDest?'#ffd700':isDep?'#7affbe':'#6ceaff';
+        planMap.beginPath();
+        planMap.arc(x,y,isDest||isDep?5.5:4,0,Math.PI*2);
+        planMap.fill();
+        if(isDest||isDep){
+          planMap.strokeStyle='#091926';
+          planMap.lineWidth=1.5;
+          planMap.stroke();
+        }
         planMap.fillStyle='#ffffff';
+        planMap.strokeStyle='#0a1e2e';
+        planMap.lineWidth=3;
+        planMap.strokeText(r.code,x+8,y+4);
         planMap.fillText(r.code,x+8,y+4);
       }
-      // Leg Distance & Track labels for route
+      planMap.canvas._hitTargets=hitTargets;
+      // Leg Distance & Track labels + Total Route Summary
+      let totalDistMeters=0;
       if(points.length>1){
         planMap.font='10px system-ui, monospace';
-        planMap.fillStyle='rgba(255, 255, 255, 0.75)';
+        planMap.fillStyle='rgba(255, 255, 255, 0.85)';
         for(let i=0;i<points.length-1;i++){
           const pA=points[i],pB=points[i+1];
           const [ax,ay]=project(pA),[bx,by]=project(pB);
           const mx=(ax+bx)/2,my=(ay+by)/2;
           const legDist=Math.hypot(pB.x-pA.x,pB.z-pA.z);
+          totalDistMeters+=legDist;
           const legNm=Math.round(legDist/1852);
           const legDeg=Math.round((Math.atan2(pB.x-pA.x,pA.z-pB.z)/rad+360)%360);
           if(Math.hypot(bx-ax,by-ay)>45){
@@ -1504,12 +1544,51 @@ function initialize(){
           }
         }
       }
+      // Route Summary Telemetry Box on Top-Right of Plan Map
+      const totalKm=Math.round(totalDistMeters/1000);
+      const totalNm=Math.round(totalDistMeters/1852);
+      const cruiseMps=(selectedAircraft().cruiseMach?selectedAircraft().cruiseMach*295:selectedAircraft().power?75:140);
+      const eteMin=Math.max(1,Math.round(totalDistMeters/Math.max(45,cruiseMps)/60));
+      planMap.fillStyle='rgba(8, 22, 34, 0.84)';
+      planMap.strokeStyle='rgba(108, 234, 255, 0.5)';
+      planMap.lineWidth=1;
+      planMap.fillRect(planW-162,8,154,42);
+      planMap.strokeRect(planW-162,8,154,42);
+      planMap.fillStyle='#6ceaff';
+      planMap.font='bold 11px monospace';
+      planMap.fillText(`DIST ${totalKm} km / ${totalNm} NM`,planW-154,25);
+      planMap.fillStyle='#ffd700';
+      planMap.fillText(`EST ETE ~${eteMin} MIN`,planW-154,42);
+      planMap.fillStyle='rgba(170, 224, 250, 0.8)';
+      planMap.font='10px system-ui';
+      planMap.fillText('點擊地圖機場快速設為目的地',10,planH-10);
       planMap.restore();
-      byId('routePreview').textContent=isClimb?'777-300ER · 桃園 05L 起飛 · 35,000 ft 巡航練習':departure.name+' → '+destination.name+' · '+route.map(p=>p.name).join(' → ');
+      byId('routePreview').textContent=isClimb?'777-300ER · 桃園 05L 起飛 · 35,000 ft 巡航練習':`${departure.name} → ${destination.name} (${totalKm}km · 約${eteMin}分) · ${route.map(p=>p.name).join(' → ')}`;
       byId('message').textContent=contract?'基本報酬 '+contract.base+' 金幣':'';
       if(isTactical) byId('message').textContent='虛構訓練空域 · '+tacticalScenarios[tacticalSelection].brief+
         (touchControls.mode.value==='mobile'?' · 點「發射」':' · M 發射');
     }catch(error){byId('message').textContent=error.message;}
+  }
+  if(planMap.canvas){
+    planMap.canvas.style.cursor='pointer';
+    planMap.canvas.addEventListener('click',e=>{
+      const targets=planMap.canvas._hitTargets;
+      if(!targets||!targets.length) return;
+      const rect=planMap.canvas.getBoundingClientRect();
+      const cx=(e.clientX-rect.left)*(430/Math.max(1,rect.width));
+      const cy=(e.clientY-rect.top)*(440/Math.max(1,rect.height));
+      let best=null,bestDist=24;
+      for(const t of targets){
+        const d=Math.hypot(cx-t.x,cy-t.y);
+        if(d<bestDist){bestDist=d;best=t.airport;}
+      }
+      if(!best) return;
+      const destSelect=byId('destination');
+      if(destSelect&&!destSelect.disabled&&best.code!==byId('departure')?.value){
+        destSelect.value=best.code;
+        drawPlan();
+      }
+    });
   }
   for(const name of ['aircraft','departure','destination','waypoints','lesson','cruiseWind']) byId(name).addEventListener('change',drawPlan);
   function showLog(){
@@ -3178,6 +3257,15 @@ function initialize(){
   }
   const trail=[];
   let trailFrame=0;
+  const radarZoomModes=['auto',15000,45000,120000];
+  let radarZoomIdx=0;
+  if(radar?.canvas){
+    radar.canvas.style.cursor='pointer';
+    radar.canvas.title='點擊切換雷達縮放 (AUTO / 15km / 45km / 120km)';
+    radar.canvas.addEventListener('click',()=>{
+      radarZoomIdx=(radarZoomIdx+1)%radarZoomModes.length;
+    });
+  }
   function drawNav(f,target){
     if(byId('hud').dataset.mobilePanel!=='nav') return;
     const canvas=radar.canvas;
@@ -3207,8 +3295,12 @@ function initialize(){
       ' km/h · Mach '+speeds.mach.toFixed(2)+(closing>5&&!f.ground?' · 航點 ETA '+(distance/closing/60).toFixed(1)+' 分':'');
     const xs=visiblePoints.map(p=>p.x),zs=visiblePoints.map(p=>p.z);
     const minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
-    const centerX=(minX+maxX)/2,centerZ=(minZ+maxZ)/2;
-    const scale=Math.min(f.ground?.11:.018,width*.72/Math.max(1,maxX-minX),height*.64/Math.max(1,maxZ-minZ));
+    const zoomRange=f.ground?'auto':radarZoomModes[radarZoomIdx];
+    const centerX=zoomRange==='auto'?(minX+maxX)/2:f.x;
+    const centerZ=zoomRange==='auto'?(minZ+maxZ)/2:f.z;
+    const scale=zoomRange==='auto'
+      ?Math.min(f.ground?.11:.018,width*.72/Math.max(1,maxX-minX),height*.64/Math.max(1,maxZ-minZ))
+      :Math.min(width,height)*0.44/zoomRange;
     const project=p=>[width/2+(p.x-centerX)*scale,height/2+(p.z-centerZ)*scale];
     if(f.ground) {
       radar.fillStyle='#2c443b';
@@ -3269,6 +3361,31 @@ function initialize(){
       }
       radar.restore();
     }
+    // VOR Stations overlay on airborne radar
+    if(!f.ground&&typeof airwaysNav!=='undefined'){
+      const vors=typeof airwaysNav.getVORStations==='function'?airwaysNav.getVORStations():(airwaysNav.taiwanVORStations||[]);
+      radar.save();
+      radar.font='bold 9px monospace';
+      radar.textAlign='center';
+      radar.textBaseline='top';
+      for(const vor of vors){
+        if(!Number.isFinite(vor.x)||!Number.isFinite(vor.z)) continue;
+        const [vx,vy]=project(vor);
+        if(vx<10||vx>width-10||vy<10||vy>height-14) continue;
+        radar.strokeStyle='#65dcff';radar.lineWidth=1.1;
+        radar.fillStyle='rgba(10,32,48,0.8)';
+        radar.beginPath();
+        for(let i=0;i<6;i++){
+          const a=i*Math.PI/3;
+          const hx=vx+4.2*Math.cos(a),hy=vy+4.2*Math.sin(a);
+          if(i===0) radar.moveTo(hx,hy);else radar.lineTo(hx,hy);
+        }
+        radar.closePath();radar.fill();radar.stroke();
+        radar.fillStyle='#a8ecff';
+        radar.fillText(vor.id,vx,vy+6);
+      }
+      radar.restore();
+    }
     const labeled=[[ownX,ownY]];
     const mapAirports=[...new Set([destination,f.departure,...airports].filter(Boolean))];
     radar.font='bold 13px system-ui';
@@ -3292,6 +3409,20 @@ function initialize(){
       radar.fillText(name,labelX,y);
       labeled.push([x,y]);
     }
+    // Ownship 45-second heading predictor vector
+    if(!f.ground){
+      const leadDist=Math.max(45,f.speed||60)*45;
+      const [lx,ly]=project({x:f.x+Math.sin(f.heading)*leadDist,z:f.z-Math.cos(f.heading)*leadDist});
+      radar.save();
+      radar.strokeStyle='rgba(255,207,94,0.72)';
+      radar.lineWidth=1.5;
+      radar.setLineDash([4,3]);
+      radar.beginPath();radar.moveTo(ownX,ownY);radar.lineTo(lx,ly);radar.stroke();
+      radar.setLineDash([]);
+      radar.fillStyle='#ffcf5e';
+      radar.beginPath();radar.arc(lx,ly,2.3,0,Math.PI*2);radar.fill();
+      radar.restore();
+    }
     radar.save();radar.translate(ownX,ownY);radar.rotate(f.heading);
     radar.beginPath();radar.moveTo(0,-9);radar.lineTo(6,7);radar.lineTo(0,4);radar.lineTo(-6,7);radar.closePath();
     radar.fillStyle='#ffcf5e';radar.fill();radar.strokeStyle='#122b31';radar.lineWidth=1.5;radar.stroke();radar.restore();
@@ -3300,14 +3431,23 @@ function initialize(){
         if(!peer.state) continue;
         const [px,py]=project(peer.state);
         if(px<-15||px>width+15||py<-15||py>height+15) continue;
+        const pDist=Math.hypot(peer.state.x-f.x,peer.state.z-f.z);
+        const pAltDiff=Math.round((peer.state.y||0)-f.y);
+        const pDistStr=pDist>=1000?(pDist/1000).toFixed(1)+'k':Math.round(pDist)+'m';
+        const pAltStr=(pAltDiff>=0?'+':'')+pAltDiff+'m';
         radar.save();radar.translate(px,py);radar.rotate(peer.state.heading||0);
         radar.beginPath();radar.moveTo(0,-7);radar.lineTo(5,5);radar.lineTo(0,3);radar.lineTo(-5,5);radar.closePath();
         radar.fillStyle='#00e5ff';radar.fill();radar.strokeStyle='#0b1a24';radar.lineWidth=1.2;radar.stroke();radar.restore();
         radar.font='bold 10px system-ui';radar.fillStyle='#7affbe';
-        radar.fillText(peer.callsign,px+7,py-3);
+        radar.fillText(peer.callsign+' '+pDistStr+' '+pAltStr,clamp(px+7,4,width-95),clamp(py-3,12,height-28));
       }
     }
-    radar.font='bold 12px system-ui';radar.textBaseline='middle';
+    radar.font='bold 11px system-ui';radar.textBaseline='middle';
+    const zoomLabel=zoomRange==='auto'?'AUTO':(zoomRange/1000)+'km';
+    radar.fillStyle='rgba(16,38,56,0.88)';radar.fillRect(6,5,48,19);
+    radar.strokeStyle='rgba(101,220,255,0.45)';radar.lineWidth=1;radar.strokeRect(6,5,48,19);
+    radar.fillStyle='#78effe';radar.fillText(zoomLabel,11,15);
+    radar.font='bold 12px system-ui';
     radar.fillStyle='#102638';radar.fillRect(width-32,5,26,21);
     radar.fillStyle='#eef9ff';radar.fillText('北 ↑',width-31,16);
     const scaleDistance=([100,250,500,1000,2000,5000,10000,25000,50000,100000,250000,500000].find(n=>n*scale>=32)||1000000);
@@ -3862,7 +4002,8 @@ function initialize(){
     }
   }
   if(typeof airportInfrastructure!=='undefined'){
-    airportInfrastructure.init(scene,THREE,airports,typeof airwaysNav!=='undefined'?airwaysNav.getVORStations():[],geoPoint);
+    const vorList=typeof airwaysNav!=='undefined'?(typeof airwaysNav.getVORStations==='function'?airwaysNav.getVORStations():(airwaysNav.taiwanVORStations||[])):[];
+    airportInfrastructure.init(scene,THREE,airports,vorList,geoPoint);
   }
   if(typeof cockpitElectrical!=='undefined'){
     cockpitElectrical.initInteraction(renderer.domElement,camera,THREE);

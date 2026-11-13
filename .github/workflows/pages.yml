@@ -48,6 +48,7 @@ jobs:
       - run: node verify-cockpit-interactive.cjs
       - run: node verify-supermaneuver-gforce.cjs
       - run: node verify-mobile-viewport.cjs
+      - run: node verify-maps-navigation.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
