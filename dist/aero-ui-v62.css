@@ -1,0 +1,315 @@
+/* SKYBOUND v0.62 Signature "Obsidian Aero-Deck" Bespoke Avionics UI & Controls */
+:root {
+  --sb-bg: rgba(9, 13, 19, 0.86);
+  --sb-surface: rgba(14, 20, 29, 0.90);
+  --sb-border: rgba(210, 228, 244, 0.14);
+  --sb-border-bright: rgba(118, 212, 255, 0.42);
+  --sb-ink: #eef4fa;
+  --sb-muted: #8fa6b8;
+  --sb-gold: #ebc366;
+  --sb-cyan: #67d6ff;
+  --sb-emerald: #5ee6b5;
+  --sb-danger: #f0655b;
+}
+
+body {
+  background: radial-gradient(ellipse at 50% 0%, #162231 0%, #0a1018 58%, #06090e 100%);
+  color: var(--sb-ink);
+  font-family: "Inter", system-ui, -apple-system, "Noto Sans TC", sans-serif;
+}
+
+/* Dispatch / Pre-Flight Architectural UI */
+header {
+  background: rgba(8, 12, 18, 0.90);
+  border-bottom: 1px solid var(--sb-border);
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.48);
+  padding: 10px 2.4vw;
+}
+header b { color: var(--sb-gold); font-weight: 800; letter-spacing: 0.12em; }
+button, select {
+  background: rgba(19, 28, 40, 0.92);
+  border: 1px solid var(--sb-border);
+  border-radius: 6px;
+  color: var(--sb-ink);
+  font-weight: 600;
+}
+button:hover {
+  background: rgba(31, 46, 65, 0.96);
+  border-color: var(--sb-border-bright);
+}
+button.primary, .plan-start #fly {
+  background: linear-gradient(135deg, #cfa042 0%, #f1cc75 100%) !important;
+  color: #0b1016 !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  letter-spacing: 0.05em;
+  box-shadow: 0 6px 22px rgba(235, 195, 102, 0.28) !important;
+}
+
+main#plan {
+  background: var(--sb-bg);
+  border: 1px solid var(--sb-border);
+  border-radius: 10px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+#plan .planner { border-top: 1px solid var(--sb-border); }
+.plan-preview {
+  background: rgba(7, 11, 16, 0.85) !important;
+  border: 1px solid var(--sb-border) !important;
+  border-radius: 8px !important;
+}
+.plan-modes button {
+  background: rgba(14, 21, 30, 0.85) !important;
+  border: 1px solid var(--sb-border) !important;
+  border-radius: 6px !important;
+  color: var(--sb-muted) !important;
+}
+.plan-modes button[aria-pressed="true"] {
+  background: linear-gradient(180deg, rgba(103, 214, 255, 0.18) 0%, rgba(16, 30, 44, 0.95) 100%) !important;
+  border-color: var(--sb-cyan) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px rgba(103, 214, 255, 0.25), inset 0 2px 0 var(--sb-cyan) !important;
+}
+#quickFlights button {
+  background: rgba(16, 24, 34, 0.88);
+  border: 1px solid var(--sb-border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  padding: 6px 13px;
+}
+
+/* Signature Minimalist In-Flight Top Command Bar */
+.flight-ui header {
+  inset: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) auto max(14px, env(safe-area-inset-left));
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.flight-ui #flightAircraft {
+  background: var(--sb-bg);
+  border: 1px solid var(--sb-border);
+  border-left: 3px solid var(--sb-gold);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.flight-ui #flightBar {
+  background: var(--sb-bg);
+  border: 1px solid var(--sb-border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.flight-ui #flightBar button {
+  min-height: 36px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #e4eef7;
+}
+.flight-ui #flightBar button:first-child {
+  background: rgba(103, 214, 255, 0.14);
+  border-color: rgba(103, 214, 255, 0.30);
+  color: #bcecff;
+}
+.flight-ui #flightBar button[aria-expanded="true"] {
+  background: rgba(94, 230, 181, 0.18);
+  border-color: rgba(94, 230, 181, 0.55);
+  color: var(--sb-emerald);
+}
+.flight-ui #flightBar #menu {
+  background: rgba(240, 101, 91, 0.16);
+  border-color: rgba(240, 101, 91, 0.35);
+  color: #ffb8b2;
+}
+.flight-ui #edition {
+  background: var(--sb-bg);
+  border: 1px solid var(--sb-border);
+  border-radius: 5px;
+  padding: 4px 8px;
+  color: var(--sb-gold);
+  font: 700 11px monospace;
+}
+
+/* Floating Drawer Panels */
+.flight-ui #flightNavigation,
+.flight-ui #systems,
+.flight-ui #mobileExtras,
+.flight-ui #quickControls[open] {
+  background: var(--sb-surface) !important;
+  border: 1px solid var(--sb-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(22px) !important;
+  -webkit-backdrop-filter: blur(22px) !important;
+}
+.flight-ui #waypointChip {
+  background: var(--sb-bg);
+  border: 1px solid rgba(235, 195, 102, 0.38);
+  border-radius: 5px;
+  color: var(--sb-gold);
+  font: 600 12px "Inter", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  padding: 4px 12px;
+}
+
+/* Desktop Bottom Interactive Avionics Dock (Original Signature Control Deck) */
+.desktop-deck {
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  background: rgba(8, 12, 18, 0.78);
+  border: 1px solid var(--sb-border);
+  border-radius: 10px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  z-index: 6;
+}
+.mobile-mode .desktop-deck,
+body:not(.flight-ui) .desktop-deck {
+  display: none !important;
+}
+.desktop-deck button {
+  position: relative;
+  min-height: 30px;
+  padding: 4px 10px 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd9e6;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  letter-spacing: 0.03em;
+}
+.desktop-deck button:hover {
+  background: rgba(103, 214, 255, 0.14);
+  border-color: rgba(103, 214, 255, 0.36);
+  color: #ffffff;
+}
+.desktop-deck button[aria-pressed="true"] {
+  background: rgba(94, 230, 181, 0.15);
+  border-color: rgba(94, 230, 181, 0.45);
+  color: var(--sb-emerald);
+}
+.desktop-deck .deck-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 2px;
+}
+.flight-ui #flightGuide {
+  bottom: 62px !important;
+}
+.desktop-deck-keys {
+  position: fixed;
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--sb-surface);
+  border: 1px solid var(--sb-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: 11.5px/1.6 monospace;
+  color: #b7cede;
+  pointer-events: auto;
+  z-index: 7;
+  max-width: 90vw;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+}
+
+/* Rebuilt Bespoke Mobile Controls — Zero Copycat Round/Orange Sliders */
+.mobile-mode.flight-ui #touchStick {
+  border-radius: 24% !important;
+  background:
+    radial-gradient(circle at center, rgba(103, 214, 255, 0.10) 0%, transparent 62%),
+    linear-gradient(to right, transparent 49.4%, rgba(255, 255, 255, 0.14) 50%, transparent 50.6%),
+    linear-gradient(to bottom, transparent 49.4%, rgba(255, 255, 255, 0.14) 50%, transparent 50.6%),
+    rgba(8, 12, 18, 0.72) !important;
+  border: 1.5px solid rgba(118, 212, 255, 0.38) !important;
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.65), 0 8px 26px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(12px);
+}
+.mobile-mode.flight-ui #touchStick span {
+  width: 34% !important;
+  height: 34% !important;
+  border-radius: 30% !important;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 224, 150, 0.92), rgba(226, 175, 72, 0.72)) !important;
+  border: 1.5px solid rgba(255, 248, 228, 0.9) !important;
+  box-shadow: 0 4px 14px rgba(235, 195, 102, 0.45) !important;
+}
+
+/* Detented Vertical Carbon Thrust Quadrant */
+.mobile-mode.flight-ui #touchThrottleControl {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 22px, rgba(255, 255, 255, 0.16) 22px 23px),
+    rgba(8, 12, 18, 0.80) !important;
+  border: 1.5px solid rgba(210, 228, 244, 0.25) !important;
+  border-radius: 9px !important;
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+.mobile-mode.flight-ui #touchThrottle {
+  border-radius: 6px !important;
+  background: linear-gradient(90deg, rgba(103, 214, 255, 0.45) var(--throttle-level, 0%), rgba(18, 24, 34, 0.72) var(--throttle-level, 0%)) !important;
+}
+.mobile-mode.flight-ui #touchThrottle::-webkit-slider-thumb {
+  width: 14px !important;
+  border-radius: 3px !important;
+  background: linear-gradient(180deg, #fff5d6 0%, #ebc366 100%) !important;
+  box-shadow: 0 0 10px rgba(235, 195, 102, 0.85) !important;
+}
+.mobile-mode.flight-ui #touchThrottleValue {
+  background: rgba(8, 12, 18, 0.82);
+  border: 1px solid var(--sb-border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font: 700 11px monospace;
+  color: var(--sb-gold);
+}
+
+/* Precision Horizontal Yaw Bar */
+.mobile-mode.flight-ui #touchRudder {
+  height: 36px !important;
+  background: linear-gradient(to right, transparent 49.3%, rgba(235, 195, 102, 0.5) 50%, transparent 50.7%), rgba(8, 12, 18, 0.76) !important;
+  border: 1.5px solid rgba(210, 228, 244, 0.24) !important;
+  border-radius: 8px !important;
+}
+.mobile-mode.flight-ui #touchRudder::-webkit-slider-thumb {
+  width: 28px !important;
+  height: 24px !important;
+  border-radius: 5px !important;
+  background: rgba(103, 214, 255, 0.38) !important;
+  border: 1.5px solid #e6f7ff !important;
+}
+
+/* Sleek Status-LED Mobile Quick Pills */
+.mobile-mode.flight-ui #touchQuick button {
+  background: rgba(9, 14, 21, 0.82) !important;
+  border: 1px solid var(--sb-border) !important;
+  border-radius: 7px !important;
+  font-size: 11px !important;
+  color: #dbe8f4 !important;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.06);
+}
+.mobile-mode.flight-ui #touchQuick button[aria-pressed="true"] {
+  background: rgba(94, 230, 181, 0.18) !important;
+  border-color: rgba(94, 230, 181, 0.55) !important;
+  box-shadow: inset 0 2.5px 0 var(--sb-emerald) !important;
+  color: #ffffff !important;
+}

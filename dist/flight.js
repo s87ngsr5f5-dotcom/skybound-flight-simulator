@@ -278,6 +278,25 @@ function initialize(){
             float glintDot=max(0.0,dot(reflDir,normalize(seaSunDir)));
             float sunTrail=pow(glintDot,34.0)*0.95+pow(glintDot,128.0)*1.95;
             diffuseColor.rgb+=vec3(1.0,0.92,0.74)*sunTrail*seaDayRatio;
+            float moonTrail=pow(max(0.0,dot(reflDir,normalize(vec3(-seaSunDir.x,abs(seaSunDir.y)+.35,seaSunDir.z)))),28.0);
+            diffuseColor.rgb+=vec3(0.38,0.48,0.68)*moonTrail*(1.0-seaDayRatio)*0.55;
+          }
+        }
+      `).replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+        float nightRatio=clamp(1.0-seaDayRatio*1.12,0.0,1.0);
+        if(nightRatio>0.01&&terrainWorldPos.y>0.25&&terrainWorldPos.y<190.0){
+          float urbanHue=smoothstep(0.0,0.16,(diffuseColor.r+diffuseColor.b)-diffuseColor.g*1.58)*smoothstep(0.18,0.46,diffuseColor.r);
+          float altMask=1.0-smoothstep(95.0,185.0,terrainWorldPos.y);
+          float urbanWeight=urbanHue*altMask;
+          if(urbanWeight>0.01){
+            vec2 g1=abs(fract(terrainXZ*0.0085)-0.5);
+            vec2 g2=abs(fract(terrainXZ*0.038)-0.5);
+            float arterial=smoothstep(0.455,0.498,max(g1.x,g1.y));
+            float streetDot=smoothstep(0.38,0.495,min(sin(terrainXZ.x*0.29)*cos(terrainXZ.y*0.29),1.0));
+            float winSpark=smoothstep(0.62,0.98,fract(sin(dot(floor(terrainXZ*0.11),vec2(127.1,311.7)))*43758.5453));
+            float gridNet=smoothstep(0.42,0.495,max(g2.x,g2.y));
+            vec3 cityCol=vec3(1.0,0.72,0.34)*(arterial*0.72+gridNet*0.26+streetDot*0.35)+vec3(1.0,0.88,0.68)*winSpark*0.42;
+            totalEmissiveRadiance+=cityCol*urbanWeight*nightRatio*0.82;
           }
         }
       `);
@@ -754,48 +773,134 @@ function initialize(){
     const [length,radius,span,wingHeight,count,sweep]=profile.geometry;
     const group=new THREE.Group(), gear=new THREE.Group(), blades=[], surfaces=[], navLights=[];
     const accent=material(['#185378','#9f5433','#16817b','#6a4b9b','#88404b','#354d66'][index]);
-    const body=new THREE.Mesh(new THREE.SphereGeometry(1,26,16),fuselage);
-    body.scale.set(radius,radius*.96,length);
+    const trimDark=material('#1f2830',.58,.35);
+    const chrome=material('#c5ced3',.22,.75);
+    const body=typeof AeroCraft!=='undefined'
+      ?new THREE.Mesh(AeroCraft.buildFuselageLoft([
+        {z:-length*(profile.jet?.96:.92),rx:radius*(profile.jet?.10:.18),ryTop:radius*(profile.jet?.09:.16),ryBot:radius*(profile.jet?.09:.16),y:0,power:2},
+        {z:-length*.78,rx:radius*(profile.jet?.46:.66),ryTop:radius*(profile.jet?.38:.52),ryBot:radius*(profile.jet?.42:.56),y:-radius*.04,pTop:2.1,pBot:2.2},
+        {z:-length*.50,rx:radius*.92,ryTop:radius*.72,ryBot:radius*.78,y:0,pTop:2.2,pBot:2.3},
+        {z:-length*.26,rx:radius,ryTop:radius*.96,ryBot:radius*.86,y:radius*.06,pTop:2.2,pBot:2.4},
+        {z:length*.16,rx:radius*.96,ryTop:radius*.90,ryBot:radius*.82,y:radius*.04,pTop:2.1,pBot:2.2},
+        {z:length*.56,rx:radius*.58,ryTop:radius*.58,ryBot:radius*.52,y:radius*.10,power:2},
+        {z:length*.88,rx:radius*.22,ryTop:radius*.26,ryBot:radius*.22,y:radius*.16,power:2},
+        {z:length*.98,rx:radius*.07,ryTop:radius*.09,ryBot:radius*.08,y:radius*.18,power:2}
+      ],28),fuselage)
+      :new THREE.Mesh(new THREE.SphereGeometry(1,26,16),fuselage);
+    if(typeof AeroCraft==='undefined')body.scale.set(radius,radius*.96,length);
     group.add(body,gear);
-    const glass=new THREE.Mesh(new THREE.SphereGeometry(1,16,10),windowMat);
-    glass.position.set(0,radius*.63,-length*.37);
-    glass.scale.set(radius*.92,radius*.59,length*.23);
+    const glass=typeof AeroCraft!=='undefined'
+      ?new THREE.Mesh(AeroCraft.buildCanopyGeometry(length*.48,radius*1.76,radius*.66,14,20),windowMat)
+      :new THREE.Mesh(new THREE.SphereGeometry(1,16,10),windowMat);
+    if(typeof AeroCraft!=='undefined'){glass.position.set(0,radius*.52,-length*.32);}
+    else{glass.position.set(0,radius*.63,-length*.37);glass.scale.set(radius*.92,radius*.59,length*.23);}
     group.add(glass);
     for(let i=0;i<(profile.jet?6:2);i++){
-      for(const side of [-1,1]) box(group,windowMat,.07,radius*.34,length*.10,side*radius*.93,radius*.20,-length*.13+i*length*.13);
+      for(const side of [-1,1]){
+        const win=new THREE.Mesh(new THREE.CapsuleGeometry(radius*.075,length*.045,4,8),windowMat);
+        win.rotation.x=Math.PI/2;win.position.set(side*radius*.94,radius*.24,-length*.10+i*length*.13);
+        group.add(win);
+      }
     }
-    function wing(side,width,rootZ,tipZ,chord,tipChord,y){
-      const geo=new THREE.BufferGeometry();
-      geo.setAttribute('position',new THREE.Float32BufferAttribute([0,y,rootZ,side*width,y+.20,tipZ,side*width,y+.20,tipZ+tipChord,0,y,rootZ+chord],3));
-      geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();
-      const mat=fuselage.clone();mat.side=THREE.DoubleSide;
-      group.add(new THREE.Mesh(geo,mat));
-    }
+    const wingMat=fuselage.clone();wingMat.side=THREE.DoubleSide;
+    const flapMat=accent.clone();flapMat.side=THREE.DoubleSide;
+    const leadRoot=-length*.40,rootChord=length*.55,tipChord=length*.19;
+    const highWing=wingHeight>radius*.25;
     for(const side of [-1,1]){
-      wing(side,span,-length*.44,-length*.4+sweep,length*.57,length*.14,wingHeight);
-      wing(side,span*.34,length*.62,length*.69,length*.27,length*.14,profile.jet?radius*1.6:radius*.23);
-      const hinge=new THREE.Group();
-      hinge.position.set(side*span*.55,wingHeight,length*.13+sweep*.55);
-      box(hinge,accent,span*.42,.07,length*.15,0,0,length*.072);
-      group.add(hinge);surfaces.push(hinge);
-      box(gear,windowMat,.34,.59,.57,side*span*.23,-profile.gearHeight+.27,length*.12);
-      navLights.push(box(group,new THREE.MeshBasicMaterial({color:side<0?0xdc3934:0x35dba0}),.17,.13,.19,side*span,.18+wingHeight,sweep-length*.30));
+      if(typeof AeroCraft!=='undefined'){
+        // True cambered NACA-2412 swept tapered main wing + washout twist
+        const wGeo=AeroCraft.buildWingLoft([
+          {x:radius*.62,leadZ:leadRoot,chord:rootChord,y:wingHeight,thick:.13,camber:.032,twist:.03},
+          {x:span*.45,leadZ:leadRoot+sweep*.42,chord:rootChord*.74+tipChord*.26,y:wingHeight+(highWing?.04:.14),thick:.115,camber:.028,twist:.01},
+          {x:span,leadZ:leadRoot+sweep,chord:tipChord,y:wingHeight+(highWing?.12:.34),thick:.095,camber:.020,twist:-.03,tipCurlY:.08}
+        ],{slices:28,capTip:true,mirror:side<0});
+        group.add(new THREE.Mesh(wGeo,wingMat));
+        // Aerodynamic horizontal stabilizer (camber 0 NACA-0010 tailplane)
+        const hTailY=profile.jet?radius*1.58:radius*.24;
+        const hGeo=AeroCraft.buildWingLoft([
+          {x:radius*.12,leadZ:length*.59,chord:length*.28,y:hTailY,thick:.10,camber:0,twist:0},
+          {x:span*.35,leadZ:length*.69,chord:length*.14,y:hTailY+(profile.jet?0:.04),thick:.085,camber:0,twist:0}
+        ],{slices:18,capTip:true,mirror:side<0});
+        group.add(new THREE.Mesh(hGeo,wingMat));
+        // Contoured airfoil aileron / flap hinge surface
+        const hinge=new THREE.Group();
+        hinge.position.set(side*span*.52,wingHeight+(highWing?.06:.18),leadRoot+sweep*.52+rootChord*.62);
+        const fGeo=AeroCraft.buildWingLoft([
+          {x:-span*.18,leadZ:0,chord:length*.14,y:0,thick:.09,camber:.015},
+          {x:span*.18,leadZ:sweep*.12,chord:length*.11,y:.02,thick:.085,camber:.015}
+        ],{slices:14,capTip:false});
+        hinge.add(new THREE.Mesh(fGeo,flapMat));
+        group.add(hinge);surfaces.push(hinge);
+        // Contoured diagonal wing strut fairing for high-wing trainers (Cessna style)
+        if(highWing){
+          const strutLen=Math.hypot(span*.42,wingHeight+radius*.58);
+          const strutGeo=new THREE.CylinderGeometry(radius*.055,radius*.07,strutLen,10);
+          strutGeo.scale(1.6,1,.65);
+          const strut=new THREE.Mesh(strutGeo,trimDark);
+          strut.position.set(side*span*.23,wingHeight*.5-radius*.25,-length*.10);
+          strut.rotation.z=-side*Math.atan2(span*.36,wingHeight+radius*.55);
+          group.add(strut);
+        }
+        // Aerodynamic gear leg + teardrop wheel pant
+        const legH=Math.max(.32,profile.gearHeight-radius*.35);
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(radius*.07,radius*.055,legH,10),chrome);
+        leg.position.set(side*span*.20,-profile.gearHeight+legH*.52,length*.08);
+        leg.rotation.z=-side*.22;gear.add(leg);
+        const pant=new THREE.Mesh(AeroCraft.buildWheelPantGeometry(radius*.36,radius*.22),accent);
+        pant.position.set(side*span*.23,-profile.gearHeight+.30,length*.09);gear.add(pant);
+      }else{
+        const geo=new THREE.BufferGeometry();
+        geo.setAttribute('position',new THREE.Float32BufferAttribute([0,wingHeight,leadRoot,side*span,wingHeight+.20,leadRoot+sweep,side*span,wingHeight+.20,leadRoot+sweep+tipChord,0,wingHeight,leadRoot+rootChord],3));
+        geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();group.add(new THREE.Mesh(geo,wingMat));
+      }
+      const nav=new THREE.Mesh(new THREE.SphereGeometry(.10,10,8),new THREE.MeshBasicMaterial({color:side<0?0xdc3934:0x35dba0}));
+      nav.position.set(side*span,wingHeight+(highWing?.13:.34),leadRoot+sweep+tipChord*.22);
+      group.add(nav);navLights.push(nav);
     }
-    const tail=new THREE.Shape();
-    tail.moveTo(0,0);tail.lineTo(length*.43,0);tail.lineTo(length*.32,radius*2.2);tail.lineTo(length*.18,radius*2.2);tail.closePath();
-    const fin=new THREE.Mesh(new THREE.ExtrudeGeometry(tail,{depth:.14,bevelEnabled:false}),accent);
-    fin.rotation.y=-Math.PI/2;fin.position.set(0,radius*.34,length*.56);group.add(fin);
-    box(gear,windowMat,.28,.48,.50,0,-profile.gearHeight+.25,-length*.55);
+    // Swept NACA-0010 vertical fin with curved dorsal fillet
+    if(typeof AeroCraft!=='undefined'){
+      const vFin=new THREE.Mesh(AeroCraft.buildVerticalFoilLoft([
+        {y:radius*.16,leadZ:length*.28,chord:length*.66,thick:.085},
+        {y:radius*.72,leadZ:length*.53,chord:length*.38,thick:.095},
+        {y:radius*2.35,leadZ:length*.72,chord:length*.16,thick:.085}
+      ],{slices:20,capTip:true}),accent);
+      group.add(vFin);
+      const nLeg=new THREE.Mesh(new THREE.CylinderGeometry(radius*.065,radius*.055,Math.max(.32,profile.gearHeight-.2),10),chrome);
+      nLeg.position.set(0,-profile.gearHeight*.52,-length*.54);nLeg.rotation.x=-.14;gear.add(nLeg);
+      const nPant=new THREE.Mesh(AeroCraft.buildWheelPantGeometry(radius*.32,radius*.20),accent);
+      nPant.position.set(0,-profile.gearHeight+.26,-length*.56);gear.add(nPant);
+    }else{
+      const tail=new THREE.Shape();tail.moveTo(0,0);tail.lineTo(length*.43,0);tail.lineTo(length*.32,radius*2.2);tail.lineTo(length*.18,radius*2.2);tail.closePath();
+      const fin=new THREE.Mesh(new THREE.ExtrudeGeometry(tail,{depth:.14,bevelEnabled:false}),accent);
+      fin.rotation.y=-Math.PI/2;fin.position.set(0,radius*.34,length*.56);group.add(fin);
+    }
     for(let i=0;i<count;i++){
-      const x=count===1?0:(i===0?-1:1)*span*(profile.jet?.23:.36);
-      const z=profile.jet?length*.53:count===1?-length*.98:-length*.33;
-      if(count===2){
-        const engine=new THREE.Mesh(new THREE.CylinderGeometry(radius*.48,radius*.60,length*.40,14),accent);
-        engine.rotation.x=Math.PI/2;engine.position.set(x,profile.jet?.28:wingHeight,z+length*.12);group.add(engine);
+      const x=count===1?0:(i===0?-1:1)*span*(profile.jet?.21:.34);
+      const y=profile.jet?.34:count===1?-.02:wingHeight-.04;
+      const z=profile.jet?length*.48:count===1?-length*.96:-length*.36;
+      if(profile.jet&&typeof AeroCraft!=='undefined'){
+        const nac=AeroCraft.buildTurbofanNacelle(THREE,radius*.52,.78,{surface:accent,metal:chrome,dark:trimDark},{chevron:false});
+        nac.group.scale.setScalar(.85);nac.group.position.set(x,y,z);group.add(nac.group);
+      }else if(count===2){
+        const nacBody=new THREE.Mesh(new THREE.CapsuleGeometry(radius*.38,length*.24,6,14),accent);
+        nacBody.rotation.x=Math.PI/2;nacBody.position.set(x,wingHeight,z+length*.14);group.add(nacBody);
       }
       if(!profile.jet){
-        const blade=box(group,windowMat,span*.43,.095,.11,x,count===1?0:wingHeight,z);
-        blades.push(blade);
+        const propGroup=new THREE.Group();propGroup.position.set(x,y,z);
+        const cone=new THREE.Mesh(new THREE.ConeGeometry(radius*.24,radius*.52,18),chrome);
+        cone.rotation.x=-Math.PI/2;propGroup.add(cone);
+        const bladeCount=count===1?2:3;
+        const bRadius=span*(count===1?.24:.19);
+        const bladeGeo=typeof AeroCraft!=='undefined'
+          ?AeroCraft.buildTwistedBlade(bRadius,radius*.17,radius*.075,.38)
+          :new THREE.BoxGeometry(bRadius,.09,.09);
+        for(let b=0;b<bladeCount;b++){
+          const blade=new THREE.Mesh(bladeGeo,trimDark);
+          blade.rotation.z=(b/bladeCount)*Math.PI*2;
+          blade.rotation.y=Math.PI/2;
+          propGroup.add(blade);
+        }
+        group.add(propGroup);blades.push(propGroup);
       }
     }
     group.userData={gear,blades,surfaces,navLights};
@@ -1789,11 +1894,12 @@ function initialize(){
     const warmth=clamp(1-Math.min(Math.abs(hour-6),Math.abs(hour-18))/1.45,0,1);
     const rtInput=byId('rtLighting');
     const rtOn=rtInput?rtInput.checked:true;
-    sunlight.intensity=.07+day*(rtOn?2.82:2.45)*strength;
-    sunlight.color.set(storm?'#d2e4fa':'#fff3df').lerp(new THREE.Color('#ffad71'),warmth*(storm?0.3:1));
-    ambient.intensity=.22+day*(rtOn?1.52:1.25)*(storm?.62:weather==='fog'?.88:1);
-    ambient.color.set(storm?'#9eb8d6':'#e6f4ff');
-    ambient.groundColor.set(storm?'#4b5866':'#8d9886');
+    const moonTint=clamp(1-day*4,0,1);
+    sunlight.intensity=(.22*moonTint+.07*(1-moonTint))+day*(rtOn?2.82:2.45)*strength;
+    sunlight.color.set(storm?'#d2e4fa':'#fff3df').lerp(new THREE.Color('#ffad71'),warmth*(storm?0.3:1)).lerp(new THREE.Color('#8bb4ea'),moonTint*.85);
+    ambient.intensity=(.28*(1-moonTint)+.19*moonTint)+day*(rtOn?1.52:1.25)*(storm?.62:weather==='fog'?.88:1);
+    ambient.color.set(storm?'#9eb8d6':'#e6f4ff').lerp(new THREE.Color('#304c78'),moonTint*.8);
+    ambient.groundColor.set(storm?'#4b5866':'#8d9886').lerp(new THREE.Color('#1a1c26'),moonTint*.85);
     renderer.toneMappingExposure=rtOn?(1.06+day*.08):(1.00+day*.04);
     sunDirection.set(Math.cos(angle)*760,elevation*820,-280);
     seaRayUniforms.rtEnabled.value=rtOn?1:0;
@@ -1801,7 +1907,8 @@ function initialize(){
     seaRayUniforms.sunDir.value.copy(sunDirection).normalize();
     atmosphericSky.setWeather(hour,day,weather,sunDirection,rtOn);
     atmosphericSky.updateEnvironment(sky,environment,sunDirection,day,warmth,weather,rtOn);
-    scene.background.set(storm?'#0b141e':'#132740').lerp(new THREE.Color(storm?'#22354a':weather==='fog'?'#d2dce2':wet?'#adc2d2':'#8fc7eb'),day);
+    if(elevation<-.05) sunDirection.set(-Math.cos(angle)*640,Math.max(240,-elevation*720),240);
+    scene.background.set(storm?'#070c14':'#050914').lerp(new THREE.Color(storm?'#22354a':weather==='fog'?'#d2dce2':wet?'#adc2d2':'#8fc7eb'),day);
     scene.fog.color.copy(scene.background);
     scene.fog.density=storm?.00035:weather==='fog'?.00064:wet?.000065:.000034;
     lampMaterial.color.set(day>.07?0xc5d7e2:0xeffaff);
@@ -5257,6 +5364,37 @@ function initialize(){
       activeDay=setEnvironment();
       rtToggle.blur();
     });
+  }
+  const deckTimeBtn=byId('deckTimeBtn'),deckKeysBtn=byId('deckKeysBtn'),deckKeyDrawer=byId('desktopKeyDrawer');
+  const deckEl=byId('desktopControlDeck');
+  if(deckEl){
+    deckEl.addEventListener('click',e=>{
+      const btn=e.target.closest('button[data-code]');
+      if(btn){
+        dispatchEvent(new KeyboardEvent('keydown',{code:btn.dataset.code,bubbles:true}));
+        setTimeout(()=>dispatchEvent(new KeyboardEvent('keyup',{code:btn.dataset.code,bubbles:true})),90);
+        btn.blur();
+      }
+    });
+    if(deckTimeBtn){
+      const cycle=['13:00','17:45','21:30'],labels=['☀ 日間','🌅 黃昏','🌙 夜航'];
+      deckTimeBtn.addEventListener('click',()=>{
+        const cur=byId('time').value||'13:00';
+        const idx=(cycle.findIndex(t=>t.slice(0,2)===cur.slice(0,2))+1)%cycle.length;
+        byId('time').value=cycle[idx];
+        activeDay=setEnvironment();
+        deckTimeBtn.textContent=labels[idx];
+        deckTimeBtn.setAttribute('aria-pressed',String(idx===2));
+        deckTimeBtn.blur();
+      });
+    }
+    if(deckKeysBtn&&deckKeyDrawer){
+      deckKeysBtn.addEventListener('click',()=>{
+        deckKeyDrawer.hidden=!deckKeyDrawer.hidden;
+        deckKeysBtn.setAttribute('aria-pressed',String(!deckKeyDrawer.hidden));
+        deckKeysBtn.blur();
+      });
+    }
   }
   drawPlan();showLog();updateReplayButton();activeDay=setEnvironment();
   byId('time').addEventListener('change',()=>{activeDay=setEnvironment();});

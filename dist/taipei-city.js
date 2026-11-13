@@ -40,8 +40,72 @@ function createTaipeiCity(scene,ground,airports){
   const wall=new THREE.MeshStandardMaterial({color:0xffffff,map:facade,vertexColors:true,roughness:.83,
     emissiveMap:lights,emissive:0xffd6a2,emissiveIntensity:0});
   const roof=new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.88});
-  const asphalt=new THREE.MeshStandardMaterial({color:0x55595b,roughness:.95,side:THREE.DoubleSide});
-  const stripe=new THREE.MeshStandardMaterial({color:0xddd8b5,roughness:.9,side:THREE.DoubleSide});
+  // Procedural PBR Multi-Lane Asphalt, Curb, Roughness & Illuminated Night Streetlamp Texture
+  function makeRoadTextures(){
+    const dayC=document.createElement('canvas');dayC.width=512;dayC.height=512;
+    const d=dayC.getContext('2d');
+    d.fillStyle='#8d9092';d.fillRect(0,0,512,512); // outer concrete curb & shoulder
+    d.fillStyle='#5c6064';d.fillRect(16,0,480,512); // curb bevel shadow
+    d.fillStyle='#31353a';d.fillRect(24,0,464,512); // main asphalt carriageways
+    for(let i=0;i<7200;i++){
+      const px=24+((i*173)%464),py=(i*311)%512;
+      d.fillStyle=i%3===0?'#3b4046':i%2===0?'#272a2e':'#43474d';
+      d.fillRect(px,py,2,2);
+    }
+    // Longitudinal rubber tire wear channels inside 4 lanes
+    for(const lx of [102,190,322,410]){
+      const wg=d.createLinearGradient(lx-32,0,lx+32,0);
+      wg.addColorStop(0,'rgba(22,25,28,0)');
+      wg.addColorStop(.32,'rgba(18,20,23,0.42)');
+      wg.addColorStop(.5,'rgba(26,29,33,0.12)');
+      wg.addColorStop(.68,'rgba(18,20,23,0.42)');
+      wg.addColorStop(1,'rgba(22,25,28,0)');
+      d.fillStyle=wg;d.fillRect(lx-32,0,64,512);
+    }
+    // Shoulder solid white fog lines
+    d.fillStyle='#e8e6d8';d.fillRect(34,0,6,512);d.fillRect(472,0,6,512);
+    // Double yellow Taiwan center divider
+    d.fillStyle='#e8b838';d.fillRect(249,0,5,512);d.fillRect(258,0,5,512);
+    // Crisp dashed white lane dividers
+    d.fillStyle='#ecece4';
+    for(let y=16;y<512;y+=128){d.fillRect(142,y,5,68);d.fillRect(365,y,5,68);}
+
+    const nightC=document.createElement('canvas');nightC.width=512;nightC.height=512;
+    const n=nightC.getContext('2d');
+    n.fillStyle='#000';n.fillRect(0,0,512,512);
+    // Warm sodium & LED streetlamp pools along both shoulders
+    for(const sy of [128,384]){
+      for(const sx of [52,460]){
+        const g=n.createRadialGradient(sx,sy,4,sx,sy,155);
+        g.addColorStop(0,'rgba(255,222,168,0.88)');
+        g.addColorStop(0.28,'rgba(255,180,94,0.46)');
+        g.addColorStop(0.68,'rgba(230,132,58,0.14)');
+        g.addColorStop(1,'rgba(0,0,0,0)');
+        n.fillStyle=g;n.fillRect(0,sy-160,512,320);
+      }
+    }
+    // Nighttime illuminated center reflectors & directional headlight/taillight streaks
+    n.fillStyle='rgba(255,208,90,0.42)';n.fillRect(250,0,12,512);
+    for(let y=28;y<512;y+=128){
+      n.fillStyle='rgba(255,244,210,0.85)';n.fillRect(92,y,5,9);n.fillRect(114,y,5,9);
+      n.fillStyle='rgba(255,56,42,0.85)';n.fillRect(390,y+44,5,8);n.fillRect(412,y+44,5,8);
+      n.fillStyle='rgba(255,244,210,0.65)';n.fillRect(178,y+64,4,8);n.fillRect(198,y+64,4,8);
+      n.fillStyle='rgba(255,56,42,0.70)';n.fillRect(308,y+8,4,8);n.fillRect(328,y+8,4,8);
+    }
+
+    const roughC=document.createElement('canvas');roughC.width=256;roughC.height=256;
+    const rc=roughC.getContext('2d');rc.fillStyle='#cfcfcf';rc.fillRect(0,0,256,256);
+    for(const lx of [51,95,161,205]){rc.fillStyle='#727272';rc.fillRect(lx-10,0,20,256);}
+
+    const map=new THREE.CanvasTexture(dayC);map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.RepeatWrapping;map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=8;
+    const eMap=new THREE.CanvasTexture(nightC);eMap.wrapS=THREE.ClampToEdgeWrapping;eMap.wrapT=THREE.RepeatWrapping;eMap.colorSpace=THREE.SRGBColorSpace;eMap.anisotropy=4;
+    const rMap=new THREE.CanvasTexture(roughC);rMap.wrapS=THREE.ClampToEdgeWrapping;rMap.wrapT=THREE.RepeatWrapping;
+    return {map,eMap,rMap};
+  }
+  const roadTex=makeRoadTextures();
+  const asphalt=new THREE.MeshStandardMaterial({color:0xffffff,map:roadTex.map,roughnessMap:roadTex.rMap,roughness:.86,emissive:0xffd89c,emissiveMap:roadTex.eMap,emissiveIntensity:0,side:THREE.DoubleSide});
+  const concreteCurb=new THREE.MeshStandardMaterial({color:0xb9bec2,roughness:.85,vertexColors:true});
+  const stripe=new THREE.MeshStandardMaterial({color:0xf3efd9,roughness:.82,emissive:0xffebb5,emissiveIntensity:0,side:THREE.DoubleSide});
   const water=new THREE.MeshStandardMaterial({color:0x486f76,roughness:.3,metalness:.2,side:THREE.DoubleSide});
   for(const mat of [asphalt,stripe,water]){mat.polygonOffset=true;mat.polygonOffsetFactor=-3;mat.polygonOffsetUnits=-3;}
   const palette=['#9b7f6d','#b7ab8e','#8b9f9c','#8896a3','#ad9585','#c8c2b2','#96a08a','#929599'].map(c=>new THREE.Color(c));
@@ -379,7 +443,7 @@ function createTaipeiCity(scene,ground,airports){
   function* build(key,data){
     const group=new THREE.Group();group.name='Taipei tile '+key;
     group.userData.masks=[];
-    const walls=buffers(),glazed=buffers(),roofs=buffers(),roads=buffers(),lines=buffers(),waters=buffers();
+    const walls=buffers(),glazed=buffers(),roofs=buffers(),roads=buffers(),curbs=buffers(),lines=buffers(),waters=buffers();
     let built=0;
     for(const [x,z,h,tone,kind,coords] of data.b){
       if(skipBuilding(x,z))continue;
@@ -422,26 +486,64 @@ function createTaipeiCity(scene,ground,airports){
       const y=Math.max(.1,Math.min(...points.map(p=>ground(...p))))+.16;
       polygon(waters,points,y,white);yield;
     }
+    const bridgeColor=new THREE.Color(0xb8bec2),pierColor=new THREE.Color(0x959ba0);
     for(let r=0;r<data.r.length;r++){
       const [width,bridge,coords]=data.r[r];
+      let cumDist=0;
       for(let i=2;i<coords.length;i+=2){
         const ax=coords[i-2],az=coords[i-1],bx=coords[i],bz=coords[i+1],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);
         if(length<.1)continue;
         mask(group,Math.min(ax,bx)-width/2,Math.min(az,bz)-width/2,Math.max(ax,bx)+width/2,Math.max(az,bz)+width/2);
-        const sections=Math.max(1,Math.ceil(length/35));
+        const sections=Math.max(1,Math.ceil(length/32));
         const nx=-dz/length,nz=dx/length;
         for(let part=0;part<sections;part++){
           const t=part/sections,u=(part+1)/sections;
           const x=ax+dx*t,z=az+dz*t,x2=ax+dx*u,z2=az+dz*u;
+          const segLen=length/sections,v0=cumDist/26,v1=(cumDist+segLen)/26;
+          cumDist+=segLen;
           // Keep runway and taxiway surfaces owned by the airport layer.
           if(airports.some(a=>Math.hypot(x-a.x,z-a.z)<a.length/2+100&&Math.abs(runwayCoordinates(x,z,a).cross)<250))continue;
-          function strip(target,half,lift){
-            const p=[[x+nx*half,z+nz*half],[x-nx*half,z-nz*half],[x2-nx*half,z2-nz*half],[x2+nx*half,z2+nz*half]];
-            const v=p.map(([px,pz])=>[px,ground(px,pz)+.18+lift+(bridge?8:0),pz]);
-            tri(target,v[0],v[1],v[2],white,[0,1,0]);tri(target,v[0],v[2],v[3],white,[0,1,0]);
+          const liftBridge=bridge?8:0,half=width/2;
+          const lx1=x+nx*half,lz1=z+nz*half,rx1=x-nx*half,rz1=z-nz*half;
+          const lx2=x2+nx*half,lz2=z2+nz*half,rx2=x2-nx*half,rz2=z2-nz*half;
+          const yL1=ground(lx1,lz1)+.18+liftBridge,yR1=ground(rx1,rz1)+.18+liftBridge;
+          const yR2=ground(rx2,rz2)+.18+liftBridge,yL2=ground(lx2,lz2)+.18+liftBridge;
+          triFlat(roads,lx1,yL1,lz1,rx1,yR1,rz1,rx2,yR2,rz2,1,1,1,0,1,0,0,v0,1,v0,1,v1);
+          triFlat(roads,lx1,yL1,lz1,rx2,yR2,rz2,lx2,yL2,lz2,1,1,1,0,1,0,0,v0,1,v1,0,v1);
+          if(bridge||width>=11){
+            const ch=bridge?1.05:.24,cw=bridge?.55:.42;
+            for(const s of [-1,1]){
+              const outOff=half+cw*.5,inOff=half-cw*.1;
+              const pA=[x+nx*s*outOff,z+nz*s*outOff],pB=[x2+nx*s*outOff,z2+nz*s*outOff];
+              const gA=ground(pA[0],pA[1])+liftBridge+.18,gB=ground(pB[0],pB[1])+liftBridge+.18;
+              const iA=[x+nx*s*inOff,z+nz*s*inOff],iB=[x2+nx*s*inOff,z2+nz*s*inOff];
+              triFlat(curbs,pA[0],gA+ch,pA[1],iA[0],gA+ch,iA[1],iB[0],gB+ch,iB[1],bridgeColor.r,bridgeColor.g,bridgeColor.b,0,1,0,0,0,1,0,1,1);
+              triFlat(curbs,pA[0],gA+ch,pA[1],iB[0],gB+ch,iB[1],pB[0],gB+ch,pB[1],bridgeColor.r,bridgeColor.g,bridgeColor.b,0,1,0,0,0,1,1,0,1);
+              triFlat(curbs,pA[0],gA-(bridge?.7:.15),pA[1],pB[0],gB-(bridge?.7:.15),pB[1],pB[0],gB+ch,pB[1],pierColor.r,pierColor.g,pierColor.b,nx*s,0,nz*s,0,0,1,0,1,1);
+              triFlat(curbs,pA[0],gA-(bridge?.7:.15),pA[1],pB[0],gB+ch,pB[1],pA[0],gA+ch,pA[1],pierColor.r,pierColor.g,pierColor.b,nx*s,0,nz*s,0,0,1,1,0,1);
+            }
+            if(bridge&&part===0&&length>14){
+              const mx=(x+x2)*.5,mz=(z+z2)*.5,gm=ground(mx,mz),pw=Math.min(2.4,width*.14);
+              for(const [sx,sz] of [[-pw,-pw],[pw,-pw],[pw,pw],[-pw,pw]]){
+                void sx;void sz;
+              }
+              triFlat(curbs,mx-pw,gm-.5,mz-pw,mx+pw,gm-.5,mz-pw,mx+pw,gm+liftBridge+.1,mz-pw,pierColor.r,pierColor.g,pierColor.b,0,0,-1,0,0,1,0,1,1);
+              triFlat(curbs,mx-pw,gm-.5,mz-pw,mx+pw,gm+liftBridge+.1,mz-pw,mx-pw,gm+liftBridge+.1,mz-pw,pierColor.r,pierColor.g,pierColor.b,0,0,-1,0,0,1,1,0,1);
+              triFlat(curbs,mx+pw,gm-.5,mz-pw,mx+pw,gm-.5,mz+pw,mx+pw,gm+liftBridge+.1,mz+pw,pierColor.r,pierColor.g,pierColor.b,1,0,0,0,0,1,0,1,1);
+              triFlat(curbs,mx+pw,gm-.5,mz-pw,mx+pw,gm+liftBridge+.1,mz+pw,mx+pw,gm+liftBridge+.1,mz-pw,pierColor.r,pierColor.g,pierColor.b,1,0,0,0,0,1,1,0,1);
+            }
           }
-          strip(roads,width/2,0);
-          if(width>=13)strip(lines,.1,.025);
+          // Pedestrian crosswalk zebra bars near major intersections
+          if(i===2&&part===0&&!bridge&&width>=12&&length>=14){
+            const cxA=ax+dx/length*1.5,czA=az+dz/length*1.5,cxB=ax+dx/length*4.5,czB=az+dz/length*4.5;
+            for(let bar=-width*.4;bar<=width*.4;bar+=1.8){
+              const a1=[cxA+nx*bar,czA+nz*bar],a2=[cxA+nx*(bar+.85),czA+nz*(bar+.85)];
+              const b1=[cxB+nx*bar,czB+nz*bar],b2=[cxB+nx*(bar+.85),czB+nz*(bar+.85)];
+              const yZ=ground(cxA,czA)+.22;
+              tri(lines,[a1[0],yZ,a1[1]],[a2[0],yZ,a2[1]],[b2[0],yZ,b2[1]],white,[0,1,0]);
+              tri(lines,[a1[0],yZ,a1[1]],[b2[0],yZ,b2[1]],[b1[0],yZ,b1[1]],white,[0,1,0]);
+            }
+          }
         }
       }
       if(r%12===0)yield;
@@ -449,7 +551,7 @@ function createTaipeiCity(scene,ground,airports){
     // Winding may differ between OSM ways; use both sides for facades only.
     wall.side=THREE.DoubleSide;
     mesh(group,walls,wall,'OSM footprint facades');mesh(group,glazed,officeGlass,'Taipei glass curtain walls');mesh(group,roofs,roof,'Taipei rooftops');
-    mesh(group,roads,asphalt,'Taipei streets and bridges');mesh(group,lines,stripe,'Road markings');mesh(group,waters,water,'Taipei water');
+    mesh(group,roads,asphalt,'Taipei streets and bridges');mesh(group,curbs,concreteCurb,'Taipei curbs and viaduct piers');mesh(group,lines,stripe,'Road markings');mesh(group,waters,water,'Taipei water');
     Object.assign(group.userData,{buildings:built,roads:data.r.length,routes:data.r.filter(r=>r[0]>=11&&r[2].length>=6)});root.add(group);loaded.set(key,group);
     stats.buildings+=built;stats.roads+=data.r.length;stats.tiles=loaded.size;
     stats.maskRevision++;
@@ -518,11 +620,13 @@ function createTaipeiCity(scene,ground,airports){
     const at=latLon(x,z),near=at.lat>24.90&&at.lat<25.22&&at.lon>121.35&&at.lon<121.74;
     root.visible=near;if(!near)return;
     const mobile=touchControls.mode.value==='mobile',range=mobile?4800:quality==='ultra'?11000:quality==='high'?9000:6500;
-    wall.emissiveIntensity=(1-day)*.36;glass.emissiveIntensity=(1-day)*.55;
-    officeGlass.emissiveIntensity=Math.pow(1-day,1.4)*.95;officeGlass.envMapIntensity=.25+day*1.15;
-    beaconMat.emissiveIntensity=(1-day)*(Math.sin(clock*4.5)>0?1.8:.1);
-    ferrisGreen.emissiveIntensity=.4+(1-day)*.9;
-    asphalt.roughness=wet?.32:.95;asphalt.metalness=wet?.15:0;
+    wall.emissiveIntensity=(1-day)*.68;glass.emissiveIntensity=(1-day)*.95;
+    officeGlass.emissiveIntensity=Math.pow(1-day,1.25)*1.28;officeGlass.envMapIntensity=.25+day*1.15;
+    beaconMat.emissiveIntensity=(1-day)*(Math.sin(clock*4.5)>0?2.1:.15);
+    ferrisGreen.emissiveIntensity=.45+(1-day)*1.25;
+    asphalt.roughness=wet?.32:.86;asphalt.metalness=wet?.18:.02;
+    asphalt.emissiveIntensity=Math.pow(1-day,1.25)*(wet?1.15:.92);
+    stripe.emissiveIntensity=Math.pow(1-day,1.3)*.28;
     traffic(dt,x,z,paused,mobile);
     if(!index&&!indexRequest&&clock>=nextScan){
       indexRequest=true;fetch('taipei-city/index.json?v=27').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})

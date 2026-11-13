@@ -160,6 +160,46 @@ function createTaiwanCity(scene,ground,airports){
   const whiteFrame=new THREE.MeshStandardMaterial({color:0xf2f5f7,roughness:.45});
   const beaconMat=new THREE.MeshStandardMaterial({color:0xff2820,emissive:0xff2218,emissiveIntensity:0,roughness:.25});
 
+  // Procedural Taiwan PBR multi-lane asphalt + highway markings + night streetlamp & traffic glow
+  const twRoadDay=texture(c=>{
+    c.fillStyle='#8d9092';c.fillRect(0,0,256,256);
+    c.fillStyle='#31363b';c.fillRect(10,0,236,256);
+    for(let i=0;i<2400;i++){
+      c.fillStyle=i%2?'#292d31':'#3a3f45';
+      c.fillRect(10+((i*73)%236),(i*139)%256,2,2);
+    }
+    for(const lx of [52,96,160,204]){
+      const wg=c.createLinearGradient(lx-14,0,lx+14,0);
+      wg.addColorStop(0,'rgba(20,22,25,0)');wg.addColorStop(.5,'rgba(18,20,23,0.42)');wg.addColorStop(1,'rgba(20,22,25,0)');
+      c.fillStyle=wg;c.fillRect(lx-14,0,28,256);
+    }
+    c.fillStyle='#eae8d9';c.fillRect(16,0,3,256);c.fillRect(237,0,3,256);
+    c.fillStyle='#ebba3b';c.fillRect(124,0,3,256);c.fillRect(129,0,3,256);
+    c.fillStyle='#f0f0e8';
+    for(let y=8;y<256;y+=64){c.fillRect(72,y,3,34);c.fillRect(181,y,3,34);}
+  },true);
+  const twRoadNight=texture(c=>{
+    c.fillStyle='#000';c.fillRect(0,0,256,256);
+    for(const sy of [64,192]){
+      for(const sx of [26,230]){
+        const g=c.createRadialGradient(sx,sy,2,sx,sy,78);
+        g.addColorStop(0,'rgba(255,220,165,0.92)');
+        g.addColorStop(0.32,'rgba(255,175,90,0.48)');
+        g.addColorStop(0.75,'rgba(215,120,48,0.14)');
+        g.addColorStop(1,'rgba(0,0,0,0)');
+        c.fillStyle=g;c.fillRect(0,sy-80,256,160);
+      }
+    }
+    c.fillStyle='rgba(255,204,88,0.38)';c.fillRect(124,0,8,256);
+    for(let y=16;y<256;y+=64){
+      c.fillStyle='rgba(255,244,210,0.88)';c.fillRect(46,y,3,5);c.fillRect(58,y,3,5);
+      c.fillStyle='rgba(255,58,42,0.88)';c.fillRect(194,y+24,3,5);c.fillRect(206,y+24,3,5);
+    }
+  },true);
+  twRoadDay.wrapS=twRoadNight.wrapS=THREE.ClampToEdgeWrapping??THREE.RepeatWrapping;
+  const roadMat=new THREE.MeshStandardMaterial({color:0xffffff,map:twRoadDay,roughness:.84,emissive:0xffd596,emissiveMap:twRoadNight,emissiveIntensity:0,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});
+  const roadCurbMat=new THREE.MeshStandardMaterial({color:0xb8bec2,roughness:.85,vertexColors:true});
+
   const palette=['#c6bfae','#b9bec2','#a89b8d','#c9c3b6','#98a7ad','#c4b7a4','#b0b6ba','#d2cab9'].map(h=>new THREE.Color(h));
   const roofPalette=['#5f7167','#6c7375','#726b62','#5d6d71','#7c766d','#636f65','#6e7178','#767067'].map(h=>new THREE.Color(h));
 
@@ -626,20 +666,89 @@ function createTaiwanCity(scene,ground,airports){
     stats.activeInfill=nRes+nOff+nTech;
   }
 
+  let roadsMeta=null,roadIndexReq=false;
+  const loadedRoadChunks=new Map(),pendingRoadChunks=new Set();
+  function* buildRoadChunk(ck,data){
+    const group=new THREE.Group();group.name='Taiwan highway chunk '+ck;
+    const roads=buffers(),curbs=buffers(),bridgeColor={r:.72,g:.74,b:.76},pierColor={r:.58,g:.61,b:.63};
+    const arr=data.r||[];
+    for(let r=0;r<arr.length;r++){
+      const [width,bridge,coords]=arr[r];
+      let cumDist=0;
+      const half=width*.5,liftBridge=bridge?8:0;
+      for(let i=2;i<coords.length;i+=2){
+        const ax=coords[i-2],az=coords[i-1],bx=coords[i],bz=coords[i+1],dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz);
+        if(length<.2)continue;
+        const nx=-dz/length,nz=dx/length;
+        const sections=Math.max(1,Math.ceil(length/55));
+        for(let part=0;part<sections;part++){
+          const t=part/sections,u=(part+1)/sections;
+          const x=ax+dx*t,z=az+dz*t,x2=ax+dx*u,z2=az+dz*u;
+          const segLen=length/sections,v0=cumDist/32,v1=(cumDist+segLen)/32;
+          cumDist+=segLen;
+          if(airports.some(a=>Math.hypot(x-a.x,z-a.z)<a.length/2+110&&Math.abs(runwayCoordinates(x,z,a).cross)<260))continue;
+          const g1=ground(x,z),g2=ground(x2,z2);
+          if(!bridge&&g1<.2&&g2<.2)continue;
+          const y1=Math.max(.35,g1)+.24+liftBridge,y2=Math.max(.35,g2)+.24+liftBridge;
+          const lx1=x+nx*half,lz1=z+nz*half,rx1=x-nx*half,rz1=z-nz*half;
+          const lx2=x2+nx*half,lz2=z2+nz*half,rx2=x2-nx*half,rz2=z2-nz*half;
+          triFlat(roads,lx1,y1,lz1,rx1,y1,rz1,rx2,y2,rz2,1,1,1,0,1,0,0,v0,1,v0,1,v1);
+          triFlat(roads,lx1,y1,lz1,rx2,y2,rz2,lx2,y2,lz2,1,1,1,0,1,0,0,v0,1,v1,0,v1);
+          if(bridge){
+            for(const s of [-1,1]){
+              const outOff=half+.5,inOff=half-.1;
+              triFlat(curbs,x+nx*s*outOff,y1+1.0,z+nz*s*outOff,x+nx*s*inOff,y1+1.0,z+nz*s*inOff,x2+nx*s*inOff,y2+1.0,z2+nz*s*inOff,bridgeColor.r,bridgeColor.g,bridgeColor.b,0,1,0,0,0,1,0,1,1);
+              triFlat(curbs,x+nx*s*outOff,y1+1.0,z+nz*s*outOff,x2+nx*s*inOff,y2+1.0,z2+nz*s*inOff,x2+nx*s*outOff,y2+1.0,z2+nz*s*outOff,bridgeColor.r,bridgeColor.g,bridgeColor.b,0,1,0,0,0,1,1,0,1);
+            }
+            if(part===0&&length>20){
+              const mx=(x+x2)*.5,mz=(z+z2)*.5,gm=ground(mx,mz),pw=1.6;
+              triFlat(curbs,mx-pw,gm-.5,mz-pw,mx+pw,gm-.5,mz-pw,mx+pw,y1,mz-pw,pierColor.r,pierColor.g,pierColor.b,0,0,-1,0,0,1,0,1,1);
+              triFlat(curbs,mx-pw,gm-.5,mz-pw,mx+pw,y1,mz-pw,mx-pw,y1,mz-pw,pierColor.r,pierColor.g,pierColor.b,0,0,-1,0,0,1,1,0,1);
+            }
+          }
+        }
+      }
+      if(r%90===0)yield;
+    }
+    addLayerMesh(group,roads,roadMat,'Taiwan highways and streets');
+    addLayerMesh(group,curbs,roadCurbMat,'Taiwan highway bridge parapets');
+    root.add(group);loadedRoadChunks.set(ck,group);
+  }
+  function ensureRoadChunks(x,z,range){
+    if(!roadsMeta?.chunks)return;
+    const maxD=Math.max(14000,range*1.85);
+    for(const [ck,cx,cz] of roadsMeta.chunks){
+      const d=Math.hypot(cx-x,cz-z);
+      const existing=loadedRoadChunks.get(ck);
+      if(existing)existing.visible=d<maxD+8000;
+      if(d<maxD&&!existing&&!pendingRoadChunks.has(ck)&&pendingRoadChunks.size<3){
+        pendingRoadChunks.add(ck);
+        fetch('taiwan-city/roads/'+ck+'.json?v=62').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(data=>jobs.push({key:'r_'+ck,iterator:buildRoadChunk(ck,data),isRoad:ck}))
+          .catch(()=>{pendingRoadChunks.delete(ck);});
+      }else if(existing&&d>maxD+18000){
+        existing.traverse(o=>o.geometry?.dispose());
+        root.remove(existing);loadedRoadChunks.delete(ck);
+      }
+    }
+  }
+
   function update(dt,x,z,quality,activeDay,wet){
     clock+=Math.min(dt,.1);day=activeDay;
     const at=latLon(x,z),near=at.lat>21.6&&at.lat<26.6&&at.lon>117.9&&at.lon<122.4;
     root.visible=near;if(!near)return;
     const mobile=touchControls.mode.value==='mobile';
     const range=mobile?5000:quality==='ultra'?12000:quality==='high'?9600:7400;
-    const nightWall=(1-day)*.42,nightOff=Math.pow(1-day,1.35)*.95,envInt=.28+day*1.15;
+    const nightWall=(1-day)*.78,nightOff=Math.pow(1-day,1.25)*1.28,envInt=.28+day*1.15;
     wall.emissiveIntensity=nightWall;
     infillWallMat.emissiveIntensity=nightWall;
-    darkGlass.emissiveIntensity=(1-day)*.62;
+    darkGlass.emissiveIntensity=(1-day)*.92;
     officeGlass.emissiveIntensity=nightOff;
     infillOfficeMat.emissiveIntensity=nightOff;
     officeGlass.envMapIntensity=infillOfficeMat.envMapIntensity=envInt;
-    beaconMat.emissiveIntensity=(Math.sin(clock*4.5)>0?1.8:.15)*(0.45+(1-day)*1.2);
+    roadMat.roughness=wet?.28:.84;roadMat.metalness=wet?.22:.02;
+    roadMat.emissiveIntensity=Math.pow(1-day,1.25)*(wet?1.25:1.05);
+    beaconMat.emissiveIntensity=(Math.sin(clock*4.5)>0?2.1:.15)*(0.45+(1-day)*1.4);
     for(let i=0;i<landmarkGroups.length;i++){
       const g=landmarkGroups[i];
       const d=Math.hypot(g.position.x-x,g.position.z-z);
@@ -660,6 +769,12 @@ function createTaiwanCity(scene,ground,airports){
         })
         .catch(()=>{indexRequest=false;nextScan=clock+12;});
     }
+    if(!roadIndexReq){
+      roadIndexReq=true;
+      fetch('taiwan-city/roads/index.json?v=62').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+        .then(data=>{roadsMeta=data;stats.roads=data.roads||0;ensureRoadChunks(x,z,range);})
+        .catch(()=>{roadIndexReq=false;});
+    }
     if(!settlementsMeta&&!settlementRequest){
       settlementRequest=true;
       fetch('taiwan-city/settlements.json?v=61').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
@@ -675,6 +790,7 @@ function createTaiwanCity(scene,ground,airports){
         if(mesh&&distance>range+7500)disposeTile(tile[0]);
       }
       ensureSettlementChunks(x,z,range);
+      ensureRoadChunks(x,z,range);
     }
     if(settlementsMeta&&(Math.hypot(x-lastInfillX,z-lastInfillZ)>280||stats.maskRevision!==lastInfillRev||chunkRevision!==lastChunkRev||range!==lastInfillRange)){
       lastInfillX=x;lastInfillZ=z;lastInfillRev=stats.maskRevision;lastChunkRev=chunkRevision;lastInfillRange=range;
@@ -684,9 +800,17 @@ function createTaiwanCity(scene,ground,airports){
     while(jobs.length&&performance.now()<end){
       const job=jobs[0];
       try{
-        if(job.iterator.next().done){jobs.shift();pending.delete(job.key);stats.loading=pending.size;nextScan=0;}
+        if(job.iterator.next().done){
+          jobs.shift();
+          if(job.isRoad)pendingRoadChunks.delete(job.isRoad);
+          else{pending.delete(job.key);stats.loading=pending.size;}
+          nextScan=0;
+        }
       }catch(error){
-        jobs.shift();pending.delete(job.key);failed.set(job.key,clock+15);console.warn('Taiwan tile:',error);
+        jobs.shift();
+        if(job.isRoad)pendingRoadChunks.delete(job.isRoad);
+        else{pending.delete(job.key);failed.set(job.key,clock+15);}
+        console.warn('Taiwan tile:',error);
       }
     }
   }

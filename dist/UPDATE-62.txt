@@ -1,0 +1,16 @@
+SKYBOUND GLOBAL v0.62 更新說明 (2026-11-13)
+
+1. 空氣力學機體重製 (AeroCraft Parametric NACA Overhaul)
+- 新增 `dist/aero-aircraft.js` 參數化氣動幾何引擎：實作彎度 NACA 四位數翼剖面放樣 (`buildWingLoft` / `buildVerticalFoilLoft`)、多截面橢圓收腰機身放樣 (`buildFuselageLoft`)、翼根整流包 (`buildCanopyGeometry` / `buildCanoeGeometry`)、漸縮螺旋槳/旋翼扭轉槳葉 (`buildTwistedBlade`)、帶流線型塔架與齒緣噴口渦扇短艙 (`buildTurbofanNacelle` / `buildAeroPylonGeometry`)、融合式翼尖小翼 (`buildBlendedWinglet`)、水滴整流輪罩與 AIM 飛彈。
+- 全面翻新 `dist/flight.js` 輕型機與噴射機、`dist/benchmark-models.js` 商用客貨機/戰機、`dist/fighter-refinement.js` F-16 收斂擴散尾噴口與掛架，以及 `dist/helicopter.js` 黑鷹/阿帕契/H6 直升機，淘汰方塊與平板幾何，保留 100% 舵面、起落架、燈光與旋轉元件互動。
+
+2. 真實道路系統與全台高速公路網 (PBR Asphalt + Curbs + Viaducts + All-Taiwan OSM Roads)
+- 新增 `tools/build-taiwan-roads.py` 自真實 OSM 資料萃取 33,461 條全台灣主要道路與高架橋樑並切分為 90 個串流分塊 (`dist/taiwan-city/roads/`)。
+- 升級 `dist/taipei-city.js`、`dist/taiwan-city.js` 與 `dist/airport-surroundings.js`：實作 512×512 瀝青骨料＋輪胎磨耗痕＋邊線/雙黃線/虛線車道標線 PBR 材質、道路切線 UV 對齊、人行道水泥路緣、高架橋防撞護欄與橋墩柱，以及路口行人斑馬線。
+
+3. 真實夜間城市夜景與光影 (Night Cityscape, Road Lamps & Atmospheric Skyglow)
+- 道路系統加入夜間鈉燈/LED 路燈光斑與車道頭尾燈動態光帶 (`emissiveMap`)。
+- `taipei-city.js`、`taiwan-city.js` 與 `airport-surroundings.js` 全面拉高夜間住宅、商辦、地標摩天樓窗燈與航廈玻璃幕牆夜光輝度；`flight.js` 地表著色器新增夜間都市道路燈網與月光海面反光通道；`atmospheric-sky.js` 新增都會區夜空暖琥珀光暈與星空/海面反射配色。
+
+4. 原創介面與操控全面打掉重設計 (Obsidian Aero-Deck UI + Vector-Arc HUD)
+- 新增 `dist/aero-ui-v62.css` 與改版 `dist/glass-hud.js`：打造原創「曜石飛航甲板」介面對話框、青銀／香檳金向量弧形透明 HUD (`makeGlassReadouts`)、底部快捷飛控列 (`#desktopControlDeck` 含一鍵日／暮／夜時段切換與鍵位抽屜)，以及重構十字萬向搖桿、節氣門棘齒油門與方向舵滑桿。

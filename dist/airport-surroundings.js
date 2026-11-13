@@ -16,14 +16,19 @@ function createAirportSurroundings(parent,airport,layout){
   function parkPadding(){return dense?44:30;}
   const stats={parkingSpaces:0,parkedVehicles:0,fencePanels:0,trees:0,lights:0,movingVehicles:0,facadeBays:0};
   const mat=(color,extra={})=>new THREE.MeshStandardMaterial({color,roughness:.83,...extra});
-  const road=mat('#434b50'),paving=mat('#a3a497'),curb=mat('#d2d0bf'),paint=mat('#e5dfc2');
+  const roadCanvas=document.createElement('canvas');roadCanvas.width=128;roadCanvas.height=128;
+  const rc=roadCanvas.getContext('2d');rc.fillStyle='#353b40';rc.fillRect(0,0,128,128);
+  for(let i=0;i<900;i++){rc.fillStyle=i%2?'#2c3135':'#40464c';rc.fillRect((i*47)%128,(i*83)%128,2,2);}
+  rc.fillStyle='rgba(25,28,31,0.38)';rc.fillRect(26,0,22,128);rc.fillRect(80,0,22,128);
+  const roadTex=new THREE.CanvasTexture(roadCanvas);roadTex.wrapS=roadTex.wrapT=THREE.RepeatWrapping;roadTex.repeat.set(2,14);roadTex.colorSpace=THREE.SRGBColorSpace;
+  const road=mat('#ffffff',{map:roadTex,roughness:.85}),paving=mat('#a3a497'),curb=mat('#d2d0bf'),paint=mat('#e5dfc2');
   const frame=mat('#737f82',{metalness:.3,roughness:.53}),white=mat('#e3e2d7'),rubber=mat('#252a2c');
   const glazing=mat('#3e6173',{metalness:.28,roughness:.32});
   const brick=mat('#9b725a'),red=mat('#aa4c3d'),grass=mat('#52674b');
   const leaves=mat('#41613e',{vertexColors:true}),trunk=mat('#77614b');
-  const lamp=mat('#f2dcab',{emissive:0xffe3a4,emissiveIntensity:.05});
+  const lamp=mat('#ffe6b0',{emissive:0xffd482,emissiveIntensity:.05});
   const darkMetal=mat('#36464b',{metalness:.55,roughness:.42});
-  const litGlass=mat('#456b79',{metalness:.48,roughness:.22,emissive:0xa2c6c7,emissiveIntensity:.02});
+  const litGlass=mat('#456b79',{metalness:.48,roughness:.22,emissive:0xffdba0,emissiveIntensity:.02});
   const drain=mat('#343c3c'),blue=mat('#396c8b'),yellow=mat('#d1ad52');
   const batches=new Map(),transform=new THREE.Object3D();
   function add(geometry,material,x,y,z,sx=1,sy=1,sz=1,angle=0){
@@ -247,9 +252,9 @@ function createAirportSurroundings(parent,airport,layout){
   function update(x,z,day,quality){
     const now=performance.now(),dt=Math.min(.1,(now-lastTime)/1000);lastTime=now;
     root.visible=Math.hypot(x-airport.x,z-airport.z)<(quality==='ultra'?9500:quality==='high'?6500:3800);
-    lamp.emissiveIntensity=day<.25?1.8:.05;
-    const night=THREE.MathUtils.clamp((.4-day)/.3,0,1);
-    litGlass.emissiveIntensity=.02+night*.75;glow.opacity=night;
+    lamp.emissiveIntensity=day<.35?2.6*(1-day):.05;
+    const night=THREE.MathUtils.clamp((.42-day)/.32,0,1);
+    litGlass.emissiveIntensity=.04+night*1.25;glow.opacity=night;
     road.roughness=byId('weather').value==='wet'?.38:.91;
     traffic.visible=root.visible&&Math.hypot(x-airport.x,z-airport.z)<2400;
     if(traffic.visible)for(const v of moving){

@@ -26,7 +26,7 @@ function refineFighter(model,profile){
       o.geometry.computeBoundingBox();
       m.map=skin;m.color.set(o.geometry.boundingBox.max.z<-half*.70?'#777f83':'#a3aaad');m.roughness=.55;m.metalness=.28;m.envMapIntensity=.9;m.needsUpdate=true;treated.add(m);
     }
-    if(m.isMeshPhysicalMaterial){m.color.set('#536b75');m.roughness=.13;m.metalness=.27;m.clearcoat=1;m.transparent=true;m.opacity=.62;m.depthWrite=false;}
+    if(m.isMeshPhysicalMaterial&&(m.transparent||m.opacity<.99)){m.color.set('#536b75');m.roughness=.13;m.metalness=.27;m.clearcoat=1;m.transparent=true;m.opacity=.62;m.depthWrite=false;}
   });
   const mat=(color,extra={})=>new THREE.MeshStandardMaterial({color,roughness:.67,...extra});
   const graphite=mat('#192228'),edge=mat('#353f42'),bezel=mat('#2b3437'),metal=mat('#929d9e',{metalness:.7,roughness:.3});
@@ -39,30 +39,40 @@ function refineFighter(model,profile){
   function part(parent,g,m,x,y,z){const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);parent.add(mesh);return mesh;}
   const box=(p,m,w,h,d,x,y,z)=>part(p,new THREE.BoxGeometry(w,h,d),m,x,y,z);
   if(f16){
-    // Distinct metallic nozzle feathers, sensor blisters and subdued original tail markings.
-    for(let i=0;i<24;i++){
-      const angle=i*Math.PI/12;
-      const petal=box(model,i%3?metal:edge,.115,.035,.52,Math.cos(angle)*.56,Math.sin(angle)*.56,half-.17);
+    // Tapered convergent-divergent metallic nozzle feather petals, sensor blisters & streamlined underwing missiles.
+    const petalGeo=new THREE.ConeGeometry(.072,.58,4);petalGeo.scale(1.25,.32,1);petalGeo.rotateX(Math.PI/2);
+    for(let i=0;i<20;i++){
+      const angle=i*Math.PI/10;
+      const petal=part(model,petalGeo,i%2?metal:edge,Math.cos(angle)*.53,Math.sin(angle)*.53,half-.12);
       petal.rotation.z=angle+Math.PI/2;
+      petal.rotation.order='ZXY';
+      petal.rotation.y=-Math.sin(angle)*.12;
     }
-    const ring=part(model,new THREE.TorusGeometry(.52,.027,8,48),metal,0,0,half+.07);
+    part(model,new THREE.TorusGeometry(.50,.028,10,48),metal,0,0,half+.08);
     for(const side of [-1,1]){
       const port=part(model,new THREE.SphereGeometry(1,14,10),paint,side*radius*.67,-.09,-half*.49);
       port.scale.set(.075,.10,.27);
-      const pylon=box(model,edge,.10,.09,.58,side*profile.geometry[2]*.96,profile.geometry[3]-.03,half*.14);
+      if(typeof AeroCraft!=='undefined'){
+        const pylonGeo=AeroCraft.buildAeroPylonGeometry(.34,.62,.42,.12,.14);
+        const pMesh=part(model,pylonGeo,edge,side*profile.geometry[2]*.56,profile.geometry[3]-.32,half*.04);
+        pMesh.rotation.x=0;
+        const msl=AeroCraft.buildAeroMissile(2.85,.078,paint,edge,graphite);
+        msl.position.set(side*profile.geometry[2]*.56,profile.geometry[3]-.42,half*.02);
+        model.add(msl);
+      }
     }
     const stencil=document.createElement('canvas');stencil.width=256;stencil.height=384;
     const s=stencil.getContext('2d');s.fillStyle='#424f55';s.font='bold 78px sans-serif';s.fillText('SB',25,115);s.font='52px monospace';s.fillText('16V',24,184);
     s.font='20px sans-serif';s.fillText('SKYBOUND',20,229);
     const map=new THREE.CanvasTexture(stencil);map.colorSpace=THREE.SRGBColorSpace;
     for(const sign of [-1,1]){
-      const label=part(model,new THREE.PlaneGeometry(.66,.98),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,side:THREE.DoubleSide}),sign>0?.015:-.185,radius*.61+half*.22,half*.72);
+      const label=part(model,new THREE.PlaneGeometry(.66,.98),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,side:THREE.DoubleSide}),sign*.12,radius*.61+half*.22,half*.70);
       label.rotation.y=sign*Math.PI/2;
     }
     const pilot=new THREE.Group();pilot.position.set(0,radius*.49,-half*.37);model.add(pilot);
-    box(pilot,seat,.34,.40,.22,0,-.03,0);
+    const torso=part(pilot,new THREE.CapsuleGeometry(.17,.22,6,12),seat,0,0,0);torso.scale.set(1.0,1.0,.68);
     const helmet=part(pilot,new THREE.SphereGeometry(.17,18,12),seat,0,.29,0);helmet.scale.y=1.1;
-    const visor=part(pilot,new THREE.SphereGeometry(.175,16,10,Math.PI*.55,Math.PI*.9,Math.PI*.2,Math.PI*.55),graphite,0,.29,-.015);
+    part(pilot,new THREE.SphereGeometry(.175,16,10,Math.PI*.55,Math.PI*.9,Math.PI*.2,Math.PI*.55),graphite,0,.29,-.015);
   }
   for(const child of [...cabin.children]){child.traverse(o=>o.geometry?.dispose());cabin.remove(child);}
   const eye={x:0,y:radius*.78+.16,z:-half*(profile.sideIntakes?.40:.37)};

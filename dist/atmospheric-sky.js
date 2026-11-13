@@ -65,16 +65,18 @@ function createAtmosphericSky(scene){
         sky+=vec3(1.,.90,.66)*daylight*(pow(glare,12.)*.26+smoothstep(.99982,.99997,glare)*8.5)+vec3(.55,.76,1.)*mie*daylight*.75;
         float night=(1.-smoothstep(.02,.40,daylight))*(1.-mist*.9);
         if(night>.01&&d.y>0.){
+          // Warm metropolitan light-pollution horizon skyglow over night cities
+          sky+=vec3(.30,.16,.065)*exp(-up*7.5)*night*(1.-mist*.65);
           vec2 grid=vec2(atan(d.x,-d.z)*103.,asin(d.y)*135.);
           vec2 cell=floor(grid);
           float random=hash(cell);
           vec2 offset=vec2(hash(cell+1.),hash(cell+19.))*.64+.18;
-          float star=(1.-smoothstep(.025,.12,length(fract(grid)-offset)))*smoothstep(.76,.99,random);
-          sky+=vec3(.76,.84,1.)*star*night*smoothstep(.02,.21,up)*(1.1+random);
+          float star=(1.-smoothstep(.025,.12,length(fract(grid)-offset)))*smoothstep(.70,.99,random);
+          sky+=vec3(.78,.86,1.)*star*night*smoothstep(.015,.20,up)*(1.25+random*1.2);
           float moonFacing=max(0.,dot(moon,d));
           float disc=smoothstep(.99992,.99995,moonFacing);
           float detail=noise3((d-moon)*340.+3.6);
-          sky+=vec3(.91,.94,1.)*night*(disc*(1.10+.83*detail)+pow(moonFacing,700.)*.09);
+          sky+=vec3(.93,.96,1.)*night*(disc*(1.25+.85*detail)+pow(moonFacing,520.)*.14);
         }
         float dy=abs(d.y)<.001?(d.y<0.?-.001:.001):d.y;
         float a=(1450.-eye.y)/dy,b=(2600.-eye.y)/dy;
@@ -188,14 +190,14 @@ function createAtmosphericSky(scene){
     lastEnvKey=key;
     const d=Math.max(0,Math.min(1,day??1));
     const tw=Math.max(0,Math.min(1,twilight??0));
-    const storm=weather==='storm', fog=weather==='fog';
+    const storm=weather==='storm', fog=weather==='fog', nMix=Math.max(0,1-d*4);
     const skyFade=ink.createLinearGradient(0,0,0,h);
-    const topR=Math.round((storm?22:fog?110:24)+d*(storm?52:fog?68:76));
-    const topG=Math.round((storm?32:fog?124:46)+d*(storm?68:fog?84:146));
-    const topB=Math.round((storm?52:fog?138:86)+d*(storm?94:fog?98:158));
-    const horR=Math.round((storm?28:38)+d*(storm?78:fog?162:192)+tw*42);
-    const horG=Math.round((storm?36:56)+d*(storm?90:fog?166:182)+tw*18);
-    const horB=Math.round((storm?48:82)+d*(storm?108:fog?162:168)-tw*12);
+    const topR=Math.round((storm?12:fog?70:6)+d*(storm?52:fog?98:94));
+    const topG=Math.round((storm?18:fog?84:12)+d*(storm?78:fog?118:180));
+    const topB=Math.round((storm?28:fog?98:26)+d*(storm?112:fog?134:218));
+    const horR=Math.round((storm?22:28)+d*(storm?86:fog?172:202)+tw*42+nMix*34);
+    const horG=Math.round((storm?26:32)+d*(storm?100:fog?184:206)+tw*18+nMix*16);
+    const horB=Math.round((storm?36:40)+d*(storm?122:fog?188:212)-tw*12);
     const seaR=Math.round(14+d*(storm?30:fog?84:48));
     const seaG=Math.round(28+d*(storm?46:fog?98:106));
     const seaB=Math.round(42+d*(storm?66:fog?108:136));
