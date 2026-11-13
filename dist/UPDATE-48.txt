@@ -1,0 +1,31 @@
+================================================================================
+SKYBOUND GLOBAL - Update v0.48 (Build 2026.11.13)
+次世代機場 3D 導航天線陣列、都卜勒氣象雷達球罩與 ICAO 標準滑行道引導標誌牌
+================================================================================
+
+【主要新增與地景架構升級】
+1. 全台實體 3D VOR/DME 導航台建築群 (airport-infrastructure.js)
+   - 參照真實 ICAO 規範與民航局標準建築外觀建模，精確錨定全台 7 座主要 VOR 導航台 (TPE, HLG, HCN, TNN, APX, MKG, KNM)。
+   - 八角形基座鋼筋混凝土設備機房、耐候防護外牆。
+   - 頂部玻璃纖維天線罩錐台 (Cone Radome) 與圓環鋁合金接地反射平面。
+   - 24 根全向發射 Alford 環形槽孔天線陣列（Alford Loop Antenna Array）。
+   - 附屬紅白雙色 DME 測距儀垂直同軸偶極天線鐵塔，以及塔頂 360 度紅色航空障礙警告信標燈。
+
+2. 跑道兩端高精細 ILS 儀表著陸系統天線實體 (Instrument Landing System Array)
+   - 跑道末端離場方向 +280m 處建立 38 公尺橫向鋼桁架 (Localizer Truss) 與 14 根雙排對數週期航向台天線 (14-Element Localizer Array)。
+   - 著陸接地點 +320m / 跑道側向 110m 處建立 22 公尺高紅白格紋下滑台垂直鐵塔 (Glide Slope Mast)，具備上中下三層垂直角反射天線與障礙指示燈。
+
+3. 次世代氣象都卜勒雷達塔與旋轉掃描光束 (Doppler Weather Radar Radome)
+   - 於桃園機場 (RCTP)、台北松山 (RCSS) 與高雄小港 (RCKH) 建立 28 公尺四足格構雷達基座鐵塔。
+   - 塔頂 8.5 米耐候球形透波天線罩 (Spherical Radome)。
+   - 內部具備程式化高速旋轉掃描偵測光束與頂部紅色航空警示頻閃信標。
+
+4. ICAO 國際民航組織標準滑行道導引燈箱牌 (ICAO Taxiway Guidance Signboards)
+   - 依據 ICAO Annex 14 規範製作三類動態高解析雙面透光標誌牌：
+     * 強制指令牌 (Mandatory Instruction Sign)：紅底白字 (例：跑道等待線 05L-23R, 10-28)，配備白色雙重反光防護邊框。
+     * 位置指示牌 (Location Sign)：黑底黃字 (例：當前滑行道 A, B, Q)，黃色外框。
+     * 方向與目的地牌 (Direction & Destination Sign)：黃底黑字 (例：RAMP →, TERMINAL →)。
+   - 雙立柱支架、黑色背板遮光罩，並具備日夜自適應自發光特性（夜間發光度自動升級至 0.85）。
+
+5. 系統效能與夜間自適應照明更新 (Night Lighting & Dynamic Scene Traversal)
+   - 透過場景圖非同步遍歷優化，支援動態都卜勒天線轉動與日夜環境交替時發光材質自動調節。

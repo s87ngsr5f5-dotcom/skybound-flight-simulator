@@ -3818,6 +3818,9 @@ function initialize(){
       }
     }
   }
+  if(typeof airportInfrastructure!=='undefined'){
+    airportInfrastructure.init(scene,THREE,airports,typeof airwaysNav!=='undefined'?airwaysNav.getVORStations():[],geoPoint);
+  }
   let lastAirportLabel='';
   function drawAirportLabel(f){
     const r=f?.destination;
@@ -4520,6 +4523,9 @@ function initialize(){
       }
       if(typeof cockpitEnhancements!=='undefined'&&model){
         cockpitEnhancements.updateCockpitLighting(model,activeDay,time);
+      }
+      if(typeof airportInfrastructure!=='undefined'){
+        airportInfrastructure.update(camera.position,!activeDay,dt);
       }
     }
     if(overviewActive) taiwanOverview.draw(renderer,flight);
