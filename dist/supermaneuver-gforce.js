@@ -36,7 +36,7 @@
       overlayCanvas.style.top = '0';
       overlayCanvas.style.left = '0';
       overlayCanvas.style.width = '100vw';
-      overlayCanvas.style.height = '100vh';
+      overlayCanvas.style.height = '100dvh';
       overlayCanvas.style.pointerEvents = 'none';
       overlayCanvas.style.zIndex = '9998';
       document.body.appendChild(overlayCanvas);
@@ -72,8 +72,9 @@
 
     function resizeOverlay() {
       if (!overlayCanvas) return;
-      overlayCanvas.width = window.innerWidth;
-      overlayCanvas.height = window.innerHeight;
+      const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+      overlayCanvas.width = Math.max(1, Math.round(vv?.width || window.innerWidth));
+      overlayCanvas.height = Math.max(1, Math.round(vv?.height || window.innerHeight));
     }
 
     // Toggle Cobra / AoA limiter override
@@ -241,6 +242,7 @@
     return {
       state,
       initOverlay,
+      resizeOverlay,
       toggleCobraArmed,
       computeSupermaneuverAero,
       stepPhysiology,

@@ -123,3 +123,73 @@
   .mobile-mode #gateGuide { width: 96%; bottom: calc(var(--stick-size) + 68px); }
   .mobile-mode header small { display: none; }
 }
+
+/* Mobile Anti-Zoom & Landscape Fullscreen Protection (v0.51) */
+.mobile-mode,
+.mobile-mode body,
+.mobile-mode .hud,
+.mobile-mode #touchFlight,
+.mobile-mode #touchFlight *,
+.mobile-mode #touchStick,
+.mobile-mode .touch-actions button,
+.mobile-mode header,
+.mobile-mode #flightBar button {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-mode #touchFlight,
+.mobile-mode #touchStick,
+.mobile-mode #touchThrottle,
+.mobile-mode #touchRudder,
+.mobile-mode #touchQuick button,
+.mobile-mode .touch-actions button {
+  touch-action: none !important;
+}
+.mobile-mode.flight-ui,
+.mobile-mode.flight-ui body {
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+}
+@media (orientation: landscape) and (max-height: 550px) {
+  .mobile-mode main {
+    width: calc(100vw - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right)));
+    margin: 8px auto;
+  }
+  .mobile-mode #plan .planner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-areas: "preview setup";
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .mobile-mode.flight-ui #hud {
+    inset: max(4px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    --stick-size: clamp(90px, 28dvh, 138px);
+    --throttle-height: clamp(118px, 36dvh, 185px);
+  }
+  .mobile-mode.flight-ui #glassReadouts {
+    top: 46%;
+    width: min(68vw, 96dvh, 620px);
+    height: min(66dvh, 72vw, 440px);
+  }
+  .mobile-mode.flight-ui #attitudePanel[data-mode="hud"] #adiCanvas {
+    top: 48%;
+    width: min(44dvh, 42vw, 300px);
+  }
+  .mobile-mode.flight-ui #touchRudderControl {
+    bottom: calc(var(--flight-bottom) + var(--throttle-height) + 12px);
+    width: min(24vw, 170px);
+  }
+  .mobile-mode.flight-ui #systems,
+  .mobile-mode.flight-ui #flightNavigation,
+  .mobile-mode.flight-ui #mobileExtras {
+    max-height: 74dvh;
+  }
+  .mobile-mode.flight-ui #mpRadioPill {
+    top: 48px;
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+}

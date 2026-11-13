@@ -42,6 +42,7 @@ const touchControls=(()=>{
   }
   stick.addEventListener('pointerdown',event=>{
     if(event.button!==0||stickPointer!==null) return;
+    event.preventDefault();
     stickPointer=event.pointerId;
     originX=event.clientX;originY=event.clientY;
     try{stick.setPointerCapture(event.pointerId);}catch{}
@@ -169,6 +170,39 @@ const touchControls=(()=>{
   mode.addEventListener('change',()=>{
     applyMode();
     try{localStorage.setItem('skybound-device',mode.value);}catch{}
+  });
+  // Global anti-zoom & anti-long-press callout guards for mobile flight
+  let lastTouchEndTime=0;
+  function isEditableTarget(target){
+    return Boolean(target&&target.closest&&target.closest('input:not([type="range"]),textarea,select,a'));
+  }
+  document.addEventListener('contextmenu',event=>{
+    if(!isEditableTarget(event.target)&&(mode.value==='mobile'||document.body.classList.contains('flight-ui'))){
+      event.preventDefault();
+    }
+  },{capture:true});
+  document.addEventListener('selectstart',event=>{
+    if(!isEditableTarget(event.target)) event.preventDefault();
+  },{capture:true});
+  for(const gEvent of ['gesturestart','gesturechange','gestureend']){
+    document.addEventListener(gEvent,event=>event.preventDefault(),{passive:false});
+  }
+  document.addEventListener('touchstart',event=>{
+    if(event.touches&&event.touches.length>1&&!isEditableTarget(event.target)){
+      if(document.body.classList.contains('flight-ui')||mode.value==='mobile') event.preventDefault();
+    }
+  },{passive:false});
+  document.addEventListener('touchend',event=>{
+    const now=Date.now();
+    if(now-lastTouchEndTime<=280&&!isEditableTarget(event.target)){
+      if(event.target.closest('#touchFlight,.hud,header,button')) event.preventDefault();
+    }
+    lastTouchEndTime=now;
+  },{passive:false});
+
+  addEventListener('orientationchange',()=>{
+    reset();
+    motion.neutral=null;
   });
   addEventListener('blur',reset);
   addEventListener('pagehide',reset);

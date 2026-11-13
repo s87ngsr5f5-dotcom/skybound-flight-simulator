@@ -1,0 +1,19 @@
+================================================================================
+SKYBOUND GLOBAL - Update v0.51 (Build 2026.11.13)
+手機觸控防長按放大保護 & 橫向旋轉切換滿版渲染修復
+================================================================================
+
+【主要修復與手機版介面體驗升級】
+1. 徹底解決「手機長按/連按就畫面放大與跳出選單」問題
+   - 更新 index.html viewport 設定：maximum-scale=1, user-scalable=no, viewport-fit=cover。
+   - 全域套用 -webkit-touch-callout: none 與 user-select: none 禁用長按選字與放大鏡彈窗（同時保留房號、呼號與聊天輸入框正常打字選取）。
+   - 於虛擬搖桿、油門推桿、方向舵與快捷動作按鍵區域強制套用 touch-action: none。
+   - 在 touch-controls.js 加入全域手勢守衛（攔截 iOS Safari gesturestart/gesturechange/gestureend、雙指捏合與快速雙擊放大）。
+
+2. 徹底修復「手機橫向切換變成剩一半畫面」核心 Bug
+   - 修正 WebGL renderer.setSize(w, h, false)，不再將像素寬高寫死於 canvas 行內樣式，並強制 CSS width: 100% !important; height: 100% !important; 搭配 100dvh 動態視口高度。
+   - 建立 getViewportSize() 優先讀取 window.visualViewport 精確可視範圍。
+   - 新增 orientationchange 與 visualViewport resize 雙重延遲防抖重算（即時 + 120ms + 350ms 補償），並於轉向後自動清除殘留捲動位移與重置搖桿原點，確保直立與橫屏瞬間轉換 100% 滿版無黑邊、不切半。
+
+3. 手機橫屏（Landscape）駕駛艙 & 規劃頁適配
+   - 在 mobile-flight.css 針對橫向短高度螢幕重新分配 HUD 與玻璃座艙儀表比例，支援劉海安全邊距（env(safe-area-inset-*)），並讓出發前規劃頁在橫屏也能舒適雙欄操作。

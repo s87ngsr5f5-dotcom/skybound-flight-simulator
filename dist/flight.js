@@ -85,8 +85,15 @@ function initialize(){
     const far=farView?430000:155000;
     if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix();}
   }
+  function getViewportSize(){
+    const vv=typeof window!=='undefined'?window.visualViewport:null;
+    const w=Math.max(1,Math.round(vv?.width||document.documentElement?.clientWidth||innerWidth));
+    const h=Math.max(1,Math.round(vv?.height||document.documentElement?.clientHeight||innerHeight));
+    return {w,h};
+  }
   function resizeOverview(){
-    if(taiwanOverview) byId('scaleBar').style.width=taiwanOverview.resize(innerWidth,innerHeight)+'px';
+    const {w,h}=getViewportSize();
+    if(taiwanOverview) byId('scaleBar').style.width=taiwanOverview.resize(w,h)+'px';
   }
   renderer.domElement.className = 'world';
   document.body.prepend(renderer.domElement);
@@ -2624,10 +2631,11 @@ function initialize(){
   let resolutionScale=1,basePixelRatio=1,nextResolutionReview=0;
   let measuredFrameTime=0,measuredFrames=0;
   function resize(){
+    const {w,h}=getViewportSize();
     const ultra=qualitySelect.value==='ultra';
     const scale={low:.6,balanced:1,high:1.75}[renderingQuality()]||1;
     const mobile=touchControls.mode.value==='mobile';
-    basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(innerWidth*innerHeight))):
+    basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(w*h))):
       Math.min(devicePixelRatio,scale,mobile?1:Infinity);
     if(hangarMode) basePixelRatio=Math.max(basePixelRatio,Math.min(devicePixelRatio,1));
     resolutionScale=1;
@@ -2647,9 +2655,25 @@ function initialize(){
         if(sunlight.shadow.map){sunlight.shadow.map.dispose();sunlight.shadow.map=null;}
       }
     }
-    renderer.setSize(innerWidth,innerHeight);
-    camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+    renderer.setSize(w,h,false);
+    renderer.domElement.style.width='100%';
+    renderer.domElement.style.height='100%';
+    camera.aspect=w/h;camera.updateProjectionMatrix();
+    if(typeof rainCanvas!=='undefined'&&rainCanvas){
+      rainCanvas.width=w;rainCanvas.height=h;
+    }
     resizeOverview();
+    if(typeof supermaneuverGforce!=='undefined'&&supermaneuverGforce.resizeOverlay){
+      supermaneuverGforce.resizeOverlay();
+    }
+    if(document.body.classList.contains('flight-ui')&&typeof scrollTo==='function'){
+      try{scrollTo(0,0);}catch{}
+    }
+  }
+  function scheduleOrientationResize(){
+    resize();
+    setTimeout(resize,120);
+    setTimeout(resize,350);
   }
   function adjustResolution(now,seconds){
     if(qualitySelect.value!=='balanced'&&qualitySelect.value!=='high') return;
@@ -2666,7 +2690,12 @@ function initialize(){
     measuredFrameTime=measuredFrames=0;
     nextResolutionReview=now+2200;
   }
-  addEventListener('resize',resize);resize();
+  addEventListener('resize',resize);
+  addEventListener('orientationchange',scheduleOrientationResize);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',resize);
+  }
+  resize();
   touchControls.mode.addEventListener('change',resize);
 
   function setupMultiplayerUI(){
