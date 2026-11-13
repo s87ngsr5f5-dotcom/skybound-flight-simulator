@@ -14,7 +14,7 @@ function createAtmosphericSky(scene){
   const uniforms={
     noiseMap:{value:noise},eye:{value:new THREE.Vector3()},sun:{value:new THREE.Vector3(0,1,0)},moon:{value:new THREE.Vector3()},
     daylight:{value:1},twilight:{value:0},coverage:{value:.55},mist:{value:0},
-    seconds:{value:0},steps:{value:8}
+    seconds:{value:0},steps:{value:8},raytrace:{value:1}
   };
   const sampleNoise=`
     float noise3(vec3 p){
@@ -39,7 +39,7 @@ function createAtmosphericSky(scene){
       varying vec3 ray;
       uniform sampler2D noiseMap;
       uniform vec3 eye,sun,moon;
-      uniform float daylight,twilight,coverage,mist,seconds;
+      uniform float daylight,twilight,coverage,mist,seconds,raytrace;
       uniform int steps;
 
       ${sampleNoise}
@@ -55,13 +55,14 @@ function createAtmosphericSky(scene){
         vec3 d=normalize(ray);
         float up=max(0.,d.y);
         float glare=max(0.,dot(sun,d));
-        float mie=pow(glare,6.)*.22+pow(glare,24.)*.35;
-        vec3 horizon=mix(vec3(.024,.035,.070),vec3(.54,.70,.83),daylight);
-        vec3 zenith=mix(vec3(.004,.010,.033),vec3(.046,.25,.57),daylight);
-        vec3 sky=mix(horizon,zenith,pow(up,.48));
-        sky+=vec3(.85,.32,.07)*twilight*pow(glare,4.)*exp(-up*3.2);
-        sky+=vec3(.48,.14,.26)*twilight*exp(-up*5.5);
-        sky+=vec3(1.,.86,.62)*daylight*(pow(glare,14.)*.20+smoothstep(.99988,.99997,glare)*6.5)+vec3(.65,.75,1.)*mie*daylight;
+        float mie=pow(glare,4.5)*.30+pow(glare,18.)*.48+pow(glare,90.)*1.15;
+        vec3 horizon=mix(vec3(.028,.045,.088),vec3(.48,.78,.98),daylight);
+        vec3 zenith=mix(vec3(.007,.018,.048),vec3(.07,.36,.88),daylight);
+        vec3 sky=mix(horizon,zenith,pow(up,.72));
+        sky+=vec3(.06,.18,.32)*daylight*exp(-up*3.5)*.35;
+        sky+=vec3(.98,.44,.12)*twilight*pow(glare,3.5)*exp(-up*2.6);
+        sky+=vec3(.55,.19,.33)*twilight*exp(-up*4.8);
+        sky+=vec3(1.,.90,.66)*daylight*(pow(glare,12.)*.26+smoothstep(.99982,.99997,glare)*8.5)+vec3(.55,.76,1.)*mie*daylight*.75;
         float night=(1.-smoothstep(.02,.40,daylight))*(1.-mist*.9);
         if(night>.01&&d.y>0.){
           vec2 grid=vec2(atan(d.x,-d.z)*103.,asin(d.y)*135.);
@@ -92,15 +93,33 @@ function createAtmosphericSky(scene){
               opacity+=weight;
             }
           }
-          vec3 cloudColor=mix(vec3(.039,.053,.086),vec3(.46,.52,.60),daylight)*opacity;
-          cloudColor+=vec3(.48,.44,.36)*light*daylight;
-          cloudColor+=vec3(.55,.18,.055)*light*twilight;
-          float silver=pow(glare,7.)*light*(1.-opacity*.6);
-          cloudColor+=vec3(1.05,.96,.82)*silver*daylight*.4;
+          vec3 cloudColor=mix(vec3(.048,.066,.105),vec3(.42,.52,.64),daylight)*opacity;
+          cloudColor+=vec3(.75,.72,.66)*light*daylight;
+          cloudColor+=vec3(.72,.26,.08)*light*twilight;
+          float silver=pow(glare,5.5)*light*(1.-opacity*.52);
+          cloudColor+=vec3(1.18,1.06,.84)*silver*daylight*(.48+.38*raytrace);
           float distanceFade=exp(-start/28000.)*smoothstep(.028,.16,abs(d.y));
           sky=mix(sky,cloudColor+sky*(1.-opacity),distanceFade);
         }
-        vec3 haze=mix(vec3(.07,.085,.12),vec3(.62,.69,.74),daylight);
+        if(raytrace>.01&&glare>.18&&(daylight+twilight)>.04&&d.y>-.06){
+          float shaftMask=pow(glare,3.0)*(.42+.58*smoothstep(-.06,.45,d.y));
+          vec3 sunAxis=normalize(mix(d,sun,.32));
+          float denom=abs(sunAxis.y)<.09?(sunAxis.y>=0.?.09:-.09):sunAxis.y;
+          float baseDist=clamp(abs((1950.-eye.y)/denom),1800.,14000.);
+          float shadowSum=0.;
+          for(int r=0;r<5;r++){
+            float frac=(float(r)+.5)/5.;
+            vec3 sp=eye+sunAxis*mix(900.,baseDist,frac);
+            sp.y=mix(1550.,2420.,frac);
+            shadowSum+=cloud(sp);
+          }
+          float gap=clamp(1.-shadowSum*.32,0.,1.);
+          vec3 tang=normalize(d-sun*dot(d,sun)+vec3(.0001,.0002,.0001));
+          float streak=.55+.45*noise3(vec3(tang.x*4.4,tang.z*4.4,tang.y*2.4+seconds*.04));
+          float godRays=shaftMask*gap*(.55+.45*pow(glare,8.))*streak*raytrace;
+          sky+=vec3(1.15,.88,.48)*godRays*(daylight*.62+twilight*.78);
+        }
+        vec3 haze=mix(vec3(.08,.10,.14),vec3(.78,.86,.93),daylight);
         sky=mix(sky,haze,mist*exp(-up*2.8));
         gl_FragColor=vec4(sky,1.);
         #include <tonemapping_fragment>
@@ -141,8 +160,9 @@ function createAtmosphericSky(scene){
         float alpha=smoothstep(deckCoverage-.04,deckCoverage+.12,shape);
         alpha*=1.-smoothstep(30000.,67000.,length(world.xz-eye.xz));
         if(alpha<.012) discard;
-        float shading=clamp(.66+(shape-field(p+sun.xz*.16))*2.8,0.,1.);
-        vec3 color=mix(vec3(.043,.069,.12),mix(vec3(.58,.69,.81),vec3(1.1,1.12,1.14),shading),daylight);
+        float shading=clamp(.68+(shape-field(p+sun.xz*.16))*2.9,0.,1.);
+        vec3 color=mix(vec3(.055,.085,.14),mix(vec3(.74,.83,.93),vec3(1.24,1.25,1.27),shading),daylight);
+        color+=vec3(.82,.30,.12)*twilight*shading*.65;
         gl_FragColor=vec4(color,alpha);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -153,8 +173,62 @@ function createAtmosphericSky(scene){
   cloudDeck.visible=false;
   cloudDeck.renderOrder=1001;
   scene.add(cloudDeck);
+  let lastEnvKey='';
+  function updateEnvironment(canvas,texture,direction,day,twilight,weather,raytrace=true){
+    if(!canvas||!texture) return false;
+    const w=canvas.width||512, h=canvas.height||256;
+    const ink=canvas.getContext?.('2d');
+    if(!ink) return false;
+    const dir=direction?direction.clone().normalize():{x:0,y:1,z:0};
+    const key=[
+      Math.round(dir.x*25),Math.round(dir.y*25),Math.round(dir.z*25),
+      Math.round((day||0)*20),Math.round((twilight||0)*20),weather||'',raytrace?1:0
+    ].join('|');
+    if(key===lastEnvKey) return false;
+    lastEnvKey=key;
+    const d=Math.max(0,Math.min(1,day??1));
+    const tw=Math.max(0,Math.min(1,twilight??0));
+    const storm=weather==='storm', fog=weather==='fog';
+    const skyFade=ink.createLinearGradient(0,0,0,h);
+    const topR=Math.round((storm?22:fog?110:24)+d*(storm?52:fog?68:76));
+    const topG=Math.round((storm?32:fog?124:46)+d*(storm?68:fog?84:146));
+    const topB=Math.round((storm?52:fog?138:86)+d*(storm?94:fog?98:158));
+    const horR=Math.round((storm?28:38)+d*(storm?78:fog?162:192)+tw*42);
+    const horG=Math.round((storm?36:56)+d*(storm?90:fog?166:182)+tw*18);
+    const horB=Math.round((storm?48:82)+d*(storm?108:fog?162:168)-tw*12);
+    const seaR=Math.round(14+d*(storm?30:fog?84:48));
+    const seaG=Math.round(28+d*(storm?46:fog?98:106));
+    const seaB=Math.round(42+d*(storm?66:fog?108:136));
+    skyFade.addColorStop(0,`rgb(${topR},${topG},${topB})`);
+    skyFade.addColorStop(.43,`rgb(${Math.min(255,horR-12)},${Math.min(255,horG-2)},${Math.min(255,horB)})`);
+    skyFade.addColorStop(.50,`rgb(${Math.min(255,horR)},${Math.min(255,horG)},${Math.min(255,horB)})`);
+    skyFade.addColorStop(.54,`rgb(${seaR},${seaG},${seaB})`);
+    skyFade.addColorStop(1,`rgb(${Math.round(seaR*.68)},${Math.round(seaG*.76)},${Math.round(seaB*.84)})`);
+    ink.fillStyle=skyFade;
+    ink.fillRect(0,0,w,h);
+    // Specular sun reflection lobe & horizon glow for PBR aircraft/canopy ray-traced IBL
+    const u=((Math.atan2(dir.z,dir.x)/(Math.PI*2))+1)%1;
+    const v=Math.acos(Math.max(-1,Math.min(1,dir.y)))/Math.PI;
+    const sunGain=(d*.92+tw*.75)*(storm?.25:fog?.42:1)*(raytrace?1:.45);
+    if(sunGain>.03){
+      for(const offset of [-w,0,w]){
+        const sx=u*w+offset, sy=v*h;
+        const glowR=raytrace?h*.42:h*.30;
+        const grad=ink.createRadialGradient(sx,sy,1,sx,sy,glowR);
+        grad.addColorStop(0,`rgba(255,250,232,${Math.min(1,.96*sunGain)})`);
+        grad.addColorStop(.16,`rgba(255,232,188,${Math.min(1,.62*sunGain)})`);
+        grad.addColorStop(.55,`rgba(186,226,255,${Math.min(1,.24*sunGain)})`);
+        grad.addColorStop(1,'rgba(186,226,255,0)');
+        ink.fillStyle=grad;
+        ink.fillRect(sx-glowR,sy-glowR,glowR*2,glowR*2);
+      }
+    }
+    texture.needsUpdate=true;
+    return true;
+  }
   return {
-    setWeather(hours,day,weather,direction){
+    uniforms,
+    setWeather(hours,day,weather,direction,raytrace=true){
       uniforms.sun.value.copy(direction).normalize();
       const moonAngle=(hours+3)*Math.PI/12;
       uniforms.moon.value.set(Math.sin(moonAngle),.41,-Math.cos(moonAngle)).normalize();
@@ -162,6 +236,7 @@ function createAtmosphericSky(scene){
       uniforms.twilight.value=Math.max(0,1-Math.min(Math.abs(hours-6),Math.abs(hours-18))/1.45);
       uniforms.coverage.value=weather==='storm'?.78:weather==='wet'?.30:weather==='clouds'?.40:weather==='fog'?.39:.51;
       uniforms.mist.value=weather==='storm'?.65:weather==='fog'?.89:weather==='wet'?.23:0;
+      uniforms.raytrace.value=raytrace?1:0;
     },
     update(camera,dt,quality){
       dome.position.copy(camera.position);
@@ -170,6 +245,8 @@ function createAtmosphericSky(scene){
       uniforms.eye.value.copy(camera.position);
       uniforms.seconds.value+=dt;
       uniforms.steps.value=quality==='ultra'?18:quality==='low'?5:quality==='high'?11:8;
-    }
+    },
+    updateEnvironment
   };
 }
+if(typeof module!=='undefined') module.exports={createAtmosphericSky};

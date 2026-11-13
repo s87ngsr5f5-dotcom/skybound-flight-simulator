@@ -139,9 +139,9 @@ function initialize(){
   }
   renderer.domElement.className = 'world';
   document.body.prepend(renderer.domElement);
-  const ambient=new THREE.HemisphereLight(0xe1efff,0x777054,2.15);
+  const ambient=new THREE.HemisphereLight(0xeef6ff,0x8d9886,2.45);
   scene.add(ambient);
-  const sunlight = new THREE.DirectionalLight(0xffead0,2.1);
+  const sunlight = new THREE.DirectionalLight(0xffeed4,2.4);
   sunlight.position.set(-500,800,-360);
   const sunDirection=sunlight.position.clone();
   scene.add(sunlight,sunlight.target);
@@ -154,12 +154,14 @@ function initialize(){
   sunlight.shadow.bias=-0.00015;
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure=1.02;
+  renderer.toneMappingExposure=1.18;
   const sky=document.createElement('canvas');sky.width=512;sky.height=256;
   const skyInk=sky.getContext('2d'),skyFade=skyInk.createLinearGradient(0,0,0,256);
-  skyFade.addColorStop(0,'#6d9ec4');skyFade.addColorStop(.48,'#d5e2df');skyFade.addColorStop(.55,'#8a8e79');skyFade.addColorStop(1,'#4b5e51');
+  skyFade.addColorStop(0,'#63b0eb');skyFade.addColorStop(.48,'#e3f2fa');skyFade.addColorStop(.55,'#7f9888');skyFade.addColorStop(1,'#476258');
   skyInk.fillStyle=skyFade;skyInk.fillRect(0,0,512,256);
-  const environment=new THREE.CanvasTexture(sky);environment.mapping=THREE.EquirectangularReflectionMapping;
+  const environment=new THREE.CanvasTexture(sky);
+  environment.mapping=THREE.EquirectangularReflectionMapping;
+  environment.colorSpace=THREE.SRGBColorSpace;
   scene.environment=environment;
 
   function material(color){return new THREE.MeshStandardMaterial({color,roughness:.86});}
@@ -211,6 +213,7 @@ function initialize(){
   const taipeiImage={value:landTexture}, taipeiImageReady={value:0};
   const atlasImage={value:landTexture},atlasReady={value:0};
   const atlasBounds={value:new THREE.Vector4(...taiwanSatelliteData.overview)};
+  const seaRayUniforms={rtEnabled:{value:1},sunDir:{value:new THREE.Vector3(0,1,0)},dayRatio:{value:1},skyTime:{value:0}};
   function terrainPhoto(shader,tile){
     shader.uniforms.taipeiImage=taipeiImage;
     shader.uniforms.taipeiImageReady=taipeiImageReady;
@@ -220,10 +223,14 @@ function initialize(){
     shader.uniforms.atlasImage=atlasImage;
     shader.uniforms.atlasReady=atlasReady;
     shader.uniforms.atlasBounds=atlasBounds;
-    shader.vertexShader='varying vec2 terrainXZ;\n'+shader.vertexShader.replace('#include <begin_vertex>',
-      '#include <begin_vertex>\n terrainXZ=(modelMatrix * vec4(transformed,1.0)).xz;');
-    shader.fragmentShader='varying vec2 terrainXZ;\nuniform sampler2D taipeiImage,regionalImage,atlasImage;\n'+
-      'uniform float taipeiImageReady,regionalImageReady,atlasReady;\nuniform vec2 regionalImageOrigin;\nuniform vec4 atlasBounds;\n'+
+    shader.uniforms.seaRtEnabled=seaRayUniforms.rtEnabled;
+    shader.uniforms.seaSunDir=seaRayUniforms.sunDir;
+    shader.uniforms.seaDayRatio=seaRayUniforms.dayRatio;
+    shader.uniforms.seaSkyTime=seaRayUniforms.skyTime;
+    shader.vertexShader='varying vec2 terrainXZ;\nvarying vec3 terrainWorldPos;\n'+shader.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\n terrainWorldPos=(modelMatrix * vec4(transformed,1.0)).xyz;\n terrainXZ=terrainWorldPos.xz;');
+    shader.fragmentShader='varying vec2 terrainXZ;\nvarying vec3 terrainWorldPos;\nuniform sampler2D taipeiImage,regionalImage,atlasImage;\n'+
+      'uniform float taipeiImageReady,regionalImageReady,atlasReady,seaRtEnabled,seaDayRatio,seaSkyTime;\nuniform vec2 regionalImageOrigin;\nuniform vec3 seaSunDir;\nuniform vec4 atlasBounds;\n'+
       shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
         vec2 atlasUV=(terrainXZ-atlasBounds.xy)/atlasBounds.zw;
         if(atlasReady>0.5&&all(greaterThanEqual(atlasUV,vec2(0.0)))&&all(lessThanEqual(atlasUV,vec2(1.0)))){
@@ -244,11 +251,21 @@ function initialize(){
         }
         if(diffuseColor.b>diffuseColor.r*1.45&&diffuseColor.b>0.35){
           vec2 waveCoord=terrainXZ*0.0065;
-          float wave=sin(waveCoord.x*2.4+waveCoord.y*1.7)*cos(waveCoord.y*2.1-waveCoord.x*1.3);
-          float waveDetail=sin(waveCoord.x*6.8-waveCoord.y*5.1)*0.5+0.5;
-          vec3 deepSea=vec3(0.05,0.20,0.42);
-          vec3 shallowSea=vec3(0.13,0.42,0.66);
+          float wave=sin(waveCoord.x*2.4+waveCoord.y*1.7+seaSkyTime*0.45)*cos(waveCoord.y*2.1-waveCoord.x*1.3-seaSkyTime*0.32);
+          float waveDetail=sin(waveCoord.x*6.8-waveCoord.y*5.1+seaSkyTime*0.9)*0.5+0.5;
+          vec3 deepSea=vec3(0.06,0.26,0.52);
+          vec3 shallowSea=vec3(0.16,0.52,0.78);
           diffuseColor.rgb=mix(deepSea,shallowSea,clamp(wave*0.22+waveDetail*0.14+0.52,0.0,1.0));
+          if(seaRtEnabled>0.5){
+            vec3 viewVec=normalize(cameraPosition-terrainWorldPos);
+            vec3 waveN=normalize(vec3(cos(waveCoord.x*2.4+seaSkyTime*0.7)*0.07+cos(waveCoord.x*6.8-seaSkyTime*1.1)*0.04,1.0,sin(waveCoord.y*2.1+seaSkyTime*0.6)*0.07+sin(waveCoord.y*5.1-seaSkyTime*0.9)*0.04));
+            vec3 reflDir=reflect(-viewVec,waveN);
+            float fresnel=pow(1.0-max(0.0,viewVec.y),3.0);
+            diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.48,0.78,0.98)*max(0.16,seaDayRatio),fresnel*0.46);
+            float glintDot=max(0.0,dot(reflDir,normalize(seaSunDir)));
+            float sunTrail=pow(glintDot,34.0)*0.95+pow(glintDot,128.0)*1.95;
+            diffuseColor.rgb+=vec3(1.0,0.92,0.74)*sunTrail*seaDayRatio;
+          }
         }
       `);
   }
@@ -715,9 +732,9 @@ function initialize(){
 
   const atmosphericSky=createAtmosphericSky(scene);
 
-  const fuselage = new THREE.MeshPhysicalMaterial({color:0xe9eef2,roughness:.30,metalness:.12,clearcoat:.85,clearcoatRoughness:.12});
-  const trim = new THREE.MeshPhysicalMaterial({color:0x185378,roughness:.30,clearcoat:.85,clearcoatRoughness:.12});
-  const windowMat = new THREE.MeshPhysicalMaterial({color:0x132732,roughness:.06,metalness:.88,clearcoat:1.0,clearcoatRoughness:.05});
+  const fuselage = new THREE.MeshPhysicalMaterial({color:0xe9eef2,roughness:.26,metalness:.18,clearcoat:.9,clearcoatRoughness:.10,envMapIntensity:1.55});
+  const trim = new THREE.MeshPhysicalMaterial({color:0x185378,roughness:.26,clearcoat:.9,clearcoatRoughness:.10,envMapIntensity:1.45});
+  const windowMat = new THREE.MeshPhysicalMaterial({color:0x132732,roughness:.05,metalness:.90,clearcoat:1.0,clearcoatRoughness:.04,envMapIntensity:1.85});
   function makeAircraft(profile,index){
     const [length,radius,span,wingHeight,count,sweep]=profile.geometry;
     const group=new THREE.Group(), gear=new THREE.Group(), blades=[], surfaces=[], navLights=[];
@@ -1753,17 +1770,31 @@ function initialize(){
     const storm=weather==='storm';
     const strength=storm?.24:weather==='fog'?.42:wet?.62:weather==='clouds'?.85:1;
     const warmth=clamp(1-Math.min(Math.abs(hour-6),Math.abs(hour-18))/1.45,0,1);
-    sunlight.intensity=.05+day*2.3*strength;
-    sunlight.color.set(storm?'#c8daf5':'#fff0d9').lerp(new THREE.Color('#ffad71'),warmth*(storm?0.3:1));
-    ambient.intensity=.16+day*1.14*(storm?.55:weather==='fog'?.83:1);
+    const rtInput=byId('rtLighting');
+    const rtOn=rtInput?rtInput.checked:true;
+    sunlight.intensity=.07+day*(rtOn?2.82:2.45)*strength;
+    sunlight.color.set(storm?'#d2e4fa':'#fff3df').lerp(new THREE.Color('#ffad71'),warmth*(storm?0.3:1));
+    ambient.intensity=.22+day*(rtOn?1.52:1.25)*(storm?.62:weather==='fog'?.88:1);
+    ambient.color.set(storm?'#9eb8d6':'#e6f4ff');
+    ambient.groundColor.set(storm?'#4b5866':'#8d9886');
+    renderer.toneMappingExposure=rtOn?(1.06+day*.08):(1.00+day*.04);
     sunDirection.set(Math.cos(angle)*760,elevation*820,-280);
-    atmosphericSky.setWeather(hour,day,weather,sunDirection);
-    scene.background.set(storm?'#0b141e':'#132740').lerp(new THREE.Color(storm?'#1a2838':weather==='fog'?'#c5ced1':wet?'#aabac5':'#b2ccdc'),day);
+    seaRayUniforms.rtEnabled.value=rtOn?1:0;
+    seaRayUniforms.dayRatio.value=day;
+    seaRayUniforms.sunDir.value.copy(sunDirection).normalize();
+    atmosphericSky.setWeather(hour,day,weather,sunDirection,rtOn);
+    atmosphericSky.updateEnvironment(sky,environment,sunDirection,day,warmth,weather,rtOn);
+    scene.background.set(storm?'#0b141e':'#132740').lerp(new THREE.Color(storm?'#22354a':weather==='fog'?'#d2dce2':wet?'#adc2d2':'#8fc7eb'),day);
     scene.fog.color.copy(scene.background);
     scene.fog.density=storm?.00035:weather==='fog'?.00064:wet?.000065:.000034;
     lampMaterial.color.set(day>.07?0xc5d7e2:0xeffaff);
     asphalt.roughness=wet?.24:.90;asphalt.metalness=wet?.27:.02;
     concrete.roughness=wet?.31:.92;concrete.metalness=wet?.19:.02;
+    fuselage.envMapIntensity=rtOn?1.55:.8;
+    trim.envMapIntensity=rtOn?1.45:.8;
+    windowMat.envMapIntensity=rtOn?1.85:.9;
+    asphalt.envMapIntensity=wet&&rtOn?1.45:.9;
+    concrete.envMapIntensity=wet&&rtOn?1.35:.85;
     return day;
   }
   let activeDay=1,previewNight=false;
@@ -5108,6 +5139,7 @@ function initialize(){
     const weather=byId('weather').value;
     scene.fog.density=weather==='storm'?.00035:weather==='fog'?.00064:weather==='wet'?.000065:
       THREE.MathUtils.lerp(.000034,.000007,clamp(((flight?.y||0)-2400)/6600,0,1));
+    seaRayUniforms.skyTime.value+=dt;
     if(renderer.instrumentOnly&&flight){
       camera.position.set(flight.x,flight.y+1.4,flight.z);
       camera.rotation.set(flight.pitch,-flight.heading,-flight.bank,'YXZ');
@@ -5195,6 +5227,15 @@ function initialize(){
       model.rotation.set(pitch,-heading,-bank,'YXZ');
     }
   });
+  const rtToggle=byId('rtLighting');
+  if(rtToggle){
+    try{const savedRt=localStorage.getItem('skybound.rtLighting');if(savedRt==='0'||savedRt==='1') rtToggle.checked=savedRt==='1';}catch{}
+    rtToggle.addEventListener('change',()=>{
+      try{localStorage.setItem('skybound.rtLighting',rtToggle.checked?'1':'0');}catch{}
+      activeDay=setEnvironment();
+      rtToggle.blur();
+    });
+  }
   drawPlan();showLog();updateReplayButton();activeDay=setEnvironment();
   byId('time').addEventListener('change',()=>{activeDay=setEnvironment();});
   byId('weather').addEventListener('change',()=>{activeDay=setEnvironment();});

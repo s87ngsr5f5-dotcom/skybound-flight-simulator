@@ -1,0 +1,11 @@
+SKYBOUND GLOBAL v0.58 - 明亮晴空大氣、體積耶穌光柱與即時光追環境反射
+
+更新項目：
+1. 明亮通透天空與體積光跡 (dist/atmospheric-sky.js)
+   - 顯著提亮白天晴空天頂 (vec3(.14,.46,.88))、清澈地平線 (vec3(.72,.87,.98)) 與高空雲蓋亮面，搭配強化的太陽前向散射光暈與雲緣銀邊光跡。
+   - 新增即時 3D 光跡雲隙散射（Volumetric Crepuscular Sun Shafts / 耶穌光）：視線朝向太陽光方向進行 5 步雲層遮擋採樣，在雲洞隙縫放射立體丁達爾光束。
+2. 動態 IBL 天空環境反射貼圖與水面光追高光 (dist/atmospheric-sky.js, dist/flight.js)
+   - 依太陽方位、晝夜、天候與暮色動態重繪等距柱狀天空與太陽高光反射貼圖 (`updateEnvironment`)，讓機身金屬塗裝、座艙玻璃與雨後濕滑跑道即時反映光追天空倒影。
+   - 海面著色器加入視角菲涅爾天空映射與動態波面太陽鏡面光軌 (Fresnel + Sun Specular Trail)，並提升日間曝光與天光二次反彈照明。
+3. 「操控設定」光追開關 (#rtLighting in dist/index.html, dist/flight.js)
+   - 支援於遊戲內隨時開啟或關閉「光追光影與體積光」，偏好自動儲存至本機設定。
