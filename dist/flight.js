@@ -2913,16 +2913,27 @@ function initialize(){
     }
 
     const headerMp=byId('headerMpBtn'), hudMpDropdown=byId('hudMpDropdown');
-    const hudMpClose=byId('hudMpClose');
+    const hudMpClose=byId('hudMpClose'), headerMpUnread=byId('headerMpUnread');
+    let unreadRadioCount=0;
+    function updateUnreadBadge(){
+      if(!headerMpUnread) return;
+      headerMpUnread.hidden=unreadRadioCount<=0;
+      headerMpUnread.textContent=unreadRadioCount>9?'9+':String(unreadRadioCount);
+    }
+    function toggleHudMpDropdown(forceOpen){
+      if(!hudMpDropdown) return;
+      hudMpDropdown.hidden=typeof forceOpen==='boolean'?!forceOpen:!hudMpDropdown.hidden;
+      if(!hudMpDropdown.hidden){
+        unreadRadioCount=0;
+        updateUnreadBadge();
+        renderPeerList();
+      }
+    }
     if(headerMp&&hudMpDropdown){
-      headerMp.onclick=()=>{
-        hudMpDropdown.hidden=!hudMpDropdown.hidden;
-      };
+      headerMp.onclick=()=>toggleHudMpDropdown();
     }
     if(hudMpClose&&hudMpDropdown){
-      hudMpClose.onclick=()=>{
-        hudMpDropdown.hidden=true;
-      };
+      hudMpClose.onclick=()=>toggleHudMpDropdown(false);
     }
 
     const hudCopyBtn=byId('hudMpCopyUrlBtn');
@@ -2992,7 +3003,7 @@ function initialize(){
     addEventListener('keydown',e=>{
       if(e.code==='KeyU'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
         if(hudMpDropdown&&flight){
-          hudMpDropdown.hidden=!hudMpDropdown.hidden;
+          toggleHudMpDropdown();
         }
       }
       if(e.code==='Tab'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
@@ -3035,6 +3046,59 @@ function initialize(){
       };
     }
 
+    function rendezvousWithPeer(peer){
+      if(!flight||!peer||typeof multiplayer==='undefined') return;
+      const targetPos=multiplayer.computeFormationRendezvous?.(peer,600,90);
+      if(!targetPos) return;
+      Object.assign(flight,{
+        x:targetPos.x,
+        y:targetPos.y,
+        z:targetPos.z,
+        heading:targetPos.heading,
+        speed:targetPos.speed,
+        vx:targetPos.vx,
+        vy:targetPos.vy,
+        vz:targetPos.vz,
+        pitch:0,
+        bank:0,
+        ground:false,
+        airborne:true,
+        landed:false,
+        gear:false,
+        parkingBrake:false,
+        power:Math.max(flight.power||0.65,0.68)
+      });
+      if(Array.isArray(flight.engines)) flight.engines=flight.engines.map(()=>true);
+      toggleHudMpDropdown(false);
+      showPill(`✈ 已進入 [${peer.callsign}] 600 m 右後翼編隊會合點！`);
+      multiplayer.sendRadio(`已飛往 ${peer.callsign} 身側編隊會合！`);
+    }
+
+    const radioHistoryEntries=[];
+    function appendRadioHistory(sender,text){
+      const box=byId('hudMpRadioHistory');
+      if(!box) return;
+      const stamp=new Date().toLocaleTimeString('zh-TW',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      radioHistoryEntries.push({sender,text,stamp});
+      if(radioHistoryEntries.length>20) radioHistoryEntries.shift();
+      box.replaceChildren();
+      for(const entry of radioHistoryEntries){
+        const line=document.createElement('div');
+        line.className='mp-radio-line';
+        const strong=document.createElement('strong');
+        strong.textContent=`[${entry.stamp}] ${entry.sender}:`;
+        const span=document.createElement('span');
+        span.textContent=entry.text;
+        line.append(strong,span);
+        box.appendChild(line);
+      }
+      box.scrollTop=box.scrollHeight;
+      if(hudMpDropdown&&hudMpDropdown.hidden){
+        unreadRadioCount++;
+        updateUnreadBadge();
+      }
+    }
+
     function renderPeerList(){
       if(!peerList||!peerCount||typeof multiplayer==='undefined') return;
       const peers=multiplayer.getPeers();
@@ -3060,12 +3124,27 @@ function initialize(){
         }else{
           peers.forEach(p=>{
             const row=document.createElement('div');
-            row.style.display='flex';
-            row.style.justifyContent='space-between';
-            row.style.padding='3px 0';
-            row.style.borderBottom='1px solid rgba(255,255,255,0.06)';
-            const dist=flight?Math.hypot(p.state.x-flight.x,p.state.z-flight.z)/1000:0;
-            row.innerHTML=`<span style="color:#7affbe;font-weight:bold;">✈ ${p.callsign}</span><span style="color:#97aeb2;">${(p.aircraftId||'').toUpperCase()} · ${dist>0?dist.toFixed(1)+'km':'--'}</span>`;
+            row.className='hud-mp-peer-row';
+            const meta=document.createElement('div');
+            meta.className='hud-mp-peer-meta';
+            const dist=flight?Math.hypot((p.state?.x||0)-flight.x,(p.state?.z||0)-flight.z)/1000:0;
+            const altDiff=flight?Math.round((p.state?.y||0)-flight.y):Math.round(p.state?.y||0);
+            const altStr=(altDiff>=0?'+':'')+altDiff+'m';
+            const titleEl=document.createElement('span');
+            titleEl.style.color='#7affbe';
+            titleEl.style.fontWeight='bold';
+            titleEl.textContent=`✈ ${p.callsign}`;
+            const subEl=document.createElement('span');
+            subEl.style.color='#97aeb2';
+            subEl.textContent=`${(p.aircraftId||'').toUpperCase()} · ${dist>0?dist.toFixed(1)+'km':'--'} · ${flight?altStr:(Math.round(p.state?.y||0)+'m')}`;
+            meta.append(titleEl,subEl);
+            const btn=document.createElement('button');
+            btn.type='button';
+            btn.className='mp-rendezvous-btn';
+            btn.textContent='✈ 編隊';
+            btn.title='傳送至該機長 600 m 右後翼編隊會合';
+            btn.onclick=()=>rendezvousWithPeer(p);
+            row.append(meta,btn);
             hudPeerList.appendChild(row);
           });
         }
@@ -3081,8 +3160,14 @@ function initialize(){
       peers.forEach(p=>{
         const item=document.createElement('div');
         item.className='mp-peer-item';
-        const dist=flight?Math.hypot(p.state.x-flight.x,p.state.z-flight.z)/1000:0;
-        item.innerHTML=`<span class="callsign">✈ ${p.callsign}</span><span class="details">${(p.aircraftId||'').toUpperCase()} · ${Math.round(p.state.y||0)}m · ${dist>0?dist.toFixed(1)+'km':'--'}</span>`;
+        const dist=flight?Math.hypot((p.state?.x||0)-flight.x,(p.state?.z||0)-flight.z)/1000:0;
+        const labelSpan=document.createElement('span');
+        labelSpan.className='callsign';
+        labelSpan.textContent=`✈ ${p.callsign}`;
+        const detailSpan=document.createElement('span');
+        detailSpan.className='details';
+        detailSpan.textContent=`${(p.aircraftId||'').toUpperCase()} · ${Math.round(p.state?.y||0)}m · ${dist>0?dist.toFixed(1)+'km':'--'}`;
+        item.append(labelSpan,detailSpan);
         peerList.appendChild(item);
       });
     }
@@ -3161,12 +3246,15 @@ function initialize(){
           renderPeerList();
         }else if(event==='peer_joined'){
           showPill(`✈ 機長 [${data.callsign}] 加入了房間！`);
+          appendRadioHistory('系統',`✈ ${data.callsign} 加入了房間`);
           renderPeerList();
         }else if(event==='peer_left'){
           showPill(`✈ 機長 [${data.callsign}] 離開了房間。`);
+          appendRadioHistory('系統',`✈ ${data.callsign} 離開了房間`);
           renderPeerList();
         }else if(event==='radio'){
           showPill(`📻 [${data.sender}]: ${data.text}`);
+          appendRadioHistory(data.sender,data.text);
         }else if(event==='kill_feed'){
           renderKillFeed(data);
         }else if(event==='damage_received'){

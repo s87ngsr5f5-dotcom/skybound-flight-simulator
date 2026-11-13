@@ -452,7 +452,11 @@ const multiplayer = (() => {
       ctx.strokeStyle = (isCombat || (hp !== undefined && hp < 100)) ? '#ff5252' : '#00e5ff';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.roundRect(4, 4, 312, 76, 12);
+      if (ctx.roundRect) {
+        ctx.roundRect(4, 4, 312, 76, 12);
+      } else {
+        ctx.rect(4, 4, 312, 76);
+      }
       ctx.fill();
       ctx.stroke();
 
@@ -602,6 +606,44 @@ const multiplayer = (() => {
     return '';
   }
 
+  function computeFormationRendezvous(peer, offsetDistM = 600, lateralOffsetM = 90) {
+    if (!peer || !peer.state) return null;
+    const s = peer.state;
+    const h = Number.isFinite(s.heading) ? s.heading : 0;
+    const sinH = Math.sin(h), cosH = Math.cos(h);
+    // Position offsetDistM behind peer and lateralOffsetM to right wing
+    const rx = (s.x || 0) - sinH * offsetDistM + cosH * lateralOffsetM;
+    const rz = (s.z || 0) + cosH * offsetDistM + sinH * lateralOffsetM;
+    const ry = Math.max(150, Number.isFinite(s.y) ? s.y : 600);
+    const speed = Math.max(95, Number.isFinite(s.speed) ? s.speed : 140);
+    return {
+      x: rx,
+      y: ry,
+      z: rz,
+      heading: h,
+      speed,
+      vx: sinH * speed,
+      vy: 0,
+      vz: -cosH * speed,
+      pitch: 0,
+      bank: 0
+    };
+  }
+
+  function getNearestPeer(ownFlight) {
+    if (!ownFlight || peers.size === 0) return null;
+    let best = null, bestDist = Infinity;
+    for (const peer of peers.values()) {
+      if (!peer.state) continue;
+      const d = Math.hypot((peer.state.x || 0) - ownFlight.x, (peer.state.z || 0) - ownFlight.z);
+      if (d < bestDist) {
+        bestDist = d;
+        best = peer;
+      }
+    }
+    return best ? { peer: best, distance: bestDist } : null;
+  }
+
   return {
     joinRoom,
     leaveRoom,
@@ -609,6 +651,8 @@ const multiplayer = (() => {
     sendCombatEvent,
     broadcastFlight,
     updatePeers3D,
+    computeFormationRendezvous,
+    getNearestPeer,
     getRoomId: () => roomId,
     getCallsign: () => callsign,
     getLocalId: () => localId,
