@@ -249,6 +249,19 @@ function initialize(){
           vec3 photo=texture2D(taipeiImage,vec2(imageUV.x,1.0-imageUV.y)).rgb;
           diffuseColor.rgb=mix(diffuseColor.rgb,photo*1.12,smoothstep(0.0,0.035,imageEdge));
         }
+        float closeFade=1.0-smoothstep(1800.0,15000.0,length(vViewPosition));
+        if(closeFade>0.005){
+          vec2 parcel=abs(fract(terrainXZ*0.0075)-0.5)*2.0;
+          vec2 blockGrid=abs(fract(terrainXZ*0.022)-0.5)*2.0;
+          float parcelEdge=smoothstep(0.84,0.98,max(parcel.x,parcel.y));
+          float blockEdge=smoothstep(0.86,0.98,max(blockGrid.x,blockGrid.y));
+          float fine=sin(terrainXZ.x*0.18)*cos(terrainXZ.y*0.18)*0.55
+            +sin((terrainXZ.x*0.43-terrainXZ.y*0.37))*0.30
+            +cos((terrainXZ.x+terrainXZ.y)*0.85)*0.15;
+          float coarsePatch=sin(terrainXZ.x*0.029+cos(terrainXZ.y*0.021)*2.0)*cos(terrainXZ.y*0.031);
+          float detailGain=1.0+closeFade*(fine*0.12+coarsePatch*0.08-parcelEdge*0.07-blockEdge*0.055);
+          diffuseColor.rgb=clamp(diffuseColor.rgb*detailGain,0.0,1.0);
+        }
         if(diffuseColor.b>diffuseColor.r*1.45&&diffuseColor.b>0.35){
           vec2 waveCoord=terrainXZ*0.0065;
           float wave=sin(waveCoord.x*2.4+waveCoord.y*1.7+seaSkyTime*0.45)*cos(waveCoord.y*2.1-waveCoord.x*1.3-seaSkyTime*0.32);
@@ -1019,7 +1032,7 @@ function initialize(){
   let inspectionMode=false,hangarMode=false;
   let hangarStage,planPreviewAirport;
   let flight=null, cameraMode=0, last=performance.now(), accumulator=0, paused=false, previousFlightRate=1;
-  let nextNavDraw=0,nextInstrumentDraw=0;
+  let nextNavDraw=0,nextInstrumentDraw=0,nextHudDraw=0;
   const attitudeCanvas=byId('adiCanvas'), attitudeToggle=byId('attitudeMode');
   const attitude=new FlightAttitudeIndicator(attitudeCanvas);
   const attitudePanel=byId('attitudePanel');
@@ -2088,7 +2101,7 @@ function initialize(){
     cockpitView.preset=0;
     resetLook();
     if(flight.regional) showSystems(flight);
-    activeDay=setEnvironment();paused=false;accumulator=0;previousFlightRate=1;nextNavDraw=nextInstrumentDraw=0;
+    activeDay=setEnvironment();paused=false;accumulator=0;previousFlightRate=1;nextNavDraw=nextInstrumentDraw=nextHudDraw=0;
     flightRate.value=byId('voyageRate').value||'1';
     releaseFlightInputs();trail.length=0;previousTouchdown=null;
     byId('plan').hidden=byId('edition').hidden=true;
@@ -2864,20 +2877,21 @@ function initialize(){
   function resize(){
     const {w,h}=getViewportSize();
     const ultra=qualitySelect.value==='ultra';
-    const scale={low:.6,balanced:1,high:1.75}[renderingQuality()]||1;
+    const scale={low:.75,balanced:1.5,high:2}[renderingQuality()]||1.5;
     const mobile=touchControls.mode.value==='mobile';
     basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(w*h))):
-      Math.min(devicePixelRatio,scale,mobile?1:Infinity);
-    if(hangarMode) basePixelRatio=Math.max(basePixelRatio,Math.min(devicePixelRatio,1));
+      Math.min(devicePixelRatio,scale,mobile?1.25:Infinity);
+    if(hangarMode) basePixelRatio=Math.max(basePixelRatio,Math.min(devicePixelRatio,1.25));
     resolutionScale=1;
     measuredFrameTime=measuredFrames=0;
-    nextResolutionReview=performance.now()+2200;
+    nextResolutionReview=performance.now()+2600;
     renderer.setPixelRatio(basePixelRatio);
     const isHigh=qualitySelect.value==='high';
     renderer.shadowMap.enabled=ultra||isHigh;
     if(ultra){
-      if(sunlight.shadow.mapSize.x!==4096){
-        sunlight.shadow.mapSize.set(4096,4096);
+      const maxShadow=renderer.capabilities.maxTextureSize>=4096?3072:2048;
+      if(sunlight.shadow.mapSize.x!==maxShadow){
+        sunlight.shadow.mapSize.set(maxShadow,maxShadow);
         if(sunlight.shadow.map){sunlight.shadow.map.dispose();sunlight.shadow.map=null;}
       }
     }else if(isHigh){
@@ -2917,14 +2931,14 @@ function initialize(){
     measuredFrames++;
     if(now<nextResolutionReview) return;
     const average=measuredFrameTime/measuredFrames;
-    const target=average>.035?Math.max(.72,resolutionScale-.14):
-      average<.023?Math.min(1,resolutionScale+.07):resolutionScale;
+    const target=average>.046?Math.max(.88,resolutionScale-.08):
+      average<.024?Math.min(1,resolutionScale+.06):resolutionScale;
     if(target!==resolutionScale){
       resolutionScale=target;
       renderer.setPixelRatio(basePixelRatio*target);
     }
     measuredFrameTime=measuredFrames=0;
-    nextResolutionReview=now+2200;
+    nextResolutionReview=now+2600;
   }
   addEventListener('resize',resize);
   addEventListener('orientationchange',scheduleOrientationResize);
@@ -4948,32 +4962,35 @@ function initialize(){
       }
       attitudePanel.hidden=!live||Boolean(f.cabinView)||Boolean(f.tow);
       glassCanvas.hidden=attitudePanel.hidden;
-      if(!attitudePanel.hidden){
-        if(attitudeMode!=='clear') attitude.draw(f,pitch,bank,heading,attitudeCanvas.clientWidth,attitudeMode);
-        glassReadouts.draw(f,speeds,cockpitActive()?'駕駛艙':'追蹤視角');
-      }
       if(!f.regional&&!f.ground&&f.waypoint<4&&Math.hypot(legacyRoute[f.waypoint].x-f.x,legacyRoute[f.waypoint].z-f.z)<420) f.waypoint++;
       const target=f.regional?activeTarget(f):legacyRoute[f.waypoint];
       if(!paused&&++trailFrame%60===0){trail.push({x:f.x,z:f.z});if(trail.length>140) trail.shift();}
-      const statusBox=byId('status');
-      statusBox.hidden=Boolean(f.tactical&&!paused)||!byId('gateGuide').hidden&&!paused&&!f.towMessage;
-      const hint=status(f,knots,target);
-      const statusText=!paused&&approachGates.visible&&gateProgress.flashUntil>f.elapsed?
-        hint+' · +100 分 ×'+gateProgress.combo:hint;
-      if(statusBox.textContent!==statusText) statusBox.textContent=statusText;
-      statusBox.classList.toggle('practice-status',statusText.startsWith('起飛 ')||Boolean(f.approach&&!f.voyage));
-      statusBox.classList.toggle('coach-warning',statusText.startsWith('起飛警告'));
-      const readyToTowIn=!f.aircraft.helicopter&&arrivalTowReady(f);
-      byId('towControls').hidden=!f.tow&&!readyToTowIn;
-      byId('startGateTow').hidden=!readyToTowIn;
-      byId('startGateTow').disabled=paused||Boolean(replay);
-      const cargo=f.mission==='cargo';
-      const towLabel=cargo?'拖往貨運機位':'拖往機位';
-      if(byId('startGateTow').textContent!==towLabel) byId('startGateTow').textContent=towLabel;
-      const skipTowLabel=f.tow?.arrival||readyToTowIn?(cargo?'跳至貨運機位':'跳至機位'):'跳至跑道';
-      if(byId('skipRunwayTow').textContent!==skipTowLabel) byId('skipRunwayTow').textContent=skipTowLabel;
-      byId('skipRunwayTow').disabled=paused||Boolean(replay);
-      drawFlightNext(f);
+      if(now>=nextHudDraw){
+        nextHudDraw=now+33;
+        if(!attitudePanel.hidden){
+          if(attitudeMode!=='clear') attitude.draw(f,pitch,bank,heading,attitudeCanvas.clientWidth,attitudeMode);
+          glassReadouts.draw(f,speeds,cockpitActive()?'駕駛艙':'追蹤視角');
+        }
+        const statusBox=byId('status');
+        statusBox.hidden=Boolean(f.tactical&&!paused)||!byId('gateGuide').hidden&&!paused&&!f.towMessage;
+        const hint=status(f,knots,target);
+        const statusText=!paused&&approachGates.visible&&gateProgress.flashUntil>f.elapsed?
+          hint+' · +100 分 ×'+gateProgress.combo:hint;
+        if(statusBox.textContent!==statusText) statusBox.textContent=statusText;
+        statusBox.classList.toggle('practice-status',statusText.startsWith('起飛 ')||Boolean(f.approach&&!f.voyage));
+        statusBox.classList.toggle('coach-warning',statusText.startsWith('起飛警告'));
+        const readyToTowIn=!f.aircraft.helicopter&&arrivalTowReady(f);
+        byId('towControls').hidden=!f.tow&&!readyToTowIn;
+        byId('startGateTow').hidden=!readyToTowIn;
+        byId('startGateTow').disabled=paused||Boolean(replay);
+        const cargo=f.mission==='cargo';
+        const towLabel=cargo?'拖往貨運機位':'拖往機位';
+        if(byId('startGateTow').textContent!==towLabel) byId('startGateTow').textContent=towLabel;
+        const skipTowLabel=f.tow?.arrival||readyToTowIn?(cargo?'跳至貨運機位':'跳至機位'):'跳至跑道';
+        if(byId('skipRunwayTow').textContent!==skipTowLabel) byId('skipRunwayTow').textContent=skipTowLabel;
+        byId('skipRunwayTow').disabled=paused||Boolean(replay);
+        drawFlightNext(f);
+      }
       if(now>=nextNavDraw){drawNav(f,target);nextNavDraw=now+100;}
     }else{
       approachGates.visible=false;

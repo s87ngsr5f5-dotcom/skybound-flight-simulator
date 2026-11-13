@@ -26,6 +26,7 @@ function createTaiwanCity(scene,ground,airports){
     draw(canvas.getContext('2d'),256);
     const tex=new THREE.CanvasTexture(canvas);
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+    tex.anisotropy=8;
     if(srgb)tex.colorSpace=THREE.SRGBColorSpace;
     return tex;
   }
@@ -377,11 +378,18 @@ function createTaiwanCity(scene,ground,airports){
 
   function buffers(){return {p:[],n:[],uv:[],c:[]};}
   function tri(out,a,b,c,col,normal,uvs){
-    for(let i=0;i<3;i++){
-      const v=[a,b,c][i];out.p.push(...v);out.n.push(...normal);
-      out.uv.push(...(uvs?.[i]??[v[0]/4,v[2]/4]));
-      out.c.push(col.r,col.g,col.b);
-    }
+    const cr=col.r,cg=col.g,cb=col.b,nx=normal[0],ny=normal[1],nz=normal[2];
+    out.p.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]);
+    out.n.push(nx,ny,nz,nx,ny,nz,nx,ny,nz);
+    if(uvs) out.uv.push(uvs[0][0],uvs[0][1],uvs[1][0],uvs[1][1],uvs[2][0],uvs[2][1]);
+    else out.uv.push(a[0]*.25,a[2]*.25,b[0]*.25,b[2]*.25,c[0]*.25,c[2]*.25);
+    out.c.push(cr,cg,cb,cr,cg,cb,cr,cg,cb);
+  }
+  function triFlat(out,ax,ay,az,bx,by,bz,cx,cy,cz,cr,cg,cb,nx,ny,nz,u0,v0,u1,v1,u2,v2){
+    out.p.push(ax,ay,az,bx,by,bz,cx,cy,cz);
+    out.n.push(nx,ny,nz,nx,ny,nz,nx,ny,nz);
+    out.uv.push(u0,v0,u1,v1,u2,v2);
+    out.c.push(cr,cg,cb,cr,cg,cb,cr,cg,cb);
   }
   function addLayerMesh(group,data,mat,name){
     if(!data.p.length)return;
@@ -393,12 +401,34 @@ function createTaiwanCity(scene,ground,airports){
     g.computeBoundingSphere();
     const m=new THREE.Mesh(g,mat);m.name=name;m.receiveShadow=true;group.add(m);
   }
+  function emitUpTri(out,p0,p1,p2,y,cr,cg,cb){
+    if((p1[1]-p0[1])*(p2[0]-p0[0])-(p1[0]-p0[0])*(p2[1]-p0[1])>0){
+      triFlat(out,p0[0],y,p0[1],p1[0],y,p1[1],p2[0],y,p2[1],cr,cg,cb,0,1,0,p0[0]*.25,p0[1]*.25,p1[0]*.25,p1[1]*.25,p2[0]*.25,p2[1]*.25);
+    }else{
+      triFlat(out,p0[0],y,p0[1],p2[0],y,p2[1],p1[0],y,p1[1],cr,cg,cb,0,1,0,p0[0]*.25,p0[1]*.25,p2[0]*.25,p2[1]*.25,p1[0]*.25,p1[1]*.25);
+    }
+  }
   function polygon(out,points,y,col){
+    const n=points.length,cr=col.r,cg=col.g,cb=col.b;
+    if(n===3){
+      emitUpTri(out,points[0],points[1],points[2],y,cr,cg,cb);
+      return;
+    }
+    if(n===4){
+      const p0=points[0],p1=points[1],p2=points[2],p3=points[3];
+      const c0=(p1[0]-p0[0])*(p2[1]-p1[1])-(p1[1]-p0[1])*(p2[0]-p1[0]);
+      const c1=(p2[0]-p1[0])*(p3[1]-p2[1])-(p2[1]-p1[1])*(p3[0]-p2[0]);
+      const c2=(p3[0]-p2[0])*(p0[1]-p3[1])-(p3[1]-p2[1])*(p0[0]-p3[0]);
+      const c3=(p0[0]-p3[0])*(p1[1]-p0[1])-(p0[1]-p3[1])*(p1[0]-p0[0]);
+      if((c0>=0&&c1>=0&&c2>=0&&c3>=0)||(c0<=0&&c1<=0&&c2<=0&&c3<=0)){
+        emitUpTri(out,p0,p1,p2,y,cr,cg,cb);
+        emitUpTri(out,p0,p2,p3,y,cr,cg,cb);
+        return;
+      }
+    }
     const contour=points.map(p=>new THREE.Vector2(p[0],p[1]));
     for(const ids of THREE.ShapeUtils.triangulateShape(contour,[])){
-      const [a,b,c]=ids.map(i=>[points[i][0],y,points[i][1]]);
-      if((b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2])>0)tri(out,a,b,c,col,[0,1,0]);
-      else tri(out,a,c,b,col,[0,1,0]);
+      emitUpTri(out,points[ids[0]],points[ids[1]],points[ids[2]],y,cr,cg,cb);
     }
   }
 
@@ -412,24 +442,39 @@ function createTaiwanCity(scene,ground,airports){
       const center=ground(x,z);
       if(center<0.35)continue;
       const points=[];
-      for(let i=0;i<coords.length;i+=2)points.push([x+coords[i],z+coords[i+1]]);
-      mask(group,Math.min(...points.map(p=>p[0]))-2,Math.min(...points.map(p=>p[1]))-2,Math.max(...points.map(p=>p[0]))+2,Math.max(...points.map(p=>p[1]))+2);
-      const base=Math.min(center,...points.map(p=>ground(...p)))-.45;
+      let minX=1e9,minZ=1e9,maxX=-1e9,maxZ=-1e9;
+      for(let i=0;i<coords.length;i+=2){
+        const px=x+coords[i],pz=z+coords[i+1];
+        points.push([px,pz]);
+        if(px<minX)minX=px;if(px>maxX)maxX=px;
+        if(pz<minZ)minZ=pz;if(pz>maxZ)maxZ=pz;
+      }
+      mask(group,minX-2,minZ-2,maxX+2,maxZ+2);
+      let base=center;
+      if(points.length<=4){
+        const g0=ground(points[0][0],points[0][1]),g2=ground(points[2][0],points[2][1]);
+        base=Math.min(center,g0,g2)-.55;
+      }else{
+        for(let i=0;i<points.length;i++){const gp=ground(points[i][0],points[i][1]);if(gp<base)base=gp;}
+        base-=.45;
+      }
       const top=center+h;
       const col=palette[tone%palette.length].clone().multiplyScalar(h>70?.80:1);
+      const cr=col.r,cg=col.g,cb=col.b;
       const isGlazed=(kind===1||h>=36);
       const isTech=(kind===2&&!isGlazed);
       const target=isGlazed?glazed:(isTech?techs:walls);
+      const vScale=isGlazed?12.8:3.2;
       polygon(roofs,points,top,roofPalette[tone%roofPalette.length]);
       for(let i=0;i<points.length;i++){
         const a=points[i],b=points[(i+1)%points.length],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz);
         if(len<.05)continue;
-        const normal=[dz/len,0,-dx/len];
-        const u=len/12.8,v=(top-base)/(isGlazed?12.8:3.2);
-        tri(target,[a[0],base,a[1]],[b[0],base,b[1]],[b[0],top,b[1]],col,normal,[[0,0],[u,0],[u,v]]);
-        tri(target,[a[0],base,a[1]],[b[0],top,b[1]],[a[0],top,a[1]],col,normal,[[0,0],[u,v],[0,v]]);
+        const nx=dz/len,nz=-dx/len;
+        const u=len/12.8,v=(top-base)/vScale;
+        triFlat(target,a[0],base,a[1],b[0],base,b[1],b[0],top,b[1],cr,cg,cb,nx,0,nz,0,0,u,0,u,v);
+        triFlat(target,a[0],base,a[1],b[0],top,b[1],a[0],top,a[1],cr,cg,cb,nx,0,nz,0,0,u,v,0,v);
       }
-      built++;if(built%180===0)yield;
+      built++;if(built%260===0)yield;
     }
     addLayerMesh(group,walls,wall,'Taiwan city facades');
     addLayerMesh(group,glazed,officeGlass,'Taiwan glass skyscrapers');
@@ -450,9 +495,135 @@ function createTaiwanCity(scene,ground,airports){
 
   function requestTile(tile){
     const key=tile[0];pending.add(key);stats.loading=pending.size;
-    fetch('taiwan-city/'+key+'.json?v=60').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+    fetch('taiwan-city/'+key+'.json?v=61').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
       .then(data=>jobs.push({key,iterator:buildTile(key,data)}))
       .catch(()=>{failed.set(key,clock+15);pending.delete(key);stats.loading=pending.size;});
+  }
+
+  // GPU-instanced multi-million settlement blocks (bottomless 2-group unit box = sides + roof = only 6 draw calls total)
+  let settlementsMeta=null,settlementRequest=false;
+  const loadedChunks=new Map(),pendingChunks=new Set();
+  let lastInfillX=1e9,lastInfillZ=1e9,lastInfillRev=-1,lastInfillRange=0,chunkRevision=0,lastChunkRev=-1;
+  function createInfillBoxGeometry(){
+    const g=new THREE.BufferGeometry();
+    // 4 walls (+x, -x, +z, -z) [0..23] + 1 roof (+y) [24..29]
+    const pos=new Float32Array([
+      0.5,0,-0.5, 0.5,0,0.5, 0.5,1,0.5,   0.5,0,-0.5, 0.5,1,0.5, 0.5,1,-0.5,
+      -0.5,0,0.5, -0.5,0,-0.5, -0.5,1,-0.5, -0.5,0,0.5, -0.5,1,-0.5, -0.5,1,0.5,
+      -0.5,0,0.5, 0.5,0,0.5, 0.5,1,0.5,   -0.5,0,0.5, 0.5,1,0.5, -0.5,1,0.5,
+      0.5,0,-0.5, -0.5,0,-0.5, -0.5,1,-0.5, 0.5,0,-0.5, -0.5,1,-0.5, 0.5,1,-0.5,
+      -0.5,1,0.5, 0.5,1,0.5, 0.5,1,-0.5,  -0.5,1,0.5, 0.5,1,-0.5, -0.5,1,-0.5
+    ]);
+    const norm=new Float32Array([
+      1,0,0, 1,0,0, 1,0,0,   1,0,0, 1,0,0, 1,0,0,
+      -1,0,0, -1,0,0, -1,0,0, -1,0,0, -1,0,0, -1,0,0,
+      0,0,1, 0,0,1, 0,0,1,   0,0,1, 0,0,1, 0,0,1,
+      0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1,
+      0,1,0, 0,1,0, 0,1,0,   0,1,0, 0,1,0, 0,1,0
+    ]);
+    const uv=new Float32Array([
+      0,0, 1,0, 1,1,  0,0, 1,1, 0,1,
+      0,0, 1,0, 1,1,  0,0, 1,1, 0,1,
+      0,0, 1,0, 1,1,  0,0, 1,1, 0,1,
+      0,0, 1,0, 1,1,  0,0, 1,1, 0,1,
+      0,0, 1,0, 1,1,  0,0, 1,1, 0,1
+    ]);
+    g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    g.setAttribute('normal',new THREE.BufferAttribute(norm,3));
+    g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+    g.addGroup(0,24,0);
+    g.addGroup(24,6,1);
+    g.computeBoundingSphere();
+    return g;
+  }
+  const infillGeo=createInfillBoxGeometry();
+  const infillWallMat=new THREE.MeshStandardMaterial({color:0xffffff,map:facadeTex,roughness:.88,emissive:0xffe0ac,emissiveMap:facadeNight,emissiveIntensity:0});
+  const infillRoofMat=new THREE.MeshStandardMaterial({color:0xc9d0cb,map:roofTex,roughness:.86});
+  const infillOfficeMat=new THREE.MeshPhysicalMaterial({color:0xffffff,map:officeTex,roughnessMap:officeRough,roughness:.24,metalness:.66,clearcoat:.75,clearcoatRoughness:.20,envMap:reflectedMap,envMapIntensity:1.05,emissive:0xffe2aa,emissiveMap:officeNight,emissiveIntensity:0});
+  const infillTechMat=new THREE.MeshStandardMaterial({color:0xffffff,map:techTex,roughness:.62,metalness:.22});
+  const MAX_RES_INST=5600,MAX_OFF_INST=1600,MAX_TECH_INST=1600;
+  const infillRes=new THREE.InstancedMesh(infillGeo,[infillWallMat,infillRoofMat],MAX_RES_INST);
+  const infillOffice=new THREE.InstancedMesh(infillGeo,[infillOfficeMat,infillRoofMat],MAX_OFF_INST);
+  const infillTech=new THREE.InstancedMesh(infillGeo,[infillTechMat,infillRoofMat],MAX_TECH_INST);
+  for(const im of [infillRes,infillOffice,infillTech]){
+    im.count=0;im.frustumCulled=false;im.receiveShadow=true;im.name='Taiwan multi-million infill';
+    root.add(im);
+  }
+  const dummyObj=new THREE.Object3D();
+  function ensureSettlementChunks(x,z,range){
+    if(!settlementsMeta?.chunks)return;
+    const chunkSz=settlementsMeta.chunkSize||24000;
+    for(const [ck,cx,cz] of settlementsMeta.chunks){
+      const d=Math.hypot(cx-x,cz-z);
+      if(d<range+chunkSz*0.78&&!loadedChunks.has(ck)&&!pendingChunks.has(ck)&&pendingChunks.size<4){
+        pendingChunks.add(ck);
+        fetch('taiwan-city/settlements/'+ck+'.json?v=61').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+          .then(data=>{loadedChunks.set(ck,data.tiles||{});pendingChunks.delete(ck);chunkRevision++;})
+          .catch(()=>{pendingChunks.delete(ck);});
+      }else if(loadedChunks.has(ck)&&d>chunkSz*1.65){
+        loadedChunks.delete(ck);chunkRevision++;
+      }
+    }
+  }
+  function refreshInfill(x,z,range){
+    if(!settlementsMeta)return;
+    const cellSz=settlementsMeta.cellSize||120,tileSz=settlementsMeta.tileSize||4800,chunkSz=settlementsMeta.chunkSize||24000;
+    const maxR=Math.min(range,9000),maxR2=maxR*maxR;
+    const tx0=Math.floor((x-maxR)/tileSz),tx1=Math.floor((x+maxR)/tileSz);
+    const tz0=Math.floor((z-maxR)/tileSz),tz1=Math.floor((z+maxR)/tileSz);
+    let nRes=0,nOff=0,nTech=0;
+    for(let tx=tx0;tx<=tx1;tx++){
+      for(let tz=tz0;tz<=tz1;tz++){
+        const k=tx+'_'+tz;
+        const sx=Math.floor(((tx+0.5)*tileSz)/chunkSz),sz=Math.floor(((tz+0.5)*tileSz)/chunkSz);
+        const chunk=loadedChunks.get(sx+'_'+sz)||settlementsMeta.tiles;
+        const rows=chunk?.[k];
+        if(!rows)continue;
+        for(let i=0;i<rows.length;i+=3){
+          const gx=rows[i],gz=rows[i+1],flags=rows[i+2];
+          const cellCx=(gx+0.5)*cellSz,cellCz=(gz+0.5)*cellSz;
+          const ddx=cellCx-x,ddz=cellCz-z;
+          const d2=ddx*ddx+ddz*ddz;
+          if(d2>maxR2)continue;
+          const kind=flags&3,dens=(flags>>2)&3,angIdx=(flags>>4)&31,hTier=(flags>>9)&7,slots=(flags>>12)&31;
+          const ang=(angIdx/31)*Math.PI;
+          const cosA=Math.cos(ang),sinA=Math.sin(ang);
+          const count=d2<(3600*3600)?slots:Math.min(slots,dens>=2?8:4);
+          let seed=(Math.imul(gx,73856093)^Math.imul(gz,19349663))>>>0;
+          for(let s=0;s<count;s++){
+            seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+            const u=((seed&0xffff)/65536-0.5)*(cellSz*0.84);
+            const v=(((seed>>>16)&0xffff)/65536-0.5)*(cellSz*0.84);
+            const bx=cellCx+u*cosA-v*sinA,bz=cellCz+u*sinA+v*cosA;
+            if(blocked(bx,bz)||skipBuilding(bx,bz))continue;
+            const gy=ground(bx,bz);
+            if(gy<0.9)continue;
+            if(Math.abs(ground(bx+8,bz)-gy)>4.2||Math.abs(ground(bx,bz+8)-gy)>4.2)continue;
+            seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+            const r1=(seed&255)/255,r2=((seed>>>8)&255)/255,r3=((seed>>>16)&255)/255;
+            const bh=(kind===2?(8.5+r1*8.5):(hTier>=5?(18+r1*26):(dens>=2?(11+r1*13):(8.5+r1*6.5))));
+            const bw=kind===2?(16+r2*18):(dens>=3?(12+r2*12):(8.5+r2*7.5));
+            const bd=kind===2?(14+r3*14):(dens>=3?(11+r3*10):(8.0+r3*6.5));
+            const col=palette[(seed>>>24)%palette.length];
+            dummyObj.position.set(bx,gy-0.55,bz);
+            dummyObj.rotation.set(0,-ang+((seed&1)?0:Math.PI*0.5),0);
+            dummyObj.scale.set(bw,bh,bd);
+            dummyObj.updateMatrix();
+            if(kind===2&&nTech<MAX_TECH_INST){
+              infillTech.setMatrixAt(nTech,dummyObj.matrix);infillTech.setColorAt(nTech,col);nTech++;
+            }else if((kind===1||bh>=28)&&nOff<MAX_OFF_INST){
+              infillOffice.setMatrixAt(nOff,dummyObj.matrix);infillOffice.setColorAt(nOff,col);nOff++;
+            }else if(nRes<MAX_RES_INST){
+              infillRes.setMatrixAt(nRes,dummyObj.matrix);infillRes.setColorAt(nRes,col);nRes++;
+            }
+          }
+        }
+      }
+    }
+    infillRes.count=nRes;infillRes.instanceMatrix.needsUpdate=true;if(infillRes.instanceColor)infillRes.instanceColor.needsUpdate=true;
+    infillOffice.count=nOff;infillOffice.instanceMatrix.needsUpdate=true;if(infillOffice.instanceColor)infillOffice.instanceColor.needsUpdate=true;
+    infillTech.count=nTech;infillTech.instanceMatrix.needsUpdate=true;if(infillTech.instanceColor)infillTech.instanceColor.needsUpdate=true;
+    stats.activeInfill=nRes+nOff+nTech;
   }
 
   function update(dt,x,z,quality,activeDay,wet){
@@ -460,25 +631,40 @@ function createTaiwanCity(scene,ground,airports){
     const at=latLon(x,z),near=at.lat>21.6&&at.lat<26.6&&at.lon>117.9&&at.lon<122.4;
     root.visible=near;if(!near)return;
     const mobile=touchControls.mode.value==='mobile';
-    const range=mobile?5000:quality==='ultra'?12000:quality==='high'?9600:7200;
-    wall.emissiveIntensity=(1-day)*.42;
+    const range=mobile?5000:quality==='ultra'?12000:quality==='high'?9600:7400;
+    const nightWall=(1-day)*.42,nightOff=Math.pow(1-day,1.35)*.95,envInt=.28+day*1.15;
+    wall.emissiveIntensity=nightWall;
+    infillWallMat.emissiveIntensity=nightWall;
     darkGlass.emissiveIntensity=(1-day)*.62;
-    officeGlass.emissiveIntensity=Math.pow(1-day,1.35)*.95;
-    officeGlass.envMapIntensity=.28+day*1.15;
+    officeGlass.emissiveIntensity=nightOff;
+    infillOfficeMat.emissiveIntensity=nightOff;
+    officeGlass.envMapIntensity=infillOfficeMat.envMapIntensity=envInt;
     beaconMat.emissiveIntensity=(Math.sin(clock*4.5)>0?1.8:.15)*(0.45+(1-day)*1.2);
     for(let i=0;i<landmarkGroups.length;i++){
       const g=landmarkGroups[i];
       const d=Math.hypot(g.position.x-x,g.position.z-z);
-      g.visible=d<Math.max(18000,range*1.9);
-      if(g.visible&&Math.abs(g.position.y-ground(g.position.x,g.position.z))>1.5){
+      const show=d<Math.max(18000,range*1.9);
+      g.visible=show;
+      if(show&&!g.userData.grounded){
         g.position.y=ground(g.position.x,g.position.z);
+        g.userData.grounded=true;
       }
     }
     if(!index&&!indexRequest&&clock>=nextScan){
       indexRequest=true;
-      fetch('taiwan-city/index.json?v=60').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
-        .then(data=>{index=data;stats.ready=true;root.userData.coverage=data;})
+      fetch('taiwan-city/index.json?v=61').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+        .then(data=>{
+          index=data;stats.ready=true;root.userData.coverage=data;
+          stats.infillCapacity=data.counts?.infillBuildings||0;
+          stats.taiwanTotalBuildings=data.counts?.taiwanTotalBuildings||data.counts?.buildings||0;
+        })
         .catch(()=>{indexRequest=false;nextScan=clock+12;});
+    }
+    if(!settlementsMeta&&!settlementRequest){
+      settlementRequest=true;
+      fetch('taiwan-city/settlements.json?v=61').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+        .then(data=>{settlementsMeta=data;chunkRevision++;ensureSettlementChunks(x,z,range);})
+        .catch(()=>{settlementRequest=false;});
     }
     if(index&&clock>=nextScan){
       nextScan=clock+.45;
@@ -488,6 +674,11 @@ function createTaiwanCity(scene,ground,airports){
         if(distance<range+3600&&!mesh&&!pending.has(tile[0])&&(failed.get(tile[0])??0)<clock&&pending.size<4)requestTile(tile);
         if(mesh&&distance>range+7500)disposeTile(tile[0]);
       }
+      ensureSettlementChunks(x,z,range);
+    }
+    if(settlementsMeta&&(Math.hypot(x-lastInfillX,z-lastInfillZ)>280||stats.maskRevision!==lastInfillRev||chunkRevision!==lastChunkRev||range!==lastInfillRange)){
+      lastInfillX=x;lastInfillZ=z;lastInfillRev=stats.maskRevision;lastChunkRev=chunkRevision;lastInfillRange=range;
+      refreshInfill(x,z,range);
     }
     const end=performance.now()+(mobile?4.0:8.0);
     while(jobs.length&&performance.now()<end){

@@ -225,7 +225,7 @@ function createAirportSurroundings(parent,airport,layout){
   }
   surfaceContext.putImageData(pixels,0,0);
   const aggregate=new THREE.CanvasTexture(surface);aggregate.wrapS=aggregate.wrapT=THREE.RepeatWrapping;
-  aggregate.colorSpace=THREE.SRGBColorSpace;aggregate.anisotropy=4;road.map=aggregate;paving.map=aggregate;
+  aggregate.colorSpace=THREE.SRGBColorSpace;aggregate.anisotropy=8;road.map=aggregate;paving.map=aggregate;
   for(const material of [road,paving])for(const g of batches.get(material)||[]){
     const positions=g.attributes.position,uv=g.attributes.uv;
     for(let i=0;i<positions.count;i++)uv.setXY(i,positions.getX(i)/7,positions.getZ(i)/7);

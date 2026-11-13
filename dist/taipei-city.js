@@ -32,7 +32,7 @@ function createTaipeiCity(scene,ground,airports){
     ctx.fillStyle='#999d98';ctx.fillRect(i*64+8,96,47,12);
   }
   const facade=new THREE.CanvasTexture(canvas);facade.colorSpace=THREE.SRGBColorSpace;
-  facade.wrapS=facade.wrapT=THREE.RepeatWrapping;
+  facade.wrapS=facade.wrapT=THREE.RepeatWrapping;facade.anisotropy=8;
   const night=document.createElement('canvas');night.width=256;night.height=128;
   const ink=night.getContext('2d');ink.fillStyle='#000';ink.fillRect(0,0,256,128);
   for(let i=0;i<4;i++){ink.fillStyle=i===1?'#d7b37c':'#080c10';ink.fillRect(i*64+11,18,40,66);}
@@ -324,11 +324,19 @@ function createTaipeiCity(scene,ground,airports){
   });
   function buffers(){return {p:[],n:[],uv:[],c:[]};}
   function tri(out,a,b,c,color,normal,uvs){
-    for(let i=0;i<3;i++){
-      const v=[a,b,c][i];out.p.push(...v);out.n.push(...normal);
-      out.uv.push(...(uvs?.[i]??[v[0]/4,v[2]/4]));
-      out.c.push(color.r,color.g,color.b);
-    }
+    const cr=color.r,cg=color.g,cb=color.b,nx=normal[0],ny=normal[1],nz=normal[2];
+    const p=out.p,n=out.n,uv=out.uv,cl=out.c;
+    p.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]);
+    n.push(nx,ny,nz,nx,ny,nz,nx,ny,nz);
+    if(uvs) uv.push(uvs[0][0],uvs[0][1],uvs[1][0],uvs[1][1],uvs[2][0],uvs[2][1]);
+    else uv.push(a[0]*.25,a[2]*.25,b[0]*.25,b[2]*.25,c[0]*.25,c[2]*.25);
+    cl.push(cr,cg,cb,cr,cg,cb,cr,cg,cb);
+  }
+  function triFlat(out,ax,ay,az,bx,by,bz,cx,cy,cz,cr,cg,cb,nx,ny,nz,u0,v0,u1,v1,u2,v2){
+    out.p.push(ax,ay,az,bx,by,bz,cx,cy,cz);
+    out.n.push(nx,ny,nz,nx,ny,nz,nx,ny,nz);
+    out.uv.push(u0,v0,u1,v1,u2,v2);
+    out.c.push(cr,cg,cb,cr,cg,cb,cr,cg,cb);
   }
   const white=new THREE.Color(0xffffff);
   function mesh(group,data,mat,name){
@@ -338,12 +346,34 @@ function createTaipeiCity(scene,ground,airports){
     g.setAttribute('color',new THREE.Float32BufferAttribute(data.c,3));g.computeBoundingSphere();
     const m=new THREE.Mesh(g,mat);m.name=name;m.receiveShadow=true;group.add(m);
   }
+  function emitUpTri(out,p0,p1,p2,y,cr,cg,cb){
+    if((p1[1]-p0[1])*(p2[0]-p0[0])-(p1[0]-p0[0])*(p2[1]-p0[1])>0){
+      triFlat(out,p0[0],y,p0[1],p1[0],y,p1[1],p2[0],y,p2[1],cr,cg,cb,0,1,0,p0[0]*.25,p0[1]*.25,p1[0]*.25,p1[1]*.25,p2[0]*.25,p2[1]*.25);
+    }else{
+      triFlat(out,p0[0],y,p0[1],p2[0],y,p2[1],p1[0],y,p1[1],cr,cg,cb,0,1,0,p0[0]*.25,p0[1]*.25,p2[0]*.25,p2[1]*.25,p1[0]*.25,p1[1]*.25);
+    }
+  }
   function polygon(out,points,y,color){
+    const n=points.length,cr=color.r,cg=color.g,cb=color.b;
+    if(n===3){
+      emitUpTri(out,points[0],points[1],points[2],y,cr,cg,cb);
+      return;
+    }
+    if(n===4){
+      const p0=points[0],p1=points[1],p2=points[2],p3=points[3];
+      const c0=(p1[0]-p0[0])*(p2[1]-p1[1])-(p1[1]-p0[1])*(p2[0]-p1[0]);
+      const c1=(p2[0]-p1[0])*(p3[1]-p2[1])-(p2[1]-p1[1])*(p3[0]-p2[0]);
+      const c2=(p3[0]-p2[0])*(p0[1]-p3[1])-(p3[1]-p2[1])*(p0[0]-p3[0]);
+      const c3=(p0[0]-p3[0])*(p1[1]-p0[1])-(p0[1]-p3[1])*(p1[0]-p0[0]);
+      if((c0>=0&&c1>=0&&c2>=0&&c3>=0)||(c0<=0&&c1<=0&&c2<=0&&c3<=0)){
+        emitUpTri(out,p0,p1,p2,y,cr,cg,cb);
+        emitUpTri(out,p0,p2,p3,y,cr,cg,cb);
+        return;
+      }
+    }
     const contour=points.map(p=>new THREE.Vector2(p[0],p[1]));
     for(const ids of THREE.ShapeUtils.triangulateShape(contour,[])){
-      const [a,b,c]=ids.map(i=>[points[i][0],y,points[i][1]]);
-      if((b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2])>0)tri(out,a,b,c,color,[0,1,0]);
-      else tri(out,a,c,b,color,[0,1,0]);
+      emitUpTri(out,points[ids[0]],points[ids[1]],points[ids[2]],y,cr,cg,cb);
     }
   }
   function* build(key,data){
@@ -353,23 +383,39 @@ function createTaipeiCity(scene,ground,airports){
     let built=0;
     for(const [x,z,h,tone,kind,coords] of data.b){
       if(skipBuilding(x,z))continue;
-      const points=[];for(let i=0;i<coords.length;i+=2)points.push([x+coords[i],z+coords[i+1]]);
-      mask(group,Math.min(...points.map(p=>p[0]))-2,Math.min(...points.map(p=>p[1]))-2,Math.max(...points.map(p=>p[0]))+2,Math.max(...points.map(p=>p[1]))+2);
-      const center=ground(x,z),base=Math.min(center,...points.map(p=>ground(...p)))-.25;
+      const points=[];
+      let minX=1e9,minZ=1e9,maxX=-1e9,maxZ=-1e9;
+      for(let i=0;i<coords.length;i+=2){
+        const px=x+coords[i],pz=z+coords[i+1];
+        points.push([px,pz]);
+        if(px<minX)minX=px;if(px>maxX)maxX=px;
+        if(pz<minZ)minZ=pz;if(pz>maxZ)maxZ=pz;
+      }
+      mask(group,minX-2,minZ-2,maxX+2,maxZ+2);
+      const center=ground(x,z);
+      let base=center;
+      if(points.length<=4){
+        const g0=ground(points[0][0],points[0][1]),g2=ground(points[2][0],points[2][1]);
+        base=Math.min(center,g0,g2)-.45;
+      }else{
+        for(let i=0;i<points.length;i++){const gp=ground(points[i][0],points[i][1]);if(gp<base)base=gp;}
+        base-=.25;
+      }
       const top=center+h,color=palette[tone].clone().multiplyScalar(h>75?.76:1);
+      const cr=color.r,cg=color.g,cb=color.b;
       const isGlazed=h>50||kind===1&&h>25;
       const facadeTarget=isGlazed?glazed:walls;
+      const vScale=isGlazed?12.8:3.2;
       polygon(roofs,points,top,roofPalette[tone]);
       for(let i=0;i<points.length;i++){
         const a=points[i],b=points[(i+1)%points.length],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);
         if(length<.01)continue;
-        const normal=[dz/length,0,-dx/length];
-        // Double-sided walls handle either winding from OSM, with physically scaled windows.
-        const u=length/12.8,v=(top-base)/(isGlazed?12.8:3.2);
-        tri(facadeTarget,[a[0],base,a[1]],[b[0],base,b[1]],[b[0],top,b[1]],color,normal,[[0,0],[u,0],[u,v]]);
-        tri(facadeTarget,[a[0],base,a[1]],[b[0],top,b[1]],[a[0],top,a[1]],color,normal,[[0,0],[u,v],[0,v]]);
+        const nx=dz/length,nz=-dx/length;
+        const u=length/12.8,v=(top-base)/vScale;
+        triFlat(facadeTarget,a[0],base,a[1],b[0],base,b[1],b[0],top,b[1],cr,cg,cb,nx,0,nz,0,0,u,0,u,v);
+        triFlat(facadeTarget,a[0],base,a[1],b[0],top,b[1],a[0],top,a[1],cr,cg,cb,nx,0,nz,0,0,u,v,0,v);
       }
-      built++;if(built%24===0)yield;
+      built++;if(built%72===0)yield;
     }
     for(const coords of data.w){
       const points=[];for(let i=0;i<coords.length;i+=2)points.push([coords[i],coords[i+1]]);

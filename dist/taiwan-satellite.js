@@ -36,7 +36,7 @@ function createTaiwanSatellite(makeMaterial,renderer,onLoaded){
       loader.load(satelliteTileURL(tile,variant),texture=>{
         if(tiles.get(tile.key)===tile&&tile.variant===variant){
           texture.colorSpace=THREE.SRGBColorSpace;
-          texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+          texture.anisotropy=Math.min(16,renderer.capabilities.getMaxAnisotropy());
           tile.texture?.dispose();
           tile.texture=tile.image.value=texture;
           tile.ready.value=1;
@@ -73,7 +73,7 @@ function createTaiwanSatellite(makeMaterial,renderer,onLoaded){
       tiles.delete(key);
     }
     candidates.sort((a,b)=>a.distance-b.distance);
-    const highTiles=quality==='ultra'?4:quality==='high'||quality==='satellite'?2:quality==='balanced'?1:0;
+    const highTiles=quality==='ultra'?9:quality==='high'?6:quality==='satellite'?5:quality==='balanced'?4:0;
     candidates.forEach(({key,x,z,distance},index)=>{
       let tile=tiles.get(key);
       if(!tile){

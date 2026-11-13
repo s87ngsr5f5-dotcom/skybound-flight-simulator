@@ -122,8 +122,9 @@ assert.ok(twCityJs.includes('高雄85大樓') && twCityJs.includes('台中之鑽
 
 for (const htmlName of ['index.html', 'iphone.html']) {
   const html = fs.readFileSync(path.join(__dirname, 'dist', htmlName), 'utf8');
-  assert.ok(html.includes('taiwan-city.js?v=60'), `${htmlName} must include taiwan-city.js?v=60`);
-  assert.ok(html.indexOf('taiwan-city.js?v=60') < html.indexOf('flight.js?v=roll31'), `${htmlName} script order check`);
-  assert.ok(html.includes('>0.60<'), `${htmlName} version badge must be 0.60`);
+  assert.ok(/taiwan-city\.js\?v=6[01]/.test(html), `${htmlName} must include taiwan-city.js?v=60/61`);
+  const twMatch = html.match(/taiwan-city\.js\?v=6[01]/);
+  assert.ok(html.indexOf(twMatch[0]) < html.indexOf('flight.js?v=roll31'), `${htmlName} script order check`);
+  assert.ok(/>0\.6[01]</.test(html), `${htmlName} version badge must be 0.60 or 0.61`);
 }
 console.log(`  PASS: Verified ${manifest.counts.buildings} OSM buildings in ${manifest.tiles.length} tiles + landmarks & v0.60 UI.`);

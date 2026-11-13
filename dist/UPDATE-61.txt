@@ -1,0 +1,15 @@
+SKYBOUND GLOBAL v0.61 更新說明 (2026-11-13)
+
+1. 畫質全面升級 (Crisp HiDPI + 高解析衛星磚 + 地表微紋理)
+- 桌面與行動端 `balanced` / `high` 模式全面解除低解析鎖定：桌面 `balanced` 預設可達 `1.5x` HiDPI、`high` 可達 `2.0x`；動態降解析下限提高至 `0.88`，畫面不再模糊。
+- `taiwan-satellite.js` 高清 `1152px` 衛星圖磚數量由 1 張擴增至 `balanced: 4 / high: 6 / ultra: 9`，並全面拉滿各向異性過濾至 `16x`。
+- `flight.js` `terrainPhoto` 著色器新增近地雙頻微表面紋理（稻田街區肌理在低空 1.8km–14km 內自動融合顯現），讓低空飛行清晰銳利。
+
+2. 每秒幀率與串流效能倍增 (FPS Boost)
+- `taipei-city.js` 與 `taiwan-city.js` 針對占全島 ~85% 的四邊形與三角形屋頂實作零配置快速直通三角化，跳過繁重的 `THREE.ShapeUtils.triangulateShape` 與多餘陣列拷貝，並減少每棟地表雙線性插值次數，大幅拉高串流建置速度並消弭卡頓。
+- `taiwan-city.js` 地標高度改為首次貼地快取，取消每幀重複 19 次 `terrainHeight` 查詢。
+- `flight.js` 將 2D 儀表板、HUD 抬頭文字與部分狀態 DOM 重繪適度節流至 ~30Hz，同時在 `ultra` 陰影使用 `3072x3072` 平衡高畫質與高幀率。
+
+3. 全台幾百萬棟 1:1 真實比例建築覆蓋 (900 萬+ 建築容量)
+- `tools/build-taiwan-cities.py` 放寬真實 OSM 建物擷取下限至 `12m²`（涵蓋小型透天厝與農舍，共抽出全島及離島 49.5 萬+ 棟真實 OSM 多邊形 + 台北 9.5 萬棟），並自 35,444 處都市區 (`landuse`) 與 542,863 條城鄉街道網建置全島 `settlements.json`（56.6 萬個 120m 城鄉聚落網格、約 863 萬棟聚落建築容量，全台總建築覆蓋達 922 萬+ 棟）。
+- `taiwan-city.js` 新增 3 組 GPU `InstancedMesh`（透天公寓、現代商辦、科技廠房，總計僅需少數 Draw Call），於飛機周邊精準對齊真實街道方向鋪設 1:1 房屋群（自動避開既有 OSM 多邊形、機場與海域山壁），飛遍全台灣鄉鎮城市都能見滿城建築與順暢高 FPS。
