@@ -434,52 +434,123 @@
       drawBlade(rightPivot, 0, 0.42);
     }
 
-    // Create 3D Rain Streaks particle geometry for Three.js
+    // Create 3D Wind-Slanted Volumetric Rain Streaks (LineSegments) for Three.js
     function createRainMesh(THREE){
       if(!THREE) return null;
-      const count = 1500;
-      const positions = new Float32Array(count * 3);
-      const spanX = 140, spanY = 90, spanZ = 140;
+      const count = 2600;
+      const nearCount = 1700;
+      const positions = new Float32Array(count * 6);
+      const colors = new Float32Array(count * 6);
+      const drops = new Array(count);
 
       for(let i = 0; i < count; i++){
-        positions[i * 3 + 0] = (Math.random() - 0.5) * spanX;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * spanY;
-        positions[i * 3 + 2] = (Math.random() - 0.5) * spanZ;
+        const isNear = i < nearCount;
+        const spanX = isNear ? 84 : 185;
+        const spanY = isNear ? 56 : 96;
+        const spanZ = isNear ? 84 : 185;
+        const x = (Math.random() - 0.5) * spanX;
+        const y = (Math.random() - 0.5) * spanY;
+        const z = (Math.random() - 0.5) * spanZ;
+        const len = isNear ? (0.65 + Math.random() * 0.75) : (1.1 + Math.random() * 1.1);
+        const speedScale = 0.85 + Math.random() * 0.35;
+        drops[i] = { x, y, z, len, speedScale, spanX, spanY, spanZ, isNear };
+
+        const o = i * 6;
+        positions[o + 0] = x;
+        positions[o + 1] = y;
+        positions[o + 2] = z;
+        positions[o + 3] = x;
+        positions[o + 4] = y + len;
+        positions[o + 5] = z;
+
+        // Tip (subtle silver-blue mist) -> Tail (soft transparent fade)
+        const headB = isNear ? 0.68 : 0.50;
+        const tailB = isNear ? 0.30 : 0.20;
+        colors[o + 0] = 0.72 * headB; colors[o + 1] = 0.84 * headB; colors[o + 2] = 0.96 * headB;
+        colors[o + 3] = 0.45 * tailB; colors[o + 4] = 0.58 * tailB; colors[o + 5] = 0.74 * tailB;
       }
 
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-      const material = new THREE.PointsMaterial({
-        color: 0xbed6e8,
-        size: 1.6,
+      const material = new THREE.LineBasicMaterial({
+        vertexColors: true,
         transparent: true,
-        opacity: 0.62,
+        opacity: 0.36,
         depthWrite: false
       });
 
-      const points = new THREE.Points(geometry, material);
-      points.frustumCulled = false;
-      state.rainParticles = points;
-      return points;
+      const lines = new THREE.LineSegments(geometry, material);
+      lines.name = 'StormRainStreaks';
+      lines.frustumCulled = false;
+      lines.userData = { count, drops, wrap: (v, span) => ((v + span * 0.5) % span + span) % span - span * 0.5 };
+      state.rainParticles = lines;
+      return lines;
     }
 
-    // Update 3D Rain Streaks
-    function updateRainMesh(points, cameraPos, dt, speed){
-      if(!points || !cameraPos) return;
-      points.position.set(cameraPos.x, cameraPos.y, cameraPos.z);
-      const attr = points.geometry.attributes.position;
+    // Update 3D Wind-Slanted Rain Streaks with aircraft & wind relative velocity
+    function updateRainMesh(lines, cameraPos, dt, speed, opts){
+      if(!lines || !cameraPos) return;
+      lines.position.set(cameraPos.x, cameraPos.y, cameraPos.z);
+      const attr = lines.geometry?.attributes?.position;
+      const drops = lines.userData?.drops;
+      if(!attr) return;
       const pos = attr.array;
-      const spanX = 140, spanY = 90, spanZ = 140;
-      const fallSpeed = (24 + (speed || 0) * 0.4) * dt;
+      const stepDt = Math.min(0.05, Math.max(0.001, dt || 0.016));
+      const intensity = Math.max(0.25, Math.min(1.0, opts?.intensity ?? 0.85));
+      if(lines.material) lines.material.opacity = 0.22 + 0.16 * intensity;
 
-      for(let i = 0; i < pos.length / 3; i++){
-        pos[i * 3 + 1] -= fallSpeed;
-        if(pos[i * 3 + 1] < -spanY * 0.5){
-          pos[i * 3 + 1] += spanY;
-          pos[i * 3 + 0] = (Math.random() - 0.5) * spanX;
-          pos[i * 3 + 2] = (Math.random() - 0.5) * spanZ;
+      if(!drops){
+        // Fallback if tested with a legacy flat position buffer
+        const spanY = 90;
+        const fallSpeed = (24 + (speed || 0) * 0.4) * stepDt;
+        for(let i = 0; i < pos.length / 3; i++){
+          pos[i * 3 + 1] -= fallSpeed;
+          if(pos[i * 3 + 1] < -spanY * 0.5) pos[i * 3 + 1] += spanY;
         }
+        attr.needsUpdate = true;
+        return;
+      }
+
+      const count = drops.length;
+      const activeCount = Math.max(400, Math.floor(count * (0.42 + 0.58 * intensity)));
+      if(typeof lines.geometry.setDrawRange === 'function'){
+        lines.geometry.setDrawRange(0, activeCount * 2);
+      }
+
+      const vx = opts?.vx || 0;
+      const vy = opts?.vy || 0;
+      const vz = opts?.vz || 0;
+      const windX = (opts?.windX ?? 4.5);
+      const windZ = (opts?.windZ ?? 2.2);
+      const baseFall = 26 + intensity * 12;
+      const wrap = lines.userData.wrap;
+
+      for(let i = 0; i < activeCount; i++){
+        const d = drops[i];
+        const relX = windX - vx;
+        const relY = -baseFall * d.speedScale - vy;
+        const relZ = windZ - vz;
+
+        d.x = wrap(d.x + relX * stepDt, d.spanX);
+        d.y = wrap(d.y + relY * stepDt, d.spanY);
+        d.z = wrap(d.z + relZ * stepDt, d.spanZ);
+
+        const relSpeed = Math.hypot(relX, relY, relZ) || 1;
+        const nx = relX / relSpeed;
+        const ny = relY / relSpeed;
+        const nz = relZ / relSpeed;
+        const stretch = Math.min(4.6, Math.max(0.85, relSpeed / 32));
+        const streakLen = d.len * (0.60 + intensity * 0.35) * stretch;
+
+        const o = i * 6;
+        pos[o + 0] = d.x;
+        pos[o + 1] = d.y;
+        pos[o + 2] = d.z;
+        pos[o + 3] = d.x - nx * streakLen;
+        pos[o + 4] = d.y - ny * streakLen;
+        pos[o + 5] = d.z - nz * streakLen;
       }
       attr.needsUpdate = true;
     }

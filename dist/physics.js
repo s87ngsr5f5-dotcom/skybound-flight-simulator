@@ -307,7 +307,7 @@ function stepTrainer(f, input, dt=simTick){
   // Actual lateral lift stays finite at 90 degrees; tan(bank) does not.
   const coordinatedYaw=attitudeAssist?Math.tan(limit(f.bank,-1.2,1.2))*g/Math.max(20,speed):
     limit(lift*Math.sin(f.bank)/(mass*Math.max(20,speed)),-1.3,1.3);
-  const targetYaw=(f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.22:.40):
+  const targetYaw=(f.ground?input.rudder*(aircraft.role&&aircraft.role!=='fighter'?.34:.45):
     coordinatedYaw+input.rudder*(fighterManual?.37:.25)*(attitudeAssist?1:Math.cos(f.bank))+beta*.35) + propPfactor;
   const yawMoment=(targetYaw+asymmetricYaw-f.yawRate)*8800*aircraft.inertia[2]/2850;
   f.pitchRate+=pitchMoment/aircraft.inertia[0]*dt;
@@ -330,7 +330,7 @@ function stepTrainer(f, input, dt=simTick){
     f.pitch=limit(f.pitch+buffetShake,pitchMin,pitchMax);
   }
 
-  f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/6,0,1):1));
+  f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/3.5,0,1):1));
   if(f.ground){
     f.lateralAcceleration=0;
     f.bank=f.bankRate=0;

@@ -54,6 +54,7 @@ jobs:
       - run: node verify-liveries-themes.cjs
       - run: node verify-layout-and-3dmap.cjs
       - run: node verify-sky-raytracing.cjs
+      - run: node verify-v60-features.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

@@ -92,8 +92,10 @@ function stepHelicopter(f, input, dt = simTick){
   f.pitch = limit(f.pitch + f.pitchRate * dt, -.60, .52);
   f.bank = limit(f.bank + f.bankRate * dt, -.55, .55);
 
-  f.yawRate += (rudder * .75 - f.yawRate) * (1 - Math.exp(-dt * 4));
-  if(!f.ground) f.heading = wrapAngle(f.heading + f.yawRate * dt);
+  const bankTurn = !f.ground ? Math.sin(f.bank) * (.72 + Math.min(.65, Math.hypot(vx, vz) * .012)) + roll * .24 : (f.rotorRPM > .35 ? roll * .45 : 0);
+  const targetYaw = rudder * .95 + bankTurn;
+  f.yawRate += (targetYaw - f.yawRate) * (1 - Math.exp(-dt * 4.5));
+  if(!f.ground || f.rotorRPM > .35) f.heading = wrapAngle(f.heading + f.yawRate * dt);
 
   const lift = g * (f.power / .55) * f.rotorRPM * f.rotorRPM * Math.pow(density, .65) * 1900 / mass;
   f.engineThrust = lift * mass; f.stall = false; f.airBrake = Boolean(input.brake && !f.ground);

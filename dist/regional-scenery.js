@@ -146,54 +146,56 @@ function* buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBou
   buildings.count=0;
   scene.add(buildings);
 
-  // Kaohsiung 85 Sky Tower (高雄 85 大樓 · 347.5m / 378m)
-  const p85=geoPoint(22.61106,120.30350), g85=ground(p85.x,p85.z);
-  const tower85=new THREE.Group();tower85.name='高雄85大樓';tower85.position.set(p85.x,g85,p85.z);
   const k85Glass=new THREE.MeshStandardMaterial({color:0x2b6468,roughness:.16,metalness:.72,emissive:0xffdfa8,emissiveIntensity:0});
   const k85Stone=new THREE.MeshStandardMaterial({color:0xb2b6b8,roughness:.72});
   const k85Metal=new THREE.MeshStandardMaterial({color:0x717980,roughness:.38,metalness:.55});
   const k85Beacon=new THREE.MeshBasicMaterial({color:0xff2222});
-  function kbox(parent,mat,w,h,d,x,y,z){
-    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
-    m.position.set(x,y,z);parent.add(m);return m;
-  }
-  function kcyl(parent,mat,rt,rb,h,seg,x,y,z){
-    const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat);
-    m.position.set(x,y,z);parent.add(m);return m;
-  }
-  kbox(tower85,k85Stone,98,34,64,0,17,0);
-  for(const side of [-1,1]){
-    kbox(tower85,k85Glass,32,122,54,side*27,34+61,0);
-    for(const cz of [-26,26]) kbox(tower85,k85Stone,3.5,122,3.5,side*27,34+61,cz);
-    for(const cx of [-15,15]) kbox(tower85,k85Stone,3.5,122,3.5,side*27+cx,34+61,0);
-  }
-  kbox(tower85,k85Stone,86,14,56,0,156+7,0);
-  kbox(tower85,k85Glass,48,142,48,0,163+71,0);
-  kbox(tower85,k85Glass,52,136,44,0,234,0);
-  kbox(tower85,k85Glass,44,136,52,0,234,0);
-  kbox(tower85,k85Stone,40,16,40,0,305+8,0);
-  kbox(tower85,k85Glass,32,14,32,0,321+7,0);
-  kcyl(tower85,k85Stone,6,28,15,4,0,335+7.5,0).rotation.y=Math.PI/4;
-  kcyl(tower85,k85Metal,.9,2.8,32,8,0,348+16,0);
-  kbox(tower85,k85Beacon,2.2,2.2,2.2,0,381,0);
-  for(const side of [-1,1]){
-    kbox(tower85,k85Beacon,1.6,1.6,1.6,side*27,156,26);
-    kbox(tower85,k85Beacon,1.6,1.6,1.6,side*27,156,-26);
-  }
-  scene.add(tower85);
+  const hasTaiwanCity=typeof createTaiwanCity==='function';
+  if(!hasTaiwanCity){
+    const p85=geoPoint(22.61106,120.30350), g85=ground(p85.x,p85.z);
+    const tower85=new THREE.Group();tower85.name='高雄85大樓';tower85.position.set(p85.x,g85,p85.z);
+    function kbox(parent,mat,w,h,d,x,y,z){
+      const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+      m.position.set(x,y,z);parent.add(m);return m;
+    }
+    function kcyl(parent,mat,rt,rb,h,seg,x,y,z){
+      const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat);
+      m.position.set(x,y,z);parent.add(m);return m;
+    }
+    kbox(tower85,k85Stone,98,34,64,0,17,0);
+    for(const side of [-1,1]){
+      kbox(tower85,k85Glass,32,122,54,side*27,34+61,0);
+      for(const cz of [-26,26]) kbox(tower85,k85Stone,3.5,122,3.5,side*27,34+61,cz);
+      for(const cx of [-15,15]) kbox(tower85,k85Stone,3.5,122,3.5,side*27+cx,34+61,0);
+    }
+    kbox(tower85,k85Stone,86,14,56,0,156+7,0);
+    kbox(tower85,k85Glass,48,142,48,0,163+71,0);
+    kbox(tower85,k85Glass,52,136,44,0,234,0);
+    kbox(tower85,k85Glass,44,136,52,0,234,0);
+    kbox(tower85,k85Stone,40,16,40,0,305+8,0);
+    kbox(tower85,k85Glass,32,14,32,0,321+7,0);
+    kcyl(tower85,k85Stone,6,28,15,4,0,335+7.5,0).rotation.y=Math.PI/4;
+    kcyl(tower85,k85Metal,.9,2.8,32,8,0,348+16,0);
+    kbox(tower85,k85Beacon,2.2,2.2,2.2,0,381,0);
+    for(const side of [-1,1]){
+      kbox(tower85,k85Beacon,1.6,1.6,1.6,side*27,156,26);
+      kbox(tower85,k85Beacon,1.6,1.6,1.6,side*27,156,-26);
+    }
+    scene.add(tower85);
 
-  // Chang-Gu 50 Tower (長谷世貿聯合國大樓 · 222m)
-  const p50=geoPoint(22.64302,120.31483), g50=ground(p50.x,p50.z);
-  const tower50=new THREE.Group();tower50.name='長谷世貿50層大樓';tower50.position.set(p50.x,g50,p50.z);
-  const cgGlass=new THREE.MeshStandardMaterial({color:0x39655e,roughness:.20,metalness:.68});
-  const cgGranite=new THREE.MeshStandardMaterial({color:0xb44c3c,roughness:.75});
-  kcyl(tower50,cgGranite,24,26,42,8,0,21,0);
-  kcyl(tower50,cgGlass,20,24,140,8,0,42+70,0);
-  kcyl(tower50,cgGranite,14,20,32,8,0,182+16,0);
-  kcyl(tower50,cgGlass,6,14,14,8,0,214+7,0);
-  kcyl(tower50,k85Metal,.6,1.8,16,8,0,228+8,0);
-  kbox(tower50,k85Beacon,1.8,1.8,1.8,0,238,0);
-  scene.add(tower50);
+    // Chang-Gu 50 Tower (長谷世貿聯合國大樓 · 222m)
+    const p50=geoPoint(22.64302,120.31483), g50=ground(p50.x,p50.z);
+    const tower50=new THREE.Group();tower50.name='長谷世貿50層大樓';tower50.position.set(p50.x,g50,p50.z);
+    const cgGlass=new THREE.MeshStandardMaterial({color:0x39655e,roughness:.20,metalness:.68});
+    const cgGranite=new THREE.MeshStandardMaterial({color:0xb44c3c,roughness:.75});
+    kcyl(tower50,cgGranite,24,26,42,8,0,21,0);
+    kcyl(tower50,cgGlass,20,24,140,8,0,42+70,0);
+    kcyl(tower50,cgGranite,14,20,32,8,0,182+16,0);
+    kcyl(tower50,cgGlass,6,14,14,8,0,214+7,0);
+    kcyl(tower50,k85Metal,.6,1.8,16,8,0,228+8,0);
+    kbox(tower50,k85Beacon,1.8,1.8,1.8,0,238,0);
+    scene.add(tower50);
+  }
   const boxMatrix=new THREE.Object3D(),color=new THREE.Color();
   const palette=[0xa6a3a1,0xc9c2ad,0x9fa9af,0xada299,0x9dada7,0xc7c8c2,0xa3a7b0];
   const carBody=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({color:0xffffff}),180);
@@ -302,7 +304,7 @@ function* buildRegionalScenery(scene,ground,airports,roadData,cityData,taipeiBou
             }
           }
         }
-        if(Math.abs(i-col)>reach-1||Math.abs(j-row)>reach-1) continue;
+        if(hasTaiwanCity||Math.abs(i-col)>reach-1||Math.abs(j-row)>reach-1) continue;
         const distance=Math.max(Math.abs(i-col),Math.abs(j-row));
         const stride=distance<=(quality==='ultra'?5:2)?1:quality==='high'||quality==='ultra'?2:3;
         for(let index=0;index<tile.buildings.length;index+=stride){

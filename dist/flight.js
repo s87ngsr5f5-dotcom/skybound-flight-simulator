@@ -637,6 +637,8 @@ function initialize(){
   }
   const taipeiCity=typeof createTaipeiCity==='function'?createTaipeiCity(scene,renderedGround,airports):
     {root:new THREE.Group(),inside:()=>false,update(){}};
+  const taiwanCity=typeof createTaiwanCity==='function'?createTaiwanCity(scene,renderedGround,airports):
+    {root:new THREE.Group(),inside:()=>false,blocked:()=>false,stats:{ready:false,maskRevision:0},update(){}};
   const buildingGeo = new THREE.BoxGeometry();
   const windows=document.createElement('canvas');
   windows.width=windows.height=64;
@@ -717,7 +719,7 @@ function initialize(){
     yield;
     const taipei={update(){}}; // Taipei geometry now streams in all device modes.
     const region=yield* buildRegionalScenery(sceneryLayers,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
-    const plants=yield* buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways,taipeiCity.blocked);
+    const plants=yield* buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways,(x,z)=>Boolean(taipeiCity.blocked?.(x,z)||taiwanCity.blocked?.(x,z)));
     detailedScenery={taipei,region,plants};
     treeCover=cover;
     terrainColorRevision++;
@@ -1120,7 +1122,9 @@ function initialize(){
     resetLook();
     changeView();
   }
-  const controls=new Set(['KeyW','KeyS','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH','KeyK','KeyO','KeyT']);
+  const controls=new Set(['KeyW','KeyS','KeyA','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Numpad4','Numpad6','Numpad8','Numpad2','Numpad0','NumpadEnter','NumpadDecimal','Space','KeyC','KeyF','KeyR','KeyQ','KeyE','KeyX','KeyZ','KeyP','KeyB','KeyI','KeyL','KeyG','KeyV','KeyN','Home','KeyJ','KeyM','KeyH','KeyK','KeyO','KeyT']);
+  document.addEventListener('change',e=>{if(flight&&e.target instanceof HTMLSelectElement) e.target.blur();});
+  document.addEventListener('click',e=>{if(flight&&e.target instanceof HTMLElement){const btn=e.target.closest('button');if(btn&&btn.closest('#hud,header,.quick-controls')) btn.blur();}});
   const radar=byId('radar').getContext('2d');
   const planMap=byId('planMap').getContext('2d');
   const flightRate=byId('flightRate'),flightRateStatus=byId('flightRateStatus');
@@ -2480,7 +2484,9 @@ function initialize(){
     }
     const code=boundCode(event.code);
     if(!flight||(!controls.has(code)&&!throttleKeys().includes(event.code))) return;
+    if(event.target instanceof HTMLInputElement&&event.target.type!=='range'||event.target instanceof HTMLTextAreaElement) return;
     if(event.target instanceof HTMLButtonElement&&code==='Space') return;
+    if(event.target instanceof HTMLSelectElement) event.target.blur();
     event.preventDefault();if(code) keys.add(code);if(throttleKeys().includes(event.code)) keys.add(event.code);
     if(!event.repeat) action(code);
   });
@@ -5087,8 +5093,11 @@ function initialize(){
     for(const detail of airportDetails)detail.update(camera.position.x,camera.position.z,activeDay,renderingQuality());
     taipeiCity.root.visible=!hangarMode;
     if(!renderer.instrumentOnly&&!hangarMode)taipeiCity.update(dt,camera.position.x,camera.position.z,
-      renderingQuality(),activeDay,byId('weather').value==='wet',paused||Boolean(replay));
-    blocks.visible=!(detailedScenery&&sceneryLayers.visible);
+      renderingQuality(),activeDay,byId('weather').value==='wet'||byId('weather').value==='storm',paused||Boolean(replay));
+    taiwanCity.root.visible=!hangarMode;
+    if(!renderer.instrumentOnly&&!hangarMode)taiwanCity.update(dt,camera.position.x,camera.position.z,
+      renderingQuality(),activeDay,byId('weather').value==='wet'||byId('weather').value==='storm');
+    blocks.visible=!(detailedScenery&&sceneryLayers.visible)&&!taiwanCity.stats?.ready;
     cityWall.emissiveIntensity=(1-activeDay)*.85;
     sunlight.target.position.set(viewerX,model.position.y,viewerZ);
     sunlight.position.copy(sunlight.target.position).add(sunDirection);
@@ -5105,7 +5114,7 @@ function initialize(){
       const {x,y,z}=camera.position;
       const heightAboveGround=y-renderedGround(x,z);
       const groundTraffic=heightAboveGround<1500;
-      detailedScenery.plants.update(x,z,renderingQuality(),heightAboveGround<3200,taipeiCity.stats?.maskRevision??0);
+      detailedScenery.plants.update(x,z,renderingQuality(),heightAboveGround<3200,(taipeiCity.stats?.maskRevision??0)+(taiwanCity.stats?.maskRevision??0));
       detailedScenery.region.update(x,z,renderingQuality(),dt,activeDay,groundTraffic);
       detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',
         paused||Boolean(replay),renderingQuality(),groundTraffic);
@@ -5153,7 +5162,7 @@ function initialize(){
       const inRain=(weather==='storm'||weather==='wet')&&!renderer.instrumentOnly&&!hangarMode;
       if(stormRainMesh){
         stormRainMesh.visible=inRain;
-        if(inRain) weatherStorm.updateRainMesh(stormRainMesh,camera.position,dt,flight?.speed||0);
+        if(inRain) weatherStorm.updateRainMesh(stormRainMesh,camera.position,dt,flight?.speed||0,{vx:flight?.vx||0,vy:flight?.vy||0,vz:flight?.vz||0,windX:flight?.wind?.x||0,windZ:flight?.wind?.z||0,intensity:weather==='storm'?1.0:0.48});
       }
       if(weather==='storm'){
         weatherStorm.stepLightning(dt,camera.position);
