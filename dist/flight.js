@@ -2900,6 +2900,11 @@ function initialize(){
           cockpitElectrical.setColdAndDark(isCold);
         }
       }
+      if(e.code==='KeyG'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
+        if(typeof supermaneuverGforce!=='undefined'&&flight&&flight.aircraft?.role==='fighter'){
+          supermaneuverGforce.toggleCobraArmed(flight);
+        }
+      }
     });
 
     document.querySelectorAll('.mp-hud-radio').forEach(btn=>{
@@ -3833,6 +3838,9 @@ function initialize(){
   if(typeof cockpitElectrical!=='undefined'){
     cockpitElectrical.initInteraction(renderer.domElement,camera,THREE);
   }
+  if(typeof supermaneuverGforce!=='undefined'){
+    supermaneuverGforce.initOverlay();
+  }
   let lastAirportLabel='';
   function drawAirportLabel(f){
     const r=f?.destination;
@@ -4541,6 +4549,9 @@ function initialize(){
       }
       if(typeof cockpitElectrical!=='undefined'){
         cockpitElectrical.update(dt,flight);
+      }
+      if(typeof supermaneuverGforce!=='undefined'){
+        supermaneuverGforce.update(flight,dt);
       }
     }
     if(overviewActive) taiwanOverview.draw(renderer,flight);

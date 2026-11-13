@@ -191,7 +191,8 @@ function stepTrainer(f, input, dt=simTick){
   const track=Math.atan2(airX,-airZ);
   const pathAngle=Math.atan2(airY,Math.hypot(airX,airZ));
   const forwardSpeed=airX*Math.sin(f.heading)-airZ*Math.cos(f.heading);
-  const alpha=limit(f.pitch-pathAngle+.036,-.65,.65);
+  const alphaLimit=(aircraft.role==='fighter'&&f.cobraActive)?1.95:.65;
+  const alpha=limit(f.pitch-pathAngle+.036,-.65,alphaLimit);
   const beta=speed>5 ? wrapAngle(track-f.heading) : 0;
   const air=atmosphere(f.y,f.temperatureOffset);
   const fastCruise=fastCruiseActive(f);
@@ -202,9 +203,13 @@ function stepTrainer(f, input, dt=simTick){
   const q=.5*rho*speed*speed;
   const stallAngle=aircraft.stallAngle+.02*f.flaps;
   const liftSlope=5.05;
-  const cl=(.27+liftSlope*limit(alpha,-stallAngle,stallAngle)+aircraft.flapLift[f.flaps])*
+  let cl=(.27+liftSlope*limit(alpha,-stallAngle,stallAngle)+aircraft.flapLift[f.flaps])*
     Math.max(.31,1-Math.max(0,Math.abs(alpha)-stallAngle)*2.9);
-  f.stall=!f.ground && (alpha>stallAngle || forwardSpeed<12);
+  if(aircraft.role==='fighter'&&alpha>stallAngle&&alpha<1.55){
+    const extraAlpha=alpha-stallAngle;
+    cl+=Math.sin(extraAlpha*2.2)*1.75*(aircraft.vortexFactor||1.15);
+  }
+  f.stall=!f.ground && (alpha>stallAngle || forwardSpeed<12) && !f.cobraActive;
 
   // Ground effect model (Wieselsberger induced drag reduction & cushion lift)
   const span=aircraft.wingSpan||(aircraft.geometry?aircraft.geometry[2]*2:Math.sqrt(aircraft.wingArea*7.5));
@@ -221,7 +226,11 @@ function stepTrainer(f, input, dt=simTick){
   const waveReference=gameAirborne?cruiseMachTarget(f):aircraft.cruiseMach;
   const waveDrag=waveReference ? .55*Math.pow(Math.max(0,mach-waveReference+.012),2):0;
   const inducedDrag=.052*cl*cl*phiGe;
-  const drag=q*aircraft.wingArea*(cleanDrag+waveDrag+inducedDrag+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta));
+  let cobraDragMultiplier=1.0;
+  if(aircraft.role==='fighter'&&(f.cobraActive||alpha>0.45)){
+    cobraDragMultiplier=1.0+3.8*Math.sin(Math.min(Math.PI*0.5,Math.abs(alpha)))*Math.sin(Math.min(Math.PI*0.5,Math.abs(alpha)));
+  }
+  const drag=q*aircraft.wingArea*(cleanDrag+waveDrag+inducedDrag+aircraft.flapDrag[f.flaps]+.11*Math.abs(beta))*cobraDragMultiplier;
   // The lever can stay at full power while the cruise Mach envelope limits thrust.
   const cruiseProtection=waveReference&&(gameAirborne||!f.gear&&!f.flaps)?
     cruiseBlend*limit((mach-waveReference+.03)*24,0,.85):0;
@@ -303,12 +312,14 @@ function stepTrainer(f, input, dt=simTick){
   const yawMoment=(targetYaw+asymmetricYaw-f.yawRate)*8800*aircraft.inertia[2]/2850;
   f.pitchRate+=pitchMoment/aircraft.inertia[0]*dt;
   f.yawRate+=yawMoment/aircraft.inertia[2]*dt;
-  f.pitch=limit(f.pitch+f.pitchRate*dt,-.62,.66);
+  const pitchMin=(aircraft.role==='fighter'&&f.cobraActive)?-0.85:-.62;
+  const pitchMax=(aircraft.role==='fighter'&&f.cobraActive)?1.92:.66;
+  f.pitch=limit(f.pitch+f.pitchRate*dt,pitchMin,pitchMax);
   f.bank=wrapAngle(f.bank+f.bankRate*dt);
-  if((f.pitch===-.62&&f.pitchRate<0)||(f.pitch===.66&&f.pitchRate>0)) f.pitchRate=0;
+  if((f.pitch===pitchMin&&f.pitchRate<0)||(f.pitch===pitchMax&&f.pitchRate>0)) f.pitchRate=0;
 
   // Aerodynamic stall & G-buffet vibration
-  const stallBuffet=(!f.ground && alpha>stallAngle*0.84) ? limit((alpha-stallAngle*0.84)/(stallAngle*0.16),0,1) : 0;
+  const stallBuffet=(!f.ground && alpha>stallAngle*0.84 && !f.cobraActive) ? limit((alpha-stallAngle*0.84)/(stallAngle*0.16),0,1) : 0;
   const gLimit=aircraft.role==='fighter'?7.5:2.5;
   const currentG=f.gForce||1.0;
   const gBuffet=(!f.ground && Math.abs(currentG-1.0)>gLimit) ? limit((Math.abs(currentG-1.0)-gLimit)/2.0,0,1) : 0;
@@ -316,7 +327,7 @@ function stepTrainer(f, input, dt=simTick){
   f.buffet=buffet;
   if(buffet>0 && !f.ground){
     const buffetShake=Math.sin(f.elapsed*55.0)*0.002*buffet;
-    f.pitch=limit(f.pitch+buffetShake,-.62,.66);
+    f.pitch=limit(f.pitch+buffetShake,pitchMin,pitchMax);
   }
 
   f.heading=wrapAngle(f.heading+f.yawRate*dt*(f.ground?limit(Math.hypot(f.vx,f.vz)/6,0,1):1));
