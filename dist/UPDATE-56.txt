@@ -1,0 +1,12 @@
+SKYBOUND GLOBAL v0.56 - 3D 地圖立體升級 & 版面互擋徹底整理
+
+更新項目：
+1. 台灣全台 3D 俯瞰地圖全面升級 (dist/taiwan-overview.js, dist/flight.js, dist/index.html)
+   - 新增「3D 斜視 (36° 立體山脈視角) ↔ 垂直俯視」一鍵切換、滾輪／按鈕縮放 (+ / − / ⌖) 與拖曳平移功能。
+   - 新增 2D 螢幕空間標籤自動避讓與碰撞隱藏演算法 (declutterLabels)：依機友 > 目的地 > 出發地 > 主要機場 > VOR 優先序自動挑選上/下/左/右最佳位置，徹底消除北台灣桃園/松山/VOR 標籤互相擋道的問題。
+   - 新增 3D 民航高空走廊線條 (W4 / B591 / A1 / G581)、機場 3D 垂直光柱信標，以及本機與多人機友海拔高度投影支柱。
+
+2. HUD 與首頁版面配置ゼロ碰撞重整 (dist/planner.css, dist/glass-flight.css, dist/mobile-flight.css, dist/multiplayer.css)
+   - 建立動態 Header 高度同步 CSS 變數 (--hdr-h)，讓地圖/選單/戰術面板/多人通訊下拉框/編隊伴飛膠囊永遠貼合頂欄下方不壓字。
+   - 徹底解決行動裝置直屏與橫屏下 #touchQuick / #touchRudderControl / #tacticalGuide / #overviewScale / #hudCombatPill / #hudMpDropdown 的重疊衝突。
+   - 整理 #plan 飛行計畫首頁：預設收摺多人細節卡片，統一快速按鈕高度與排版，確保電腦螢幕一進入無須捲動即可看見主要起飛按鈕。

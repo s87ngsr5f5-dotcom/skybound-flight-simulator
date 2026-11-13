@@ -64,7 +64,7 @@
 .mobile-mode [data-mobile-panel="nav"] .right { display: block; }
 .mobile-mode .systems,
 .mobile-mode .right {
-  top: 46px;
+  top: var(--hdr-h, 52px);
   max-height: 45vh;
   z-index: 5;
 }
@@ -73,7 +73,8 @@
   grid-template-columns: repeat(3, minmax(64px, 1fr));
   position: absolute;
   right: 0;
-  bottom: calc(100% + 5px);
+  top: var(--hdr-h, 52px);
+  bottom: auto;
   gap: 4px;
   padding: 5px;
   border: 1px solid #91cce18c;
@@ -179,13 +180,14 @@
     width: min(44dvh, 42vw, 300px);
   }
   .mobile-mode.flight-ui #touchRudderControl {
-    bottom: calc(var(--flight-bottom) + var(--throttle-height) + 12px);
-    width: min(24vw, 170px);
+    bottom: calc(var(--flight-bottom) + var(--throttle-height) + 24px);
+    width: min(21vw, 152px);
   }
   .mobile-mode.flight-ui #systems,
   .mobile-mode.flight-ui #flightNavigation,
   .mobile-mode.flight-ui #mobileExtras {
-    max-height: 74dvh;
+    top: var(--hdr-h, 52px);
+    max-height: calc(100dvh - var(--hdr-h, 52px) - var(--flight-bottom, 12px) - 8px);
   }
   .mobile-mode.flight-ui #mpRadioPill {
     top: 48px;

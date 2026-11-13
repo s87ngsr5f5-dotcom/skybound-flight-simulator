@@ -55,6 +55,10 @@ function initialize(){
   let taiwanOverview, overviewActive=false;
   const overviewToggle=byId('taiwanOverview'),overviewScale=byId('overviewScale');
   const mapButton=byId('flightBar').querySelector('[data-panel="nav"]');
+  const ovModeBtn=byId('ovViewModeBtn'), ovZoomIn=byId('ovZoomInBtn'), ovZoomOut=byId('ovZoomOutBtn'), ovReset=byId('ovResetBtn');
+  function syncOverviewScale(scalePx){
+    if(typeof scalePx==='number'&&isFinite(scalePx)) byId('scaleBar').style.width=Math.max(24,Math.round(scalePx))+'px';
+  }
   function setOverview(active){
     overviewActive=active;
     overviewToggle.setAttribute('aria-pressed',String(active));
@@ -62,6 +66,7 @@ function initialize(){
     overviewScale.hidden=!active;
     mapButton.textContent=active?'回飛行':'地圖';
     document.body.classList.toggle('overview-active',active);
+    if(active&&taiwanOverview) resizeOverview();
   }
   overviewToggle.onclick=()=>{
     if(!overviewToggle.hidden&&taiwanOverview){
@@ -69,6 +74,43 @@ function initialize(){
       setMobilePanel('');
     }
   };
+  if(ovModeBtn){
+    ovModeBtn.onclick=()=>{
+      if(!taiwanOverview?.setViewMode) return;
+      const next=taiwanOverview.viewState?.mode==='3d'?'top':'3d';
+      taiwanOverview.setViewMode(next);
+      ovModeBtn.setAttribute('aria-pressed',String(next==='3d'));
+      ovModeBtn.textContent=next==='3d'?'📐 3D斜視':'🗺 俯視';
+    };
+  }
+  if(ovZoomIn){
+    ovZoomIn.onclick=()=>{if(taiwanOverview?.zoomBy) syncOverviewScale(taiwanOverview.zoomBy(1.32).scalePx);};
+  }
+  if(ovZoomOut){
+    ovZoomOut.onclick=()=>{if(taiwanOverview?.zoomBy) syncOverviewScale(taiwanOverview.zoomBy(1/1.32).scalePx);};
+  }
+  if(ovReset){
+    ovReset.onclick=()=>{if(taiwanOverview?.resetView) syncOverviewScale(taiwanOverview.resetView().scalePx);};
+  }
+  // Allow wheel zoom and drag pan directly on the 3D overview canvas
+  renderer.domElement.addEventListener('wheel',e=>{
+    if(!overviewActive||!taiwanOverview?.zoomBy) return;
+    e.preventDefault();
+    const factor=e.deltaY<0?1.16:1/1.16;
+    syncOverviewScale(taiwanOverview.zoomBy(factor).scalePx);
+  },{passive:false});
+  let ovDrag=null;
+  renderer.domElement.addEventListener('pointerdown',e=>{
+    if(!overviewActive||!taiwanOverview?.panBy) return;
+    ovDrag={id:e.pointerId,x:e.clientX,y:e.clientY};
+  });
+  renderer.domElement.addEventListener('pointermove',e=>{
+    if(!overviewActive||!ovDrag||ovDrag.id!==e.pointerId||!taiwanOverview?.panBy) return;
+    taiwanOverview.panBy(e.clientX-ovDrag.x,e.clientY-ovDrag.y);
+    ovDrag.x=e.clientX;ovDrag.y=e.clientY;
+  });
+  addEventListener('pointerup',e=>{if(ovDrag&&ovDrag.id===e.pointerId) ovDrag=null;});
+  addEventListener('pointercancel',()=>{ovDrag=null;});
   function updateTaiwanOverview(f){
     const visible=!renderer.instrumentOnly&&Boolean(f)&&!f.ground&&f.y>=9000&&!f.tactical&&!replay;
     const farView=!renderer.instrumentOnly&&f?.y>2200&&
@@ -93,7 +135,7 @@ function initialize(){
   }
   function resizeOverview(){
     const {w,h}=getViewportSize();
-    if(taiwanOverview) byId('scaleBar').style.width=taiwanOverview.resize(w,h)+'px';
+    if(taiwanOverview) syncOverviewScale(taiwanOverview.resize(w,h));
   }
   renderer.domElement.className = 'world';
   document.body.prepend(renderer.domElement);
@@ -1376,6 +1418,10 @@ function initialize(){
   }
   for(const button of planModes) button.onclick=()=>{
     byId('lesson').value=button.dataset.planMode;
+    if(button.dataset.planMode==='multiplayer'){
+      const mps=byId('multiplayerSection');
+      if(mps) mps.open=true;
+    }
     drawPlan();
   };
   function drawPlan(){
@@ -1988,6 +2034,7 @@ function initialize(){
         if(text) text.textContent=`🌐 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`;
       }
     }
+    if(typeof resize==='function') resize();
     const isFighterOrCombat = flight?.aircraft?.role === 'fighter' || Boolean(flight?.tactical) || byId('lesson')?.value === 'multiplayer';
     const combatPill = byId('hudCombatPill');
     const touchCombat = byId('touchCombatBar');
@@ -2658,7 +2705,11 @@ function initialize(){
   function setMobilePanel(name){
     // The overview hides cockpit panels. Leave it before opening any menu.
     if(name&&overviewActive)setOverview(false);
-    if(name){releaseFlightInputs();touchControls.reset();}
+    if(name){
+      releaseFlightInputs();touchControls.reset();
+      const hudMp=byId('hudMpDropdown');
+      if(hudMp) hudMp.hidden=true;
+    }
     byId('hud').dataset.mobilePanel=name;
     document.body.classList.toggle('flight-panel-open',Boolean(name));
     byId('tacticalPanel').open=name==='nav'&&Boolean(flight?.tactical);
@@ -2764,6 +2815,11 @@ function initialize(){
       rainCanvas.width=w;rainCanvas.height=h;
     }
     resizeOverview();
+    const hdr=document.querySelector('header');
+    if(hdr){
+      const hb=Math.max(46,Math.ceil(hdr.getBoundingClientRect().bottom+6));
+      document.documentElement.style.setProperty('--hdr-h',hb+'px');
+    }
     if(typeof supermaneuverGforce!=='undefined'&&supermaneuverGforce.resizeOverlay){
       supermaneuverGforce.resizeOverlay();
     }
@@ -3049,7 +3105,12 @@ function initialize(){
     }
     function toggleHudMpDropdown(forceOpen){
       if(!hudMpDropdown) return;
-      hudMpDropdown.hidden=typeof forceOpen==='boolean'?!forceOpen:!hudMpDropdown.hidden;
+      const nextOpen=typeof forceOpen==='boolean'?forceOpen:hudMpDropdown.hidden;
+      if(nextOpen){
+        // Close mobile overlay drawer before opening multiplayer radio dropdown so they never collide.
+        setMobilePanel('');
+      }
+      hudMpDropdown.hidden=!nextOpen;
       if(!hudMpDropdown.hidden){
         unreadRadioCount=0;
         updateUnreadBadge();

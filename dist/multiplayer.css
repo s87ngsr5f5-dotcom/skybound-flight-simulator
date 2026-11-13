@@ -214,11 +214,13 @@
 
 /* In-flight HUD Multiplayer Window */
 .hud-mp-dropdown {
-  position: absolute;
-  top: 8px;
+  position: fixed;
+  top: var(--hdr-h, 58px);
   left: 50%;
   transform: translateX(-50%);
   width: min(350px, 92vw);
+  max-height: calc(100dvh - var(--hdr-h, 58px) - 24px);
+  overflow-y: auto;
   background: rgba(10, 24, 36, 0.94);
   border: 1px solid #00e5ff;
   border-radius: 12px;
@@ -378,7 +380,8 @@
 /* Combat Mode HUD Status Pill */
 .hud-combat-pill {
   position: fixed;
-  bottom: 86px;
+  top: var(--hdr-h, 56px);
+  bottom: auto;
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;
@@ -392,8 +395,15 @@
   color: #ffffff;
   font-size: 13px;
   font-weight: bold;
-  z-index: 100;
+  z-index: 94;
   pointer-events: none;
+}
+#hud:has(#hudFormationChip:not([hidden])) .hud-combat-pill {
+  top: calc(var(--hdr-h, 56px) + 34px);
+}
+#hud:has(#hudMpDropdown:not([hidden])) .hud-combat-pill,
+.mobile-mode [data-mobile-panel]:not([data-mobile-panel=""]) .hud-combat-pill {
+  visibility: hidden;
 }
 .hud-combat-hp-bar {
   width: 70px;
@@ -678,9 +688,9 @@
 @media (max-width: 650px), ((orientation: landscape) and (max-height: 550px)) {
   .hud-mp-dropdown {
     width: min(370px, 94vw);
-    max-height: 78vh;
+    max-height: calc(100dvh - var(--hdr-h, 58px) - 18px);
     overflow-y: auto;
-    top: 4px;
+    top: var(--hdr-h, 58px);
     padding: 10px 12px;
   }
   .hud-mp-head button {
@@ -691,7 +701,13 @@
     font-size: 12px;
     padding: 6px 12px;
     max-width: 88vw;
-    top: 48px !important;
+    top: calc(var(--hdr-h, 58px) + 4px) !important;
+  }
+  #hud:has(#tacticalPanel[open]:not([hidden])) .hud-combat-pill,
+  #hud:has(#tacticalPanel[open]:not([hidden])) .hud-formation-chip {
+    left: 10px;
+    transform: none;
+    max-width: calc(100vw - 205px);
   }
 }
 
@@ -723,7 +739,7 @@
 }
 .hud-formation-chip {
   position: fixed;
-  top: 52px;
+  top: var(--hdr-h, 58px);
   left: 50%;
   transform: translateX(-50%);
   background: rgba(10, 32, 46, 0.92);
@@ -739,6 +755,11 @@
   z-index: 95;
   pointer-events: auto;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+#hud:has(#hudMpDropdown:not([hidden])) .hud-formation-chip,
+.mobile-mode [data-mobile-panel]:not([data-mobile-panel=""]) .hud-formation-chip {
+  visibility: hidden;
+  pointer-events: none;
 }
 .hud-formation-chip button {
   background: rgba(255, 82, 82, 0.24);
