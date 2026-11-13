@@ -183,4 +183,8 @@ assert(glassCss.includes('#tacticalGuide') && glassCss.includes('left: 39%') && 
 assert(plannerCss.includes('#overviewScale') && plannerCss.includes('top: var(--hdr-h'), 'planner.css must anchor #overviewScale safely under header');
 assert(mobileCss.includes('top: var(--hdr-h'), 'mobile-flight.css must align overlay panels under header');
 
+console.log('3. Checking shared 2D canvas label decluttering on #planMap and #radar in flight.js...');
+assert(flightJs.includes('function placeCanvasLabel('), 'flight.js must define placeCanvasLabel collision avoidance helper');
+assert(flightJs.includes('placedPlanBoxes') && flightJs.includes('placedRadarBoxes'), 'flight.js must declutter both #planMap and #radar labels');
+
 console.log('ALL 3D MAP DECLUTTER & LAYOUT CHECKS PASSED!');
