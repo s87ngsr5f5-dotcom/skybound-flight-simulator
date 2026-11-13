@@ -3600,10 +3600,6 @@ function initialize(){
           renderKillFeed(data);
         }else if(event==='damage_received'){
           updateCombatPill();
-          const flash=document.createElement('div');
-          flash.className='damage-flash';
-          document.body.appendChild(flash);
-          setTimeout(()=>flash.remove(),400);
           showPill(`⚠️ 遭到 [${data.attacker}] 攻擊！受到 ${data.damage}% 損傷！`);
           if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([40,20,60]);
         }else if(event==='player_scored_kill'){
@@ -4682,7 +4678,7 @@ function initialize(){
             f.crashTriggered=true;
             flightAudio.crashExplosion?.();
             crashVFX.trigger(f.x,f.y,f.z,f.vx,f.vz,f.speed);
-            crashShake=1.35;
+            crashShake=0;
             if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([120,50,180,50,240]);
           }
           if(f.voyage) captureVoyage(f,voyageFrames,f.finished);

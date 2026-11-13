@@ -419,18 +419,14 @@
   transition: width 0.2s ease;
 }
 
-/* Screen Damage Flash */
+/* Screen Damage Flash (disabled cleanly) */
 .damage-flash {
+  display: none;
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle, transparent 40%, rgba(255, 0, 0, 0.45) 100%);
+  background: transparent;
   pointer-events: none;
   z-index: 9999;
-  animation: flashFade 0.4s ease-out forwards;
-}
-@keyframes flashFade {
-  from { opacity: 1; }
-  to { opacity: 0; }
 }
 
 /* Mobile Combat Quick Buttons */

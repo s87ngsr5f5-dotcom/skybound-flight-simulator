@@ -51,7 +51,7 @@ assert.strictEqual(sky.updateEnvironment(mockCanvas, mockTex, new THREE.Vector3(
 const html = fs.readFileSync('dist/index.html', 'utf8');
 const flightJs = fs.readFileSync('dist/flight.js', 'utf8');
 assert.ok(html.includes('id="rtLighting"'), 'index.html must include #rtLighting toggle');
-assert.ok(html.includes('0.58'), 'index.html should display version 0.58');
+assert.ok(/<small id="edition">\d+\.\d+<\/small>/.test(html), 'index.html must display semantic version in #edition');
 assert.ok(flightJs.includes('seaRayUniforms') && flightJs.includes('sunTrail') && flightJs.includes('fresnel'),
   'flight.js terrain shader must include ocean Fresnel and sun specular trail reflection');
 assert.ok(flightJs.includes('atmosphericSky.updateEnvironment('), 'setEnvironment must refresh dynamic IBL sky map');

@@ -25,7 +25,7 @@
     let overlayCtx = null;
     let hudPillEl = null;
 
-    // Initialize fullscreen physiological overlay canvas
+    // Initialize overlay element (kept clear; blackout/redout visual overlays disabled)
     function initOverlay() {
       if (typeof document === 'undefined') return;
       if (overlayCanvas) return;
@@ -38,6 +38,7 @@
       overlayCanvas.style.width = '100vw';
       overlayCanvas.style.height = '100dvh';
       overlayCanvas.style.pointerEvents = 'none';
+      overlayCanvas.style.display = 'none';
       overlayCanvas.style.zIndex = '9998';
       document.body.appendChild(overlayCanvas);
 
@@ -73,8 +74,8 @@
     function resizeOverlay() {
       if (!overlayCanvas) return;
       const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-      overlayCanvas.width = Math.max(1, Math.round(vv?.width || window.innerWidth));
-      overlayCanvas.height = Math.max(1, Math.round(vv?.height || window.innerHeight));
+      overlayCanvas.width = Math.max(1, Math.round(vv?.width || window.innerWidth || overlayCanvas.width || 1));
+      overlayCanvas.height = Math.max(1, Math.round(vv?.height || window.innerHeight || overlayCanvas.height || 1));
     }
 
     // Toggle Cobra / AoA limiter override
@@ -149,41 +150,20 @@
       return { vortexLift, cobraDrag };
     }
 
-    // Step pilot physiological G-load tolerance (Blackout & Redout)
+    // Step G-force telemetry without inducing dizziness, blackout, tunnel vision, or redout overlays
     function stepPhysiology(flight, dt) {
       if (!flight || dt <= 0) return;
       const rawG = flight.gForce !== undefined ? flight.gForce : 1.0;
 
-      // Smooth G to model human cardiovascular lag (~0.3s time constant)
+      // Smooth G for telemetry display without applying physiological vision impairers
       state.smoothedG += (rawG - state.smoothedG) * Math.min(1.0, 4.0 * dt);
-      const g = state.smoothedG;
-
-      // Positive G Blackout / Greyout threshold: +4.8G onwards
-      if (g > 4.8) {
-        const excess = (g - 4.8) / 3.8;
-        state.blackout = Math.min(1.0, state.blackout + excess * 0.42 * dt);
-      } else if (g < 3.2) {
-        // Recovery when G eases off
-        state.blackout = Math.max(0.0, state.blackout - 1.2 * dt);
-      }
-
-      // Tunnel vision radius (1.0 = wide open, 0.18 = severe tunnel)
-      state.tunnelVision = Math.max(0.18, 1.0 - state.blackout * 0.82);
-
-      // Negative G Redout threshold: -1.5G downwards
-      if (g < -1.5) {
-        const excess = (-g - 1.5) / 2.2;
-        state.redout = Math.min(1.0, state.redout + excess * 0.65 * dt);
-      } else if (g > -0.5) {
-        // Recovery from redout
-        state.redout = Math.max(0.0, state.redout - 1.5 * dt);
-      }
-
-      // Audio muffling under severe G
-      state.audioMuffle = Math.max(state.blackout * 0.8, state.redout * 0.7);
+      state.blackout = 0.0;
+      state.redout = 0.0;
+      state.tunnelVision = 1.0;
+      state.audioMuffle = 0.0;
     }
 
-    // Render fullscreen Blackout & Redout visual effect
+    // Keep fullscreen overlay clear (no blackout, tunnel vision, or redout effects)
     function renderVisualFX() {
       if (!overlayCanvas || !overlayCtx) return;
       const w = overlayCanvas.width;
@@ -191,44 +171,6 @@
       if (!w || !h) return;
 
       overlayCtx.clearRect(0, 0, w, h);
-
-      // A. Positive G Blackout & Tunnel Vision
-      if (state.blackout > 0.02) {
-        const cx = w * 0.5;
-        const cy = h * 0.5;
-        const maxR = Math.hypot(cx, cy);
-        const innerR = Math.max(10, maxR * state.tunnelVision);
-
-        const grad = overlayCtx.createRadialGradient(cx, cy, innerR * 0.4, cx, cy, maxR);
-        grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        grad.addColorStop(0.55, `rgba(15, 15, 15, ${Math.min(0.9, state.blackout * 0.85)})`);
-        grad.addColorStop(1, `rgba(0, 0, 0, ${Math.min(0.98, state.blackout * 1.05)})`);
-
-        overlayCtx.fillStyle = grad;
-        overlayCtx.fillRect(0, 0, w, h);
-
-        // Heavy G-LOC total blackout
-        if (state.blackout > 0.88) {
-          overlayCtx.fillStyle = `rgba(0, 0, 0, ${(state.blackout - 0.88) * 8.0})`;
-          overlayCtx.fillRect(0, 0, w, h);
-        }
-      }
-
-      // B. Negative G Redout
-      if (state.redout > 0.02) {
-        const redAlpha = Math.min(0.85, state.redout * 0.82);
-        overlayCtx.fillStyle = `rgba(185, 18, 12, ${redAlpha})`;
-        overlayCtx.fillRect(0, 0, w, h);
-
-        // Capillary peripheral glare
-        const cx = w * 0.5, cy = h * 0.5;
-        const maxR = Math.hypot(cx, cy);
-        const grad = overlayCtx.createRadialGradient(cx, cy, maxR * 0.2, cx, cy, maxR);
-        grad.addColorStop(0, 'rgba(230, 25, 20, 0)');
-        grad.addColorStop(1, `rgba(130, 8, 4, ${Math.min(0.92, state.redout * 0.9)})`);
-        overlayCtx.fillStyle = grad;
-        overlayCtx.fillRect(0, 0, w, h);
-      }
     }
 
     // Update called per frame in main loop

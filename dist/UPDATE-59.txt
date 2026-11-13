@@ -1,0 +1,7 @@
+SKYBOUND GLOBAL v0.59 - 移除高 G 暈眩黑視、視野縮窄與滿版紅色效果
+
+更新項目：
+1. 移除高 G 生理暈眩與紅色視覺遮罩 (dist/supermaneuver-gforce.js)
+   - 保留高攻角眼鏡蛇機動 (Cobra) 與 LERX 渦流升力氣動效果，全面停用正 G 黑視 (Blackout / Greyout)、隧道視野縮窄 (Tunnel Vision)、音訊悶音 (audioMuffle) 與負 G 滿版紅視 (Redout) 效果。
+2. 移除受擊滿版紅閃與碰撞鏡頭劇烈震動 (dist/flight.js, dist/multiplayer.css)
+   - 停用多人空戰受擊時的 `.damage-flash` 滿版紅色放射閃爍，保留上方清晰文字與戰績狀態提示；並停用碰撞時的鏡頭晃動 (crashShake = 0)，維持視野穩定舒適。

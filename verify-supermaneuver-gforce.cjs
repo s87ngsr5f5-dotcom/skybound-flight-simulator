@@ -4,10 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
+let fillCalls = 0;
+let clearCalls = 0;
 const mockCtx = {
   fillStyle: '',
-  fillRect: () => {},
-  clearRect: () => {},
+  fillRect: () => { fillCalls++; },
+  clearRect: () => { clearCalls++; },
   createRadialGradient: () => ({
     addColorStop: () => {}
   })
@@ -97,43 +99,29 @@ fighterFlight.pitch = 0.75;
 const aero = sm.computeSupermaneuverAero(fighterFlight, 0.016);
 assert(aero.vortexLift > 0.5, 'Vortex lift must provide substantial high-AoA lift');
 
-console.log('Testing Positive G Blackout & Tunnel Vision Physiology...');
+console.log('Testing Positive & Negative G without Blackout, Tunnel Vision, or Redout...');
 fighterFlight.gForce = 8.2; // +8.2G high-G turn
 for (let i = 0; i < 40; i++) {
   sm.stepPhysiology(fighterFlight, 0.05);
 }
-assert(sm.state.blackout > 0.4, 'Sustained +8.2G must induce blackout / greyout');
-assert(sm.state.tunnelVision < 0.8, 'Peripheral vision must constrict into tunnel vision');
+assert.strictEqual(sm.state.blackout, 0, 'Blackout visual effect must remain disabled');
+assert.strictEqual(sm.state.tunnelVision, 1.0, 'Tunnel vision constriction must remain disabled');
+assert.strictEqual(sm.state.audioMuffle, 0, 'Audio muffle must remain disabled');
 
-// Recovery from G
-fighterFlight.gForce = 1.0;
-for (let i = 0; i < 40; i++) {
-  sm.stepPhysiology(fighterFlight, 0.05);
-}
-assert(sm.state.blackout < 0.1, 'Blackout must recover when G returns to 1.0');
-assert(sm.state.tunnelVision > 0.9, 'Tunnel vision must clear back to full view');
-
-console.log('Testing Negative G Redout Physiology...');
 fighterFlight.gForce = -3.2; // -3.2G inverted push
 for (let i = 0; i < 30; i++) {
   sm.stepPhysiology(fighterFlight, 0.05);
 }
-assert(sm.state.redout > 0.4, 'Negative G must induce retinal redout');
+assert.strictEqual(sm.state.redout, 0, 'Negative-G redout effect must remain disabled');
 
-// Recovery from negative G
-fighterFlight.gForce = 1.0;
-for (let i = 0; i < 30; i++) {
-  sm.stepPhysiology(fighterFlight, 0.05);
-}
-assert(sm.state.redout < 0.05, 'Redout must recover quickly');
-
-console.log('Testing Fullscreen Overlay Init & Visual FX Rendering...');
+console.log('Testing Fullscreen Overlay Remains Clear (No Red/Dark Fill)...');
 sm.initOverlay();
-sm.state.blackout = 0.65;
+assert.strictEqual(mockCanvas.style.display, 'none', 'Overlay canvas should remain hidden');
+fillCalls = 0;
+clearCalls = 0;
 sm.renderVisualFX();
-sm.state.blackout = 0;
-sm.state.redout = 0.75;
-sm.renderVisualFX();
+assert.strictEqual(clearCalls, 1, 'renderVisualFX should only clear any residual frame');
+assert.strictEqual(fillCalls, 0, 'renderVisualFX must never draw blackout or redout overlays');
 
 console.log('Testing physics.js Integration with High-AoA & Cobra limits...');
 const physicsCode = fs.readFileSync(path.join(__dirname, 'dist', 'physics.js'), 'utf8');
