@@ -931,6 +931,9 @@ function initialize(){
       airlinerDetails[profile.id]=refineAirliner(model,{twin:profile.id==='b773'});
     }
     if(typeof cockpitEnhancements!=='undefined') cockpitEnhancements.enhanceCockpit(model,profile,THREE);
+    if(typeof cockpitElectrical!=='undefined'&&model.userData&&model.userData.cabin){
+      cockpitElectrical.buildSwitchPanel(THREE,model.userData.cabin,profile.role==='fighter');
+    }
     models.set(profile.id,model);
     return model;
   }
@@ -2891,6 +2894,12 @@ function initialize(){
           if(!hudLeaderboard.hidden) renderLeaderboard();
         }
       }
+      if(e.code==='KeyK'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
+        if(typeof cockpitElectrical!=='undefined'&&flight){
+          const isCold=!cockpitElectrical.state.coldAndDark;
+          cockpitElectrical.setColdAndDark(isCold);
+        }
+      }
     });
 
     document.querySelectorAll('.mp-hud-radio').forEach(btn=>{
@@ -3821,6 +3830,9 @@ function initialize(){
   if(typeof airportInfrastructure!=='undefined'){
     airportInfrastructure.init(scene,THREE,airports,typeof airwaysNav!=='undefined'?airwaysNav.getVORStations():[],geoPoint);
   }
+  if(typeof cockpitElectrical!=='undefined'){
+    cockpitElectrical.initInteraction(renderer.domElement,camera,THREE);
+  }
   let lastAirportLabel='';
   function drawAirportLabel(f){
     const r=f?.destination;
@@ -4526,6 +4538,9 @@ function initialize(){
       }
       if(typeof airportInfrastructure!=='undefined'){
         airportInfrastructure.update(camera.position,!activeDay,dt);
+      }
+      if(typeof cockpitElectrical!=='undefined'){
+        cockpitElectrical.update(dt,flight);
       }
     }
     if(overviewActive) taiwanOverview.draw(renderer,flight);

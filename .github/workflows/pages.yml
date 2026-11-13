@@ -45,6 +45,7 @@ jobs:
       - run: node verify-combat-leaderboard.cjs
       - run: node verify-windshield-physics.cjs
       - run: node verify-airport-infrastructure.cjs
+      - run: node verify-cockpit-interactive.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
