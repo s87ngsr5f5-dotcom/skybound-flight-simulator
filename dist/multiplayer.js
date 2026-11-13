@@ -259,7 +259,8 @@ const multiplayer = (() => {
           mesh: null,
           billboard: null,
           hp: msg.state?.hp ?? 100,
-          isCombat: Boolean(msg.state?.combat)
+          isCombat: Boolean(msg.state?.combat),
+          liveryTheme: msg.state?.liveryTheme || 'default'
         };
         peers.set(msg.sender, peer);
         notify('peer_joined', peer);
@@ -269,6 +270,7 @@ const multiplayer = (() => {
         peer.targetState = { ...msg.state };
         peer.hp = msg.state?.hp ?? peer.hp ?? 100;
         peer.isCombat = Boolean(msg.state?.combat);
+        if (msg.state?.liveryTheme) peer.liveryTheme = msg.state.liveryTheme;
         peer.lastSeen = performance.now();
       }
     } else if (msg.type === 'leave') {
@@ -413,7 +415,8 @@ const multiplayer = (() => {
         lights: Boolean(f.lights),
         contrails: Boolean(f.y > 7200 && f.power > 0.6),
         hp: localHp,
-        combat: Boolean(isCombatMode || f.combatMode || f.tactical?.armed)
+        combat: Boolean(isCombatMode || f.combatMode || f.tactical?.armed),
+        liveryTheme: (typeof aircraftSkins !== 'undefined' && aircraftSkins.getSelectedTheme) ? aircraftSkins.getSelectedTheme() : 'default'
       }
     };
     sendRaw(payload);
@@ -528,11 +531,17 @@ const multiplayer = (() => {
           }
           if (peer.mesh) {
             if (typeof aircraftSkins !== 'undefined' && typeof THREE !== 'undefined') {
-              aircraftSkins.applyLivery(peer.mesh, profile, THREE);
+              aircraftSkins.applyLivery(peer.mesh, profile, THREE, peer.liveryTheme || 'default');
             }
             peer.mesh.name = `Multiplayer_${peer.callsign}`;
             scene.add(peer.mesh);
           }
+        }
+      } else if (typeof aircraftSkins !== 'undefined' && typeof THREE !== 'undefined' && peer.liveryTheme && peer.mesh.userData?.skinTheme !== peer.liveryTheme) {
+        const fleetList = typeof fleet !== 'undefined' ? fleet : [];
+        const profile = fleetList.find(a => a.id === peer.aircraftId) || fleetList[0];
+        if (profile && aircraftSkins.reapplyLivery) {
+          aircraftSkins.reapplyLivery(peer.mesh, profile, THREE, peer.liveryTheme);
         }
       }
 

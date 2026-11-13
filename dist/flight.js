@@ -1196,11 +1196,13 @@ function initialize(){
     const career=readCareer(),aircraft=selectedAircraft();
     hangarLiveries=career.liveries??{};
     const available=Boolean(aircraft.role),owned=career.owned?.[aircraft.id];
-    byId('hangarShop').hidden=!available;
+    byId('hangarShop').hidden=false;
+    byId('buyLivery').hidden=!available;
+    byId('buyPlane').hidden=!available;
     byId('buyLivery').disabled=Boolean(hangarLiveries[aircraft.id]);
     byId('buyPlane').disabled=!hangarPrices[aircraft.id]||Boolean(owned);
-    byId('shopInfo').textContent='海灣青塗裝 '+(hangarLiveries[aircraft.id]?'已購買':liveryPrice.toLocaleString()+' 金幣')+
-      (hangarPrices[aircraft.id]?' · '+(owned?'已擁有':'買機 '+hangarPrices[aircraft.id].toLocaleString()+' 金幣 · 未購買時每個載客航班租金 4,500'):'');
+    byId('shopInfo').textContent=available?('海灣青塗裝 '+(hangarLiveries[aircraft.id]?'已購買':liveryPrice.toLocaleString()+' 金幣')+
+      (hangarPrices[aircraft.id]?' · '+(owned?'已擁有':'買機 '+hangarPrices[aircraft.id].toLocaleString()+' 金幣 · 未購買時每個載客航班租金 4,500'):'')):'全機型皆可免費切換上方「機身塗裝貼膜」主題';
     const quote=maintenanceQuote(career,aircraft);
     const maintenance=byId('servicePlane');
     maintenance.hidden=byId('maintenanceInfo').hidden=!quote.owned;
@@ -1209,6 +1211,26 @@ function initialize(){
     byId('maintenanceInfo').textContent='機況 '+quote.condition+'%'+(quote.busy?' · 航班進行中':
       quote.condition<minimumDispatchCondition?' · 需維修後才能接定期航班':' · 可執飛定期航班');
   }
+  const liveryThemeSelect=byId('liveryThemeSelect'), hangarLiverySelect=byId('hangarLiverySelect');
+  function syncLiveryThemeUI(themeId){
+    if(typeof aircraftSkins!=='undefined'&&aircraftSkins.setSelectedTheme&&themeId){
+      aircraftSkins.setSelectedTheme(themeId);
+    }
+    const current=typeof aircraftSkins!=='undefined'&&aircraftSkins.getSelectedTheme?aircraftSkins.getSelectedTheme():(themeId||'default');
+    if(liveryThemeSelect) liveryThemeSelect.value=current;
+    if(hangarLiverySelect) hangarLiverySelect.value=current;
+    const targetProfile=flight?.aircraft||(hangarMode?displayedAircraft():selectedAircraft());
+    if(targetProfile&&models.has(targetProfile.id)&&typeof aircraftSkins!=='undefined'&&aircraftSkins.reapplyLivery){
+      aircraftSkins.reapplyLivery(models.get(targetProfile.id),targetProfile,THREE,current);
+    }
+  }
+  if(liveryThemeSelect){
+    liveryThemeSelect.addEventListener('change',()=>syncLiveryThemeUI(liveryThemeSelect.value));
+  }
+  if(hangarLiverySelect){
+    hangarLiverySelect.addEventListener('change',()=>syncLiveryThemeUI(hangarLiverySelect.value));
+  }
+  syncLiveryThemeUI();
   for(const [id,item] of [['buyLivery','livery'],['buyPlane','plane']]){
     byId(id).onclick=()=>{
       const ok=purchaseHangar(selectedAircraft(),item);
@@ -4400,6 +4422,9 @@ function initialize(){
     const previewInspection=hangarMode?hangarView.value:inspectionMode?byId('inspect').value:'orbit';
     if(hangarStage) hangarStage.visible=hangarMode;
     const model=aircraftModel(profile);
+    if(typeof aircraftSkins!=='undefined'&&aircraftSkins.getSelectedTheme&&aircraftSkins.reapplyLivery&&model.userData?.skinTheme!==aircraftSkins.getSelectedTheme()){
+      aircraftSkins.reapplyLivery(model,profile,THREE,aircraftSkins.getSelectedTheme());
+    }
     const livery=hangarLiveries[profile.id]||!flight&&byId('liveryPreview').checked;
     if(!renderer.instrumentOnly) updateDownloadedAircraft(model,profile,flight,livery,renderer.capabilities.getMaxAnisotropy());
     model.userData.setLivery?.(livery);

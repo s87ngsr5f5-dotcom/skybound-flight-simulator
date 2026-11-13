@@ -7,6 +7,32 @@
  */
 const aircraftSkins = (() => {
   const textureCache = new Map();
+  const LIVERY_THEMES = [
+    { id: 'default', name: '太平洋海灣 (Pacific Teal)', primary: '#0f405c', accent: '#00b4d8', tail: '#003399', text: '#0d2d3e', label: 'SKYBOUND GLOBAL' },
+    { id: 'starlux', name: '曜石鎏金 (Obsidian Gold)', primary: '#1e242b', accent: '#d4af37', tail: '#2c353f', text: '#b8942e', label: 'STARBOUND LUX' },
+    { id: 'plum', name: '梅花紫紺 (Formosa Plum)', primary: '#1d2d6b', accent: '#d85a98', tail: '#2b3990', text: '#1d2d6b', label: 'FORMOSA AIRLINES' },
+    { id: 'thunder', name: '雷虎特技 (Thunder Tigers)', primary: '#b71c1c', accent: '#ffffff', tail: '#0d47a1', text: '#b71c1c', label: 'THUNDER TIGERS' },
+    { id: 'camo', name: '戰術迷彩 (Digital Stealth)', primary: '#37474f', accent: '#607d8b', tail: '#263238', text: '#cfd8dc', label: '401 TFW · LOW VIS' },
+    { id: 'rescue', name: '空勤搜救 (NASC Rescue)', primary: '#e65100', accent: '#ffd54f', tail: '#bf360c', text: '#ffffff', label: 'NASC RESCUE' }
+  ];
+  let selectedTheme = 'default';
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('skybound.liveryTheme');
+      if (saved && LIVERY_THEMES.some(t => t.id === saved)) selectedTheme = saved;
+    }
+  } catch {}
+  function getThemeSpec(themeId) {
+    return LIVERY_THEMES.find(t => t.id === (themeId || selectedTheme)) || LIVERY_THEMES[0];
+  }
+  function getSelectedTheme() { return selectedTheme; }
+  function setSelectedTheme(themeId) {
+    if (LIVERY_THEMES.some(t => t.id === themeId)) {
+      selectedTheme = themeId;
+      try { if (typeof localStorage !== 'undefined') localStorage.setItem('skybound.liveryTheme', themeId); } catch {}
+    }
+    return selectedTheme;
+  }
 
   function createOffscreenCanvas(w, h) {
     if (typeof document !== 'undefined' && document.createElement) {
@@ -162,8 +188,9 @@ const aircraftSkins = (() => {
   }
 
   // 3. Tactical Fighter Tail Art Decal (Sun God Totem / Tail Flash)
-  function createFighterTailTexture(THREE, profile) {
-    const key = `tail_${profile.id || 'f16'}`;
+  function createFighterTailTexture(THREE, profile, themeId) {
+    const theme = getThemeSpec(themeId);
+    const key = `tail_${profile.id || 'f16'}_${theme.id}`;
     if (textureCache.has(key)) return textureCache.get(key);
 
     const canvas = createOffscreenCanvas(512, 512);
@@ -174,8 +201,8 @@ const aircraftSkins = (() => {
 
     // Diagonal tactical camouflage streak
     const grad = ctx.createLinearGradient(0, 0, 512, 512);
-    grad.addColorStop(0, 'rgba(45, 55, 65, 0.92)');
-    grad.addColorStop(1, 'rgba(25, 35, 42, 0.95)');
+    grad.addColorStop(0, theme.primary);
+    grad.addColorStop(1, theme.tail);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(30, 480);
@@ -184,19 +211,19 @@ const aircraftSkins = (() => {
     ctx.lineTo(260, 40);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#00e5ff';
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 5;
     ctx.stroke();
 
     // Sun God Maladao / Ace Totem artwork
     const cx = 350, cy = 250;
-    ctx.fillStyle = '#ffb300';
+    ctx.fillStyle = theme.id === 'thunder' ? '#ffffff' : '#ffb300';
     ctx.beginPath();
     ctx.arc(cx, cy, 55, 0, Math.PI * 2);
     ctx.fill();
 
     // Sun Rays
-    ctx.strokeStyle = '#ff3d00';
+    ctx.strokeStyle = theme.id === 'camo' ? '#90a4ae' : '#ff3d00';
     ctx.lineWidth = 5;
     for (let i = 0; i < 16; i++) {
       const a = (i * Math.PI) / 8;
@@ -208,9 +235,9 @@ const aircraftSkins = (() => {
 
     // Squadron Stencils
     ctx.fillStyle = '#e2f5ff';
-    ctx.font = 'bold 36px "Segoe UI", Arial, sans-serif';
+    ctx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('401 TFW', 350, 390);
+    ctx.fillText(theme.id === 'thunder' ? 'THUNDER' : '401 TFW', 350, 390);
 
     ctx.fillStyle = '#9fbacf';
     ctx.font = 'bold 26px "Courier New", monospace';
@@ -226,9 +253,11 @@ const aircraftSkins = (() => {
     return tex;
   }
 
-  // 4. Commercial Airliner Fuselage Cheatline & Brand Decal
-  function createAirlinerLiveryTexture(THREE, profile) {
-    const key = `airliner_${profile.id || 'a320'}`;
+  // 4. Commercial Airliner / Cargo Fuselage Cheatline & Brand Decal
+  function createAirlinerLiveryTexture(THREE, profile, themeId) {
+    const theme = getThemeSpec(themeId);
+    const isCargo = profile.role === 'cargo';
+    const key = `airliner_${profile.id || 'a320'}_${theme.id}_${isCargo}`;
     if (textureCache.has(key)) return textureCache.get(key);
 
     const canvas = createOffscreenCanvas(2048, 256);
@@ -237,14 +266,14 @@ const aircraftSkins = (() => {
 
     ctx.clearRect(0, 0, 2048, 256);
 
-    // Dual Sweeping Cheatlines (Deep Teal & Vibrant Cyan)
+    // Dual Sweeping Cheatlines
     ctx.beginPath();
     ctx.moveTo(0, 160);
     ctx.bezierCurveTo(400, 165, 1400, 155, 2048, 80);
     ctx.lineTo(2048, 125);
     ctx.bezierCurveTo(1400, 195, 400, 200, 0, 185);
     ctx.closePath();
-    ctx.fillStyle = '#0f405c';
+    ctx.fillStyle = theme.primary;
     ctx.fill();
 
     ctx.beginPath();
@@ -253,41 +282,107 @@ const aircraftSkins = (() => {
     ctx.lineTo(2048, 145);
     ctx.bezierCurveTo(1400, 215, 400, 215, 0, 195);
     ctx.closePath();
-    ctx.fillStyle = '#00b4d8';
+    ctx.fillStyle = theme.accent;
     ctx.fill();
 
     // Airline Typography Logo
-    ctx.fillStyle = '#0d2d3e';
-    ctx.font = 'bold 64px "Segoe UI", "Helvetica Neue", sans-serif';
+    ctx.fillStyle = theme.text;
+    ctx.font = 'bold 62px "Segoe UI", "Helvetica Neue", sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('SKYBOUND GLOBAL', 320, 130);
+    ctx.fillText(isCargo ? `${theme.label} CARGO` : theme.label, 320, 130);
 
-    ctx.fillStyle = '#0096c7';
-    ctx.font = '600 30px "Segoe UI", sans-serif';
-    ctx.fillText('PACIFIC AIRWAYS  ·  HORIZON', 325, 70);
+    ctx.fillStyle = theme.accent;
+    ctx.font = '600 28px "Segoe UI", sans-serif';
+    ctx.fillText(isCargo ? 'HEAVY FREIGHTER · TRANS-PACIFIC' : `${theme.name} · B-18901`, 325, 70);
 
-    // Realistic Passenger Window Band with warm cabin glare
-    const startX = 260;
-    const windowCount = profile.id === 'b773' || profile.id === 'sa380' ? 68 : 42;
-    for (let i = 0; i < windowCount; i++) {
-      const wx = startX + i * 24;
-      const wy = 142;
+    if (isCargo) {
+      // Freighter Cargo Doors & Safety Stencils
+      ctx.strokeStyle = theme.primary;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(420, 138, 130, 56);
+      ctx.strokeRect(1380, 132, 160, 58);
+      ctx.fillStyle = '#ff6d00';
+      ctx.fillRect(1560, 156, 95, 12);
+    } else {
+      // Realistic Passenger Window Band with warm cabin glare
+      const startX = 260;
+      const windowCount = profile.id === 'b773' || profile.id === 'sa380' ? 68 : 42;
+      for (let i = 0; i < windowCount; i++) {
+        const wx = startX + i * 24;
+        const wy = 142;
 
-      // Window Frame & Tinted Polarized Glass
-      ctx.fillStyle = '#0a1620';
-      ctx.beginPath();
-      ctx.roundRect ? ctx.roundRect(wx, wy, 12, 19, 4) : ctx.rect(wx, wy, 12, 19);
-      ctx.fill();
+        ctx.fillStyle = '#0a1620';
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(wx, wy, 12, 19, 4) : ctx.rect(wx, wy, 12, 19);
+        ctx.fill();
 
-      // Warm interior reflection
-      ctx.fillStyle = 'rgba(255, 225, 170, 0.65)';
-      ctx.fillRect(wx + 2, wy + 2, 8, 4);
+        ctx.fillStyle = 'rgba(255, 225, 170, 0.65)';
+        ctx.fillRect(wx + 2, wy + 2, 8, 4);
 
-      // Glass specular sheen
-      ctx.fillStyle = 'rgba(100, 200, 255, 0.35)';
-      ctx.fillRect(wx + 2, wy + 7, 8, 9);
+        ctx.fillStyle = 'rgba(100, 200, 255, 0.35)';
+        ctx.fillRect(wx + 2, wy + 7, 8, 9);
+      }
     }
 
+    let tex = null;
+    if (THREE && THREE.CanvasTexture) {
+      tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+    }
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  // 4B. Wing & Tail Crest Decal (Visible from chase camera)
+  function createWingStripeTexture(THREE, profile, themeId) {
+    const theme = getThemeSpec(themeId);
+    const key = `wing_${profile.id || 'jet'}_${theme.id}`;
+    if (textureCache.has(key)) return textureCache.get(key);
+    const canvas = createOffscreenCanvas(512, 256);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.clearRect(0, 0, 512, 256);
+    ctx.fillStyle = theme.primary;
+    ctx.beginPath();
+    ctx.moveTo(0, 40); ctx.lineTo(512, 110); ctx.lineTo(512, 175); ctx.lineTo(0, 110); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = theme.accent;
+    ctx.beginPath();
+    ctx.moveTo(0, 115); ctx.lineTo(512, 180); ctx.lineTo(512, 215); ctx.lineTo(0, 150); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 42px monospace';
+    ctx.fillText(profile.role === 'fighter' ? 'TW-AF' : 'B-189', 54, 96);
+    let tex = null;
+    if (THREE && THREE.CanvasTexture) {
+      tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+    }
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  // 4C. Helicopter Rescue / Tactical Stencil Texture
+  function createHelicopterLiveryTexture(THREE, themeId) {
+    const theme = getThemeSpec(themeId);
+    const key = `heli_${theme.id}`;
+    if (textureCache.has(key)) return textureCache.get(key);
+    const canvas = createOffscreenCanvas(512, 256);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.clearRect(0, 0, 512, 256);
+    ctx.fillStyle = theme.primary;
+    ctx.fillRect(0, 88, 512, 54);
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(0, 144, 512, 22);
+    // Hazard Tail Stripe
+    ctx.fillStyle = '#ffd54f';
+    for (let x = 360; x < 490; x += 26) {
+      ctx.fillRect(x, 88, 12, 78);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 38px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(theme.id === 'camo' ? 'ROCA AVN' : 'NASC 空中勤務', 24, 128);
     let tex = null;
     if (THREE && THREE.CanvasTexture) {
       tex = new THREE.CanvasTexture(canvas);
@@ -342,12 +437,20 @@ const aircraftSkins = (() => {
   }
 
   // 6. Spawn High-Precision Decal Meshes & Apply Livery
-  function applyLivery(model, profile, THREE) {
+  function applyLivery(model, profile, THREE, themeOverride) {
     if (!model || !profile || !THREE) return;
-    if (model.userData?.skinApplied) return;
+    const theme = getThemeSpec(themeOverride);
+    if (model.userData?.skinApplied && model.userData?.skinTheme === theme.id) return;
+    if (model.userData?.decalGroup) {
+      try {
+        if (model.userData.decalGroup.parent) model.userData.decalGroup.parent.remove(model.userData.decalGroup);
+      } catch {}
+      model.userData.decalGroup = null;
+    }
 
     const isFighter = profile.role === 'fighter';
     const isPassenger = profile.role === 'passenger' || profile.role === 'cargo';
+    const isHelicopter = Boolean(profile.helicopter);
     const isTrainer = profile.id === 'c172s';
     const half = profile.geometry ? profile.geometry[0] : 10;
     const radius = profile.geometry ? profile.geometry[1] : 1.5;
@@ -365,7 +468,6 @@ const aircraftSkins = (() => {
               m.bumpMap = bumpMap;
               m.bumpScale = isFighter ? 0.035 : 0.022;
             }
-            // Elevate plastic/dull look to metallic aerospace surface
             if (isFighter) {
               m.metalness = Math.max(m.metalness || 0, 0.48);
               m.roughness = Math.min(m.roughness || 1, 0.38);
@@ -386,13 +488,13 @@ const aircraftSkins = (() => {
     const decalGroup = new THREE.Group();
     decalGroup.name = 'AircraftSkins_Decals';
 
-    // A. Fighter Decals (Roundels on Wings & Fuselage, Tail Art)
+    // A. Fighter Decals (Roundels on Wings & Fuselage, Tail Art, Wing Spine Stripes)
     if (isFighter) {
-      const roundelTex = createRoundelTexture(THREE, true);
-      const tailTex = createFighterTailTexture(THREE, profile);
+      const roundelTex = createRoundelTexture(THREE, theme.id === 'camo');
+      const tailTex = createFighterTailTexture(THREE, profile, theme.id);
+      const wingTex = createWingStripeTexture(THREE, profile, theme.id);
 
       if (roundelTex) {
-        // Wing Roundels (Left & Right outer wings)
         const roundelGeo = new THREE.PlaneGeometry(1.4, 1.4);
         const roundelMat = new THREE.MeshBasicMaterial({
           map: roundelTex,
@@ -401,19 +503,16 @@ const aircraftSkins = (() => {
           depthWrite: false
         });
 
-        // Left Wing Top
         const rwLeft = new THREE.Mesh(roundelGeo, roundelMat);
         rwLeft.rotation.x = -Math.PI / 2;
         rwLeft.position.set(-span * 0.58, 0.22, half * 0.12);
         decalGroup.add(rwLeft);
 
-        // Right Wing Bottom
         const rwRight = new THREE.Mesh(roundelGeo, roundelMat);
         rwRight.rotation.x = Math.PI / 2;
         rwRight.position.set(span * 0.58, -0.22, half * 0.12);
         decalGroup.add(rwRight);
 
-        // Fuselage Side Roundels
         const sideRoundelGeo = new THREE.PlaneGeometry(0.9, 0.9);
         for (const side of [-1, 1]) {
           const rSide = new THREE.Mesh(sideRoundelGeo, roundelMat);
@@ -423,7 +522,17 @@ const aircraftSkins = (() => {
         }
       }
 
-      // Tail Artwork on Vertical Stabilizer
+      if (wingTex) {
+        const wGeo = new THREE.PlaneGeometry(span * 0.55, half * 0.28);
+        const wMat = new THREE.MeshBasicMaterial({ map: wingTex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+        for (const side of [-1, 1]) {
+          const wMesh = new THREE.Mesh(wGeo, wMat);
+          wMesh.rotation.x = -Math.PI / 2;
+          wMesh.position.set(side * span * 0.44, 0.25, half * 0.18);
+          decalGroup.add(wMesh);
+        }
+      }
+
       if (tailTex) {
         const tailGeo = new THREE.PlaneGeometry(half * 0.45, half * 0.35);
         const tailMat = new THREE.MeshBasicMaterial({
@@ -441,9 +550,10 @@ const aircraftSkins = (() => {
       }
     }
 
-    // B. Commercial Airliner Decals (Fuselage Cheatline & Brand Decals)
+    // B. Commercial Airliner / Cargo Decals (Fuselage Cheatline + Top Wing Stripe + Vertical Tail Crest)
     if (isPassenger) {
-      const liveryTex = createAirlinerLiveryTexture(THREE, profile);
+      const liveryTex = createAirlinerLiveryTexture(THREE, profile, theme.id);
+      const wingTex = createWingStripeTexture(THREE, profile, theme.id);
       if (liveryTex) {
         const bannerLength = half * 1.35;
         const bannerHeight = radius * 0.72;
@@ -458,9 +568,26 @@ const aircraftSkins = (() => {
         for (const side of [-1, 1]) {
           const banner = new THREE.Mesh(bannerGeo, bannerMat);
           banner.rotation.y = side * Math.PI / 2;
-          // Position precisely on the cylindrical fuselage side
           banner.position.set(side * (radius * 0.98 + 0.03), radius * 0.22, -half * 0.08);
           decalGroup.add(banner);
+        }
+      }
+      if (wingTex) {
+        const wingGeo = new THREE.PlaneGeometry(span * 0.46, radius * 1.25);
+        const wingMat = new THREE.MeshBasicMaterial({ map: wingTex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+        for (const side of [-1, 1]) {
+          const wm = new THREE.Mesh(wingGeo, wingMat);
+          wm.rotation.x = -Math.PI / 2;
+          wm.position.set(side * span * 0.45, radius * 0.26, half * 0.05);
+          decalGroup.add(wm);
+        }
+        // Tail Crest Banner visible cleanly from chase camera
+        const tailBannerGeo = new THREE.PlaneGeometry(radius * 2.1, radius * 1.55);
+        for (const side of [-1, 1]) {
+          const tb = new THREE.Mesh(tailBannerGeo, wingMat);
+          tb.rotation.y = side * Math.PI / 2;
+          tb.position.set(side * 0.16, radius * 2.05, half * 0.72);
+          decalGroup.add(tb);
         }
       }
     }
@@ -485,19 +612,47 @@ const aircraftSkins = (() => {
       }
     }
 
+    // D. Helicopter Rescue / Army Tactical Decals
+    if (isHelicopter) {
+      const heliTex = createHelicopterLiveryTexture(THREE, theme.id);
+      if (heliTex) {
+        const hGeo = new THREE.PlaneGeometry(half * 0.92, radius * 0.68);
+        const hMat = new THREE.MeshBasicMaterial({ map: heliTex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+        for (const side of [-1, 1]) {
+          const hMesh = new THREE.Mesh(hGeo, hMat);
+          hMesh.rotation.y = side * Math.PI / 2;
+          hMesh.position.set(side * (radius * 0.82 + 0.05), radius * 0.15, half * 0.18);
+          decalGroup.add(hMesh);
+        }
+      }
+    }
+
     model.add(decalGroup);
     if (!model.userData) model.userData = {};
     model.userData.skinApplied = true;
+    model.userData.skinTheme = theme.id;
     model.userData.decalGroup = decalGroup;
   }
 
+  function reapplyLivery(model, profile, THREE, themeOverride) {
+    if (!model) return;
+    if (model.userData) model.userData.skinApplied = false;
+    applyLivery(model, profile, THREE, themeOverride);
+  }
+
   return {
+    LIVERY_THEMES,
+    getSelectedTheme,
+    setSelectedTheme,
     getPanelBumpTexture,
     createRoundelTexture,
     createFighterTailTexture,
     createAirlinerLiveryTexture,
+    createWingStripeTexture,
+    createHelicopterLiveryTexture,
     createTrainerLiveryTexture,
-    applyLivery
+    applyLivery,
+    reapplyLivery
   };
 })();
 
