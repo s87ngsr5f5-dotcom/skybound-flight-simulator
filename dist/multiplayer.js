@@ -428,7 +428,10 @@ const multiplayer = (() => {
     }
     if (peer.billboard) {
       try {
-        if (peer.billboard.parent) peer.billboard.parent.remove(peer.billboard);
+        const sprite = peer.billboard.sprite || peer.billboard;
+        if (sprite && sprite.parent) sprite.parent.remove(sprite);
+        if (sprite?.material?.map) sprite.material.map.dispose();
+        if (sprite?.material) sprite.material.dispose();
       } catch {}
       peer.billboard = null;
     }
@@ -644,6 +647,38 @@ const multiplayer = (() => {
     return best ? { peer: best, distance: bestDist } : null;
   }
 
+  function computeFormationGuidance(ownFlight, peer, spacingM = 180, lateralM = 55) {
+    if (!ownFlight || !peer || !peer.state) return null;
+    const s = peer.state;
+    const h = Number.isFinite(s.heading) ? s.heading : 0;
+    const sinH = Math.sin(h), cosH = Math.cos(h);
+    const slotX = (s.x || 0) - sinH * spacingM + cosH * lateralM;
+    const slotZ = (s.z || 0) + cosH * spacingM + sinH * lateralM;
+    const slotY = Math.max(150, Number.isFinite(s.y) ? s.y : ownFlight.y);
+    const dx = slotX - ownFlight.x, dz = slotZ - ownFlight.z;
+    const slotDist = Math.hypot(dx, dz);
+    const bearingToSlot = Math.atan2(dx, -dz);
+    const wrapDiff = (target, current) => {
+      let d = target - current;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      return d;
+    };
+    const alignBlend = Math.min(1, slotDist / 380);
+    const desiredHeading = h + wrapDiff(bearingToSlot, h) * alignBlend;
+    const headingErr = wrapDiff(desiredHeading, ownFlight.heading || 0);
+    const roll = Math.max(-0.55, Math.min(0.55, headingErr * 1.8));
+    const altErr = slotY - (ownFlight.y || 0);
+    const desiredVS = Math.max(-12, Math.min(12, altErr * 0.18));
+    const pitch = Math.max(-0.5, Math.min(0.6, 0.08 + (desiredVS - (ownFlight.vy || 0)) * 0.09));
+    const leaderSpeed = Math.max(85, Number.isFinite(s.speed) ? s.speed : 130);
+    const catchupBoost = Math.max(-25, Math.min(60, (slotDist - 40) * 0.08));
+    const targetSpeed = leaderSpeed + catchupBoost;
+    const speedErr = targetSpeed - (ownFlight.speed || 0);
+    const throttle = Math.max(-0.35, Math.min(0.45, speedErr * 0.025));
+    return { slotX, slotY, slotZ, slotDist, targetSpeed, roll, pitch, throttle };
+  }
+
   return {
     joinRoom,
     leaveRoom,
@@ -652,6 +687,7 @@ const multiplayer = (() => {
     broadcastFlight,
     updatePeers3D,
     computeFormationRendezvous,
+    computeFormationGuidance,
     getNearestPeer,
     getRoomId: () => roomId,
     getCallsign: () => callsign,

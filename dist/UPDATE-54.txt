@@ -1,0 +1,10 @@
+SKYBOUND GLOBAL v0.54 更新紀錄
+1. 多人模式長機自動伴飛系統 (Formation Autopilot)
+   - multiplayer.js 新增 computeFormationGuidance()，即時計算右後翼 180 m 編隊航線、坡度、仰角與油門速度同步指令。
+   - 多人 HUD 清單每位機友旁新增「🤝 伴飛／✕ 取消」按鈕與頂部 #hudFormationChip 狀態膠囊；手動大幅拉桿即可隨時接管退出。
+2. 多人自由空域 3D 實戰武器與熱焰彈同步
+   - 支援在多人房間中發射具備追蹤導引的 3D AIM-9X 響尾蛇飛彈、20mm 機砲曳光彈、目標雷達循環鎖定與 3D 熱焰干擾彈。
+   - 命中判定與敵機火力/熱焰彈即時同步給房內所有玩家，並觸發 3D 彈道與警報廣播。
+3. 關鍵修正與 iPhone 相容入口同步
+   - 修復 destroyPeer3D() 未正確移除 peer.billboard.sprite 造成的 3D 銘牌殘留洩漏。
+   - 同步 dist/iphone.html 的防長按選取與防縮放視口保護。

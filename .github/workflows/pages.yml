@@ -50,6 +50,7 @@ jobs:
       - run: node verify-mobile-viewport.cjs
       - run: node verify-maps-navigation.cjs
       - run: node verify-multiplayer-interaction.cjs
+      - run: node verify-combat-formation.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

@@ -2777,6 +2777,111 @@ function initialize(){
   resize();
   touchControls.mode.addEventListener('change',resize);
 
+  let activeFollowPeerId=null;
+  let lockedPeerId=null;
+  const mpProjectiles=[];
+
+  function setFollowLeader(peer){
+    const chip=byId('hudFormationChip'), text=byId('hudFormationText');
+    if(!peer){
+      activeFollowPeerId=null;
+      if(chip) chip.hidden=true;
+      return;
+    }
+    activeFollowPeerId=peer.id;
+    if(chip&&text){
+      const d=flight?Math.round(Math.hypot((peer.state?.x||0)-flight.x,(peer.state?.z||0)-flight.z)):0;
+      text.textContent=`✈ 自動伴飛 [${peer.callsign}] · ${d} m`;
+      chip.hidden=false;
+    }
+  }
+
+  function spawnMpEffect(kind,origin,dirVec,targetId,isOwn){
+    if(!scene||!origin) return;
+    const basePos=new THREE.Vector3(origin.x||0,origin.y||0,origin.z||0);
+    const dir=(dirVec?new THREE.Vector3(dirVec.x,dirVec.y,dirVec.z):new THREE.Vector3(0,0,-1)).normalize();
+    if(kind==='flare'){
+      const flareMat=new THREE.MeshBasicMaterial({color:0xffb84d});
+      const flareGeo=new THREE.SphereGeometry(0.65,6,6);
+      for(let i=0;i<4;i++){
+        const m=new THREE.Mesh(flareGeo,flareMat);
+        m.position.copy(basePos);
+        scene.add(m);
+        mpProjectiles.push({
+          mesh:m,kind:'flare',isOwn:false,life:2.2,
+          vx:(Math.random()-0.5)*18-dir.x*22,
+          vy:-10-Math.random()*12,
+          vz:(Math.random()-0.5)*18-dir.z*22
+        });
+      }
+      return;
+    }
+    const isMissile=kind==='fire_missile';
+    const geo=isMissile?new THREE.CylinderGeometry(0.18,0.22,3.4,8):new THREE.CylinderGeometry(0.12,0.12,4.5,6);
+    geo.rotateX(Math.PI/2);
+    const mat=new THREE.MeshBasicMaterial({color:isMissile?0xff7b3a:0xffe46b});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.copy(basePos).addScaledVector(dir,12);
+    mesh.lookAt(mesh.position.clone().add(dir));
+    scene.add(mesh);
+    const speed=isMissile?420:760;
+    mpProjectiles.push({
+      mesh,kind,targetId:targetId||null,isOwn:Boolean(isOwn),
+      life:isMissile?7.0:1.6,speed,
+      vx:dir.x*speed,vy:dir.y*speed,vz:dir.z*speed
+    });
+  }
+
+  function updateMpProjectiles(dt,f){
+    if(!mpProjectiles.length) return;
+    const peers=(typeof multiplayer!=='undefined'&&multiplayer.isConnected())?multiplayer.getPeers():[];
+    for(let i=mpProjectiles.length-1;i>=0;i--){
+      const p=mpProjectiles[i];
+      p.life-=dt;
+      if(p.kind==='flare'){
+        p.vy-=12*dt;
+      }else if(p.kind==='fire_missile'&&p.targetId){
+        const target=peers.find(peer=>peer.id===p.targetId&&peer.state);
+        if(target){
+          const toTarget=new THREE.Vector3(target.state.x-p.mesh.position.x,target.state.y-p.mesh.position.y,target.state.z-p.mesh.position.z);
+          if(toTarget.lengthSq()>1){
+            toTarget.normalize().multiplyScalar(p.speed);
+            p.vx=THREE.MathUtils.lerp(p.vx,toTarget.x,Math.min(1,dt*4.5));
+            p.vy=THREE.MathUtils.lerp(p.vy,toTarget.y,Math.min(1,dt*4.5));
+            p.vz=THREE.MathUtils.lerp(p.vz,toTarget.z,Math.min(1,dt*4.5));
+            p.mesh.lookAt(p.mesh.position.x+p.vx,p.mesh.position.y+p.vy,p.mesh.position.z+p.vz);
+          }
+        }
+      }
+      p.mesh.position.x+=p.vx*dt;
+      p.mesh.position.y+=p.vy*dt;
+      p.mesh.position.z+=p.vz*dt;
+      let hit=false;
+      if(p.isOwn&&p.kind!=='flare'){
+        const hitRadius=p.kind==='fire_missile'?58:42;
+        for(const peer of peers){
+          if(!peer.state) continue;
+          const dist=Math.hypot(peer.state.x-p.mesh.position.x,peer.state.y-p.mesh.position.y,peer.state.z-p.mesh.position.z);
+          if(dist<=hitRadius){
+            multiplayer.sendCombatEvent('hit',{
+              targetId:peer.id,
+              damage:p.kind==='fire_missile'?35:14,
+              weapon:p.kind==='fire_missile'?'AIM-9X':'20mm 機砲'
+            });
+            hit=true;
+            break;
+          }
+        }
+      }
+      if(hit||p.life<=0||p.mesh.position.y<-20){
+        scene.remove(p.mesh);
+        if(p.mesh.geometry) p.mesh.geometry.dispose();
+        if(p.mesh.material) p.mesh.material.dispose();
+        mpProjectiles.splice(i,1);
+      }
+    }
+  }
+
   function setupMultiplayerUI(){
     const joinBtn=byId('mpJoinBtn'), leaveBtn=byId('mpLeaveBtn');
     const roomInput=byId('mpRoomInput'), callsignInput=byId('mpCallsignInput');
@@ -3138,13 +3243,32 @@ function initialize(){
             subEl.style.color='#97aeb2';
             subEl.textContent=`${(p.aircraftId||'').toUpperCase()} · ${dist>0?dist.toFixed(1)+'km':'--'} · ${flight?altStr:(Math.round(p.state?.y||0)+'m')}`;
             meta.append(titleEl,subEl);
+            const actionsWrap=document.createElement('div');
+            actionsWrap.className='hud-mp-peer-actions';
             const btn=document.createElement('button');
             btn.type='button';
             btn.className='mp-rendezvous-btn';
             btn.textContent='✈ 編隊';
             btn.title='傳送至該機長 600 m 右後翼編隊會合';
             btn.onclick=()=>rendezvousWithPeer(p);
-            row.append(meta,btn);
+            const followBtn=document.createElement('button');
+            followBtn.type='button';
+            followBtn.className='mp-follow-btn'+(activeFollowPeerId===p.id?' active':'');
+            followBtn.textContent=activeFollowPeerId===p.id?'✕ 取消':'🤝 伴飛';
+            followBtn.title='自動駕駛跟飛該長機右後翼編隊';
+            followBtn.onclick=()=>{
+              if(activeFollowPeerId===p.id){
+                setFollowLeader(null);
+                showPill('✋ 已結束自動伴飛');
+              }else{
+                setFollowLeader(p);
+                toggleHudMpDropdown(false);
+                showPill(`🤝 啟動自動伴飛 [${p.callsign}]`);
+              }
+              renderPeerList();
+            };
+            actionsWrap.append(btn,followBtn);
+            row.append(meta,actionsWrap);
             hudPeerList.appendChild(row);
           });
         }
@@ -3197,28 +3321,82 @@ function initialize(){
       }
     }
 
-    // Touch combat action button bindings
+    const formationCancelBtn=byId('hudFormationCancel');
+    if(formationCancelBtn){
+      formationCancelBtn.onclick=()=>{
+        setFollowLeader(null);
+        renderPeerList();
+        showPill('✋ 已退出自動伴飛');
+      };
+    }
+
+    // Touch & multiplayer 3D combat action button bindings
+    function getAimDirection(f){
+      if(!f) return {x:0,y:0,z:-1};
+      const cosP=Math.cos(f.pitch||0);
+      return {
+        x:Math.sin(f.heading||0)*cosP,
+        y:Math.sin(f.pitch||0),
+        z:-Math.cos(f.heading||0)*cosP
+      };
+    }
     const btnMissile=byId('touchCombatMissile');
     const btnGun=byId('touchCombatGun');
     const btnLock=byId('touchCombatLock');
     const btnFlare=byId('touchCombatFlare');
     if(btnMissile) btnMissile.onclick=()=>{
       if(flight?.tactical) tacticalView.command('fire');
-      else showPill('🚀 戰術飛彈架就緒');
+      else if(flight){
+        const peers=typeof multiplayer!=='undefined'&&multiplayer.isConnected()?multiplayer.getPeers():[];
+        let target=peers.find(p=>p.id===lockedPeerId);
+        if(!target&&typeof multiplayer!=='undefined'&&multiplayer.getNearestPeer){
+          target=multiplayer.getNearestPeer(flight)?.peer||null;
+        }
+        const origin={x:flight.x,y:flight.y,z:flight.z};
+        const dir=getAimDirection(flight);
+        spawnMpEffect('fire_missile',origin,dir,target?.id||null,true);
+        if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+          multiplayer.sendCombatEvent('fire_missile',{origin,dir,targetId:target?.id||null});
+        }
+        showPill(target?`🚀 Fox-2! 飛彈鎖定 [${target.callsign}] 發射`:'🚀 發射 AIM-9X 響尾蛇飛彈');
+      }
       if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([20,15,30]);
     };
     if(btnGun) btnGun.onclick=()=>{
       if(flight?.tactical) tacticalView.command('gun');
-      else showPill('💥 20mm 機砲短射');
+      else if(flight){
+        const origin={x:flight.x,y:flight.y,z:flight.z};
+        const dir=getAimDirection(flight);
+        spawnMpEffect('fire_gun',origin,dir,null,true);
+        if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+          multiplayer.sendCombatEvent('fire_gun',{origin,dir});
+        }
+        showPill('💥 20mm 機砲曳光彈短射');
+      }
       if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(18);
     };
     if(btnLock) btnLock.onclick=()=>{
       if(flight?.tactical) tacticalView.command('next');
-      else showPill('🎯 切換雷達鎖定目標');
+      else if(typeof multiplayer!=='undefined'){
+        const peers=multiplayer.getPeers();
+        if(!peers.length){
+          lockedPeerId=null;
+          showPill('🎯 空域無可鎖定機友');
+        }else{
+          const idx=peers.findIndex(p=>p.id===lockedPeerId);
+          const next=peers[(idx+1)%peers.length];
+          lockedPeerId=next.id;
+          const distKm=flight?(Math.hypot((next.state?.x||0)-flight.x,(next.state?.z||0)-flight.z)/1000).toFixed(1):'--';
+          showPill(`🎯 鎖定 [${next.callsign}] (${distKm} km)`);
+        }
+      }
     };
     if(btnFlare) btnFlare.onclick=()=>{
+      const origin={x:flight?.x||0,y:flight?.y||0,z:flight?.z||0};
+      const dir=getAimDirection(flight);
+      spawnMpEffect('flare',origin,dir,null,false);
       if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
-        multiplayer.sendCombatEvent('flare',{origin:{x:flight?.x||0,y:flight?.y||0,z:flight?.z||0}});
+        multiplayer.sendCombatEvent('flare',{origin,dir});
       }
       showPill('✨ 已投放熱焰彈');
       if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([15,10,15]);
@@ -3236,6 +3414,8 @@ function initialize(){
           showPill(`🟢 已進入房間 [${data.roomId}] 呼號 ${data.callsign}`);
           renderPeerList();
         }else if(event==='disconnect'){
+          setFollowLeader(null);
+          lockedPeerId=null;
           if(badge){badge.classList.add('offline');statusText.textContent='未連線';}
           if(joinBtn) joinBtn.hidden=false;
           if(leaveBtn) leaveBtn.hidden=true;
@@ -3249,6 +3429,11 @@ function initialize(){
           appendRadioHistory('系統',`✈ ${data.callsign} 加入了房間`);
           renderPeerList();
         }else if(event==='peer_left'){
+          if(activeFollowPeerId===data.id){
+            setFollowLeader(null);
+            showPill(`✋ [${data.callsign}] 已離開，自動伴飛結束`);
+          }
+          if(lockedPeerId===data.id) lockedPeerId=null;
           showPill(`✈ 機長 [${data.callsign}] 離開了房間。`);
           appendRadioHistory('系統',`✈ ${data.callsign} 離開了房間`);
           renderPeerList();
@@ -3276,7 +3461,13 @@ function initialize(){
             updateCombatPill();
             showPill('🛡️ 戰機已重生修復！');
           },3000);
+        }else if(event==='enemy_fire_missile'){
+          if(data?.origin) spawnMpEffect('fire_missile',data.origin,data.dir,data.targetId,false);
+          if(data?.targetId===multiplayer.getLocalId()) showPill(`🚨 警報！[${data.callsign}] 向你發射飛彈！`);
+        }else if(event==='enemy_fire_gun'){
+          if(data?.origin) spawnMpEffect('fire_gun',data.origin,data.dir,null,false);
         }else if(event==='enemy_flare'){
+          if(data?.origin) spawnMpEffect('flare',data.origin,data.dir,null,false);
           showPill(`✨ [${data.callsign}] 投放了熱焰干擾彈`);
         }
       });
@@ -3337,6 +3528,23 @@ function initialize(){
         f.tactical.aimAssist=false;
         f.tactical.notice='手動接管';
       }else ({roll,pitch,rudder:assistedRudder}=assist);
+    }else if(activeFollowPeerId&&!f.ground&&typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
+      const leader=multiplayer.getPeers().find(p=>p.id===activeFollowPeerId);
+      if(!leader){
+        setFollowLeader(null);
+      }else if(Math.abs(manual.pitch)+Math.abs(manual.roll)+Math.abs(manual.rudder)>.22){
+        setFollowLeader(null);
+        showPill('✋ 已手動接管，結束自動伴飛');
+      }else{
+        const guidance=multiplayer.computeFormationGuidance?.(f,leader);
+        if(guidance){
+          roll=guidance.roll;
+          pitch=guidance.pitch;
+          throttle=guidance.throttle;
+          const formText=byId('hudFormationText');
+          if(formText) formText.textContent=`✈ 自動伴飛 [${leader.callsign}] · 距離 ${Math.round(guidance.slotDist)} m`;
+        }
+      }
     }
     return {autoLevel:!settings.keepBank||Boolean(f.levelWings),response:settings.sensitivity,yokeDamping:settings.mouse&&!f.hold&&!f.tactical?.aimAssist&&Math.abs(manual.pitch)<.07,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
       rudder:assistedRudder??clamp(manual.rudder+(f.ground?roll:0),-1,1),
@@ -4362,6 +4570,7 @@ function initialize(){
       if(typeof multiplayer!=='undefined'){
         multiplayer.broadcastFlight(f,profile);
         multiplayer.updatePeers3D(dt,now,f,scene,camera);
+        if(!paused) updateMpProjectiles(dt,f);
       }
       const airport=f.landed?f.destination:f.departure;
       if(f.ground&&airport&&Math.hypot(f.x-airport.x,f.z-airport.z)<airport.length*.5+450){
