@@ -2645,13 +2645,13 @@ function initialize(){
           };
         }
       }else if(preset==='refueling'&&typeof airRefueling!=='undefined'){
-        const distBehind=650;
+        const distBehind=260;
         const sinH=Math.sin(airRefueling.tanker.heading);
         const cosH=Math.cos(airRefueling.tanker.heading);
-        const posX=airRefueling.tanker.x+sinH*distBehind;
-        const posZ=airRefueling.tanker.z-cosH*distBehind;
-        const posY=airRefueling.tanker.y-10;
-        const targetSpeed=airRefueling.tanker.speed+8;
+        const posX=airRefueling.tanker.x-sinH*distBehind;
+        const posZ=airRefueling.tanker.z+cosH*distBehind;
+        const posY=airRefueling.tanker.y-12;
+        const targetSpeed=airRefueling.tanker.speed+6;
         Object.assign(flight,{
           x:posX,y:posY,z:posZ,
           heading:airRefueling.tanker.heading,
@@ -3219,7 +3219,7 @@ function initialize(){
     const scale={low:.75,balanced:1.5,high:2}[renderingQuality()]||1.5;
     const mobile=touchControls.mode.value==='mobile';
     basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?2.1:2.5,Math.sqrt(6500000/(w*h))):
-      Math.min(devicePixelRatio,scale,mobile?2:Infinity);
+      Math.min(devicePixelRatio,scale,mobile?(qualitySelect.value==='balanced'?1.25:2):Infinity);
     if(hangarMode) basePixelRatio=Math.max(basePixelRatio,Math.min(devicePixelRatio,1.25));
     resolutionScale=1;
     measuredFrameTime=measuredFrames=0;
@@ -5658,7 +5658,7 @@ function initialize(){
   });
   const rtToggle=byId('rtLighting');
   if(rtToggle){
-    try{const savedRt=localStorage.getItem('skybound.rtLighting');if(savedRt==='0'||savedRt==='1') rtToggle.checked=savedRt==='1';}catch{}
+    try{const savedRt=localStorage.getItem('skybound.rtLighting');rtToggle.checked=savedRt==='1';}catch{rtToggle.checked=false;}
     rtToggle.addEventListener('change',()=>{
       try{localStorage.setItem('skybound.rtLighting',rtToggle.checked?'1':'0');}catch{}
       activeDay=setEnvironment();

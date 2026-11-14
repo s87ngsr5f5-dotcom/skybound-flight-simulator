@@ -723,9 +723,24 @@ body.flight-ui:not(.mobile-mode) #storyObjectiveHud {
 }
 
 body.flight-ui:not(.mobile-mode) #storyRadioBar {
-  bottom: 112px;
-  width: min(560px, 82vw);
-  padding: 9px 15px;
+  top: calc(var(--hdr-h, 52px) + 46px);
+  bottom: auto;
+  left: 16px;
+  transform: none;
+  width: min(360px, 34vw);
+  padding: 8px 12px;
+}
+
+body.flight-ui:not(.mobile-mode) #tacticalGuide {
+  bottom: 38px;
+  max-width: min(760px, 90vw);
+  padding: 5px 10px;
+}
+
+body.flight-ui:not(.mobile-mode) #tacticalGuide button {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .mobile-mode.flight-ui #hud {
@@ -805,19 +820,46 @@ body.flight-ui:not(.mobile-mode) #storyRadioBar {
   max-width: none;
 }
 
+.mobile-mode.flight-ui #tacticalGuide {
+  left: calc(var(--stick-size) + 10px);
+  right: calc(var(--throttle-width) + min(26vw, 200px) + 12px);
+  bottom: calc(var(--flight-bottom) + 28px) !important;
+  transform: none;
+  width: auto;
+  max-width: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.mobile-mode.flight-ui #tacticalGuide p {
+  width: 100%;
+  margin: 0 0 2px;
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+
+.mobile-mode.flight-ui #tacticalGuide button {
+  min-height: 28px !important;
+  padding: 3px 7px !important;
+  font-size: 11px !important;
+}
+
 .mobile-mode.flight-ui #status {
   font-size: 11.5px;
   padding: 4px 10px;
 }
 
 .mobile-mode.flight-ui #storyRadioBar {
-  left: calc(var(--stick-size) + 12px);
-  right: calc(var(--throttle-width) + min(26vw, 200px) + 16px);
-  bottom: calc(var(--flight-bottom) + 64px);
+  left: max(8px, env(safe-area-inset-left));
+  right: auto;
+  bottom: calc(var(--stick-size) + var(--flight-bottom) + 14px);
   transform: none;
   width: auto;
-  max-width: 440px;
-  margin-inline: auto;
+  max-width: min(290px, 34vw);
+  margin-inline: 0;
   padding: 6px 10px;
   border-radius: 10px;
   animation: radioFadeUpMobile 0.24s ease;
@@ -844,15 +886,19 @@ body.flight-ui:not(.mobile-mode) #storyRadioBar {
     bottom: calc(var(--stick-size) + 10px);
   }
   .mobile-mode.flight-ui #flightGuide,
-  .mobile-mode.flight-ui #gateGuide {
+  .mobile-mode.flight-ui #gateGuide,
+  .mobile-mode.flight-ui #tacticalGuide {
     left: 8px;
     right: 8px;
     bottom: calc(var(--stick-size) + 42px) !important;
+    max-width: none;
+    transform: none;
   }
   .mobile-mode.flight-ui #storyRadioBar {
+    top: calc(var(--hdr-h, 50px) + 42px);
+    bottom: auto;
     left: 10px;
     right: 10px;
-    bottom: calc(var(--stick-size) + 84px);
     max-width: none;
   }
 }
