@@ -1,5 +1,5 @@
 'use strict';
-// v0.64 Complete 3-Stage Story Campaign, Pilot Career Progression, Medals & Endless Challenge Modes
+// v0.65 Unified Single Home Hub (Home / Story / Online Multiplayer / Challenges / Tactical / Free Flight / Scenery / Settings)
 (function (globalScope) {
   const PROGRESS_KEY = 'skybound.campaignProgress.v1';
   const CAREER_META_KEY = 'skybound.campaignCareer.v1';
@@ -319,24 +319,24 @@
   ];
 
   const TACTICAL_CARDS = [
-    { id: 'sunset', tag: '黃金日落', title: '松山夕陽觀光起飛', desc: '從松山 10 跑道出發，欣賞金色夕陽與 101 市區光影。', quick: 'sunset' },
-    { id: 'carrierCatapult', tag: '海上航艦', title: '⚓ 航艦蒸汽彈射起飛', desc: '滿載推力自海上移動航艦彈射升空。', quick: 'carrierCatapult' },
-    { id: 'carrierTrap', tag: '精密進場', title: '🛬 航艦尾鉤攔截降落', desc: '放下尾鉤挑戰險峻航艦動態甲板落地。', quick: 'carrierTrap' },
-    { id: 'stormApproach', tag: '極端天候', title: '⚡ 雷暴微下衝極限進場', desc: '狂風暴雨伴隨下沉氣流警報的最終考驗。', quick: 'stormApproach' },
-    { id: 'refueling', tag: '高空編隊', title: '⛽ KC-135 空中加油對接', desc: '配合 PDI 燈號完成驚險的高空加油補給。', quick: 'refueling' },
-    { id: 'mirage', tag: '音速巡弋', title: '幻象 2000 戰機起飛', desc: '體驗三角翼高機動性能與座艙 HUD。', quick: 'mirage' },
-    { id: 'duel', tag: '空戰 PVP', title: '一對一近距纏鬥空戰', desc: '雷達鎖定敵機並運用熱焰彈反制飛彈。', quick: 'duel' },
-    { id: 'landing', tag: '盲降訓練', title: '桃園國際機場五邊降落', desc: '練習長距離寬體機 ILS 對準接地。', quick: 'landing' }
+    { id: 'sunset', tag: '黃金日落', image: 'assets/campaign/ch1.jpg', title: '松山夕陽觀光起飛', desc: '從松山 10 跑道出發，欣賞金色夕陽與 101 市區光影。', quick: 'sunset' },
+    { id: 'carrierCatapult', tag: '海上航艦', image: 'assets/campaign/ch4.jpg', title: '⚓ 航艦蒸汽彈射起飛', desc: '滿載推力自海上移動航艦彈射升空。', quick: 'carrierCatapult' },
+    { id: 'carrierTrap', tag: '精密進場', image: 'assets/campaign/ch4.jpg', title: '🛬 航艦尾鉤攔截降落', desc: '放下尾鉤挑戰險峻航艦動態甲板落地。', quick: 'carrierTrap' },
+    { id: 'stormApproach', tag: '極端天候', image: 'assets/campaign/ch3.jpg', title: '⚡ 雷暴微下衝極限進場', desc: '狂風暴雨伴隨下沉氣流警報的最終考驗。', quick: 'stormApproach' },
+    { id: 'refueling', tag: '高空編隊', image: 'assets/campaign/ch5.jpg', title: '⛽ KC-135 空中加油對接', desc: '配合 PDI 燈號完成驚險的高空加油補給。', quick: 'refueling' },
+    { id: 'mirage', tag: '音速巡弋', image: 'assets/campaign/ch6.jpg', title: '幻象 2000 戰機起飛', desc: '體驗三角翼高機動性能與座艙 HUD。', quick: 'mirage' },
+    { id: 'duel', tag: '空戰 PVP', image: 'assets/campaign/ch6.jpg', title: '一對一近距纏鬥空戰', desc: '雷達鎖定敵機並運用熱焰彈反制飛彈。', quick: 'duel' },
+    { id: 'landing', tag: '盲降訓練', image: 'assets/campaign/ch7.jpg', title: '桃園國際機場五邊降落', desc: '練習長距離寬體機 ILS 對準接地。', quick: 'landing' }
   ];
 
   const SCENERY_CARDS = [
-    { id: 'tour-city', tag: '台北信義', title: '台北 101 與摩天高樓夜景', desc: '近距離檢視高擬真玻璃帷幕大樓與夜晚都市繁華燈火。', inspect: 'tour-city' },
-    { id: 'tour-terminal', tag: '國際樞紐', title: '出發機場航廈與空橋巡覽', desc: '細節滿點的機場塔台、登機門、空橋與滑行道。', inspect: 'tour-terminal' },
-    { id: 'tour-river', tag: '都會動脈', title: '基隆河岸橋樑與都會車流', desc: '立體公路交流道網與橋樑上川流不息的車輛與夜燈。', inspect: 'tour-river' },
-    { id: 'tour-downtown', tag: '都會街景', title: '臺北車站與西區街道實景', desc: '體驗等比例台灣樓群街道密集建築（飛行撞擊會觸發真實大爆炸！）。', inspect: 'tour-downtown' }
+    { id: 'tour-city', tag: '台北信義', image: 'assets/campaign/ch2.jpg', title: '台北 101 與摩天高樓夜景', desc: '近距離檢視高擬真玻璃帷幕大樓與夜晚都市繁華燈火。', inspect: 'tour-city' },
+    { id: 'tour-terminal', tag: '國際樞紐', image: 'assets/campaign/ch7.jpg', title: '出發機場航廈與空橋巡覽', desc: '細節滿點的機場塔台、登機門、空橋與滑行道。', inspect: 'tour-terminal' },
+    { id: 'tour-river', tag: '都會動脈', image: 'assets/campaign/ch1.jpg', title: '基隆河岸橋樑與都會車流', desc: '立體公路交流道網與橋樑上川流不息的車輛與夜燈。', inspect: 'tour-river' },
+    { id: 'tour-downtown', tag: '都會街景', image: 'assets/campaign/ch2.jpg', title: '臺北車站與西區街道實景', desc: '體驗等比例台灣樓群街道密集建築（碰撞會觸發真實大爆炸！）。', inspect: 'tour-downtown' }
   ];
 
-  let activeTab = 'campaign';
+  let activeTab = 'welcome';
   let selectedChapterId = 1;
   let activeMission = null;
   let radioHideTimer = null;
@@ -344,10 +344,7 @@
 
   function todayStr() {
     const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   function hashString(str) {
@@ -531,13 +528,13 @@
         rewardMoney: 14000,
         rewardXp: 360,
         maxSafeG: 8.5,
-        targetText: '全程壓低在 2,800 ft 以下（超過會重設計時警告），極速衝刺 6.0 km！',
+        targetText: '全程壓低在 2,800 ft 以下極速衝刺 6.0 km！',
         radio: [
           { delay: 1.0, speaker: '競速計時官 · RACE CTRL', text: '「計時開始！F-16 全推力起飛，壓低高度 2,800 ft 以下全速衝完 6 公里！」' }
         ],
         stages: [
           {
-            label: '階段 1/3 · 起飛加速突破 250 kt',
+            label: '階段 1/3 · 起飛加速突破 220 kt',
             check: f => !f.ended && !f.ground && Math.hypot(f.vx || 0, f.vz || 0) * 1.94384 >= 220,
             radio: { speaker: '競速計時官 · RACE CTRL', text: '「速度突破 220 kt！保持低空貼地飛行，切勿拉高超過 2,800 ft！」' }
           },
@@ -599,7 +596,6 @@
       };
     }
 
-    // mystery random dispatch
     const acList = [
       { id: 'c172s', name: 'Cessna 172S', g: 3.5 },
       { id: 'a223', name: 'A220-300', g: 3.4 },
@@ -671,6 +667,12 @@
     };
   }
 
+  function cloneOptionsHtml(sourceId) {
+    const sel = document.getElementById(sourceId);
+    if (!sel) return '';
+    return [...sel.options].map(o => `<option value="${o.value}"${o.value === sel.value ? ' selected' : ''}>${o.textContent}</option>`).join('');
+  }
+
   function ensureDOM() {
     if (document.getElementById('titleHub')) return;
 
@@ -679,7 +681,7 @@
       const bar = document.createElement('div');
       bar.id = 'plannerBackBar';
       bar.className = 'planner-back-bar';
-      bar.innerHTML = `<button type="button" id="backToHubBtn" class="hub-back-btn">← 返回條列式主選單</button><span class="muted" style="font-size:12px">自由設定機場、天氣、機型與進階控制</span>`;
+      bar.innerHTML = `<button type="button" id="backToHubBtn" class="hub-back-btn">← 返回統一主選單</button><span class="muted" style="font-size:12px">進階航線與載客貨運詳細規劃</span>`;
       plan.insertBefore(bar, plan.firstChild);
       bar.querySelector('#backToHubBtn').onclick = () => openHub('welcome');
     }
@@ -691,24 +693,25 @@
       <aside class="hub-sidebar">
         <div>
           <div class="hub-brand">
-            <span class="hub-kicker">SKYBOUND GLOBAL · v0.63</span>
+            <span class="hub-kicker">SKYBOUND GLOBAL · v0.65</span>
             <h1 class="hub-title">蒼穹守望者</h1>
-            <p class="hub-subtitle">Formosa Wings · 3D 實景劇情戰役、軍階勳章與每日無限挑戰</p>
+            <p class="hub-subtitle">Formosa Wings · 故事模式 · 線上連線 · 每日挑戰</p>
           </div>
           <div id="hubCareerCard" class="hub-career-card"></div>
           <ul class="hub-menu-list" role="tablist">
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="campaign"><div class="hub-menu-btn-main"><span>📖 劇情戰役 · Story Campaign</span><span class="hub-menu-btn-sub">7 章三階段目標 · 動態無線電與三星評級</span></div><span class="hub-menu-badge">7 章節</span></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="challenges"><div class="hub-menu-btn-main"><span>🏆 每日任務與耐玩挑戰</span><span class="hub-menu-btn-sub">今日雙倍派遣 · 低空競速 · 暴風連勝 · 盲盒</span></div><span class="hub-menu-badge">耐玩</span></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="tactical"><div class="hub-menu-btn-main"><span>🎯 戰術與特勤關卡</span><span class="hub-menu-btn-sub">航艦彈射 · 雷暴切風 · 空中加油 · 空戰</span></div><span class="hub-menu-badge">8 任務</span></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="planner"><div class="hub-menu-btn-main"><span>✈ 自由飛行規劃</span><span class="hub-menu-btn-sub">自選全台機場、天候、載客貨運與航線</span></div></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="hangar"><div class="hub-menu-btn-main"><span>🏛️ 3D 機庫與塗裝工坊</span><span class="hub-menu-btn-sub">用任務獎金購機與保養 · 座艙檢視</span></div></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="multiplayer"><div class="hub-menu-btn-main"><span>🌐 多人連線大廳</span><span class="hub-menu-btn-sub">即時房號編隊 · 多人空戰與無線電</span></div></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="scenery"><div class="hub-menu-btn-main"><span>🗺️ 全台地景巡覽與勳章</span><span class="hub-menu-btn-sub">101 摩天樓夜景 · 飛行日誌與成就牆</span></div></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="welcome"><div class="hub-menu-btn-main"><span>🏠 主首頁 · Home</span><span class="hub-menu-btn-sub">故事模式 · 線上模式 · 快速出動</span></div></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="campaign"><div class="hub-menu-btn-main"><span>📖 故事模式 · Story Mode</span><span class="hub-menu-btn-sub">7 章臺灣航空劇情 · 插圖與三星評級</span></div><span class="hub-menu-badge">7 章</span></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="multiplayer"><div class="hub-menu-btn-main"><span>🌐 線上模式 · Online</span><span class="hub-menu-btn-sub">即時房號編隊 · 多人空戰與無線電</span></div><span class="hub-menu-badge" id="hubMpSideBadge">大廳</span></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="challenges"><div class="hub-menu-btn-main"><span>🏆 每日與無限挑戰</span><span class="hub-menu-btn-sub">雙倍派遣 · 低空競速 · 暴風連勝 · 盲盒</span></div><span class="hub-menu-badge">耐玩</span></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="tactical"><div class="hub-menu-btn-main"><span>🎯 戰術特勤訓練</span><span class="hub-menu-btn-sub">航艦彈射 · 空中加油 · 雷暴進場</span></div></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="freeflight"><div class="hub-menu-btn-main"><span>✈ 自由飛行</span><span class="hub-menu-btn-sub">機型 · 機場 · 天候 · 3D 機庫與塗裝</span></div></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="scenery"><div class="hub-menu-btn-main"><span>🗺️ 地景巡覽與勳章</span><span class="hub-menu-btn-sub">101 夜景 · 車流高架 · 成就勳章牆</span></div></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="settings"><div class="hub-menu-btn-main"><span>⚙ 遊戲設定</span><span class="hub-menu-btn-sub">畫質 · 操控靈敏度 · 音效 · 操作模式</span></div></button></li>
           </ul>
         </div>
         <div class="hub-sidebar-footer">
-          <span>💡 飛航警示：撞擊大樓／塔台將觸發真實爆炸墜毀</span>
-          <span>🎮 座艙視角 <b>C</b> · 視野切換 <b>N</b> · 輔助巡航 <b>J</b></span>
+          <span>💡 撞擊建築物與塔台將觸發真實爆炸墜毀</span>
+          <span>🎮 座艙視角 <b>C</b> · 視野 <b>N</b> · 輔助 <b>J</b></span>
         </div>
       </aside>
       <section class="hub-stage" id="hubStage"></section>
@@ -735,41 +738,30 @@
     hub.addEventListener('click', e => {
       const tabBtn = e.target.closest('[data-hub-tab]');
       if (tabBtn) {
-        const tab = tabBtn.dataset.hubTab;
-        if (tab === 'planner') {
-          closeHub();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (tab === 'hangar') {
-          closeHub();
-          document.getElementById('openHangar')?.click();
-        } else if (tab === 'multiplayer') {
-          closeHub();
-          const mpBtn = document.getElementById('modeMultiplayer');
-          mpBtn?.click();
-          const mpDet = document.getElementById('multiplayerSection');
-          if (mpDet) mpDet.open = true;
-        } else {
-          renderStage(tab);
-        }
+        renderStage(tabBtn.dataset.hubTab);
+        return;
       }
       const chBtn = e.target.closest('[data-chapter-id]');
       if (chBtn) {
         selectedChapterId = Number(chBtn.dataset.chapterId);
         renderStage('campaign');
+        return;
       }
-      const launchBtn = e.target.closest('#hubLaunchChapterBtn');
-      if (launchBtn) {
+      if (e.target.closest('#hubLaunchChapterBtn')) {
         startChapter(selectedChapterId);
+        return;
       }
       const chalBtn = e.target.closest('[data-challenge-type]');
       if (chalBtn) {
         startChallenge(chalBtn.dataset.challengeType);
+        return;
       }
       const quickBtn = e.target.closest('[data-hub-quick]');
       if (quickBtn) {
         const key = quickBtn.dataset.hubQuick;
         closeHub();
         document.querySelector(`#quickFlights [data-quick="${key}"]`)?.click();
+        return;
       }
       const inspBtn = e.target.closest('[data-hub-inspect]');
       if (inspBtn) {
@@ -778,6 +770,89 @@
         const sel = document.getElementById('inspect');
         if (sel) sel.value = key;
         document.getElementById('viewScene')?.click();
+        return;
+      }
+      const jumpTab = e.target.closest('[data-jump-tab]');
+      if (jumpTab) {
+        renderStage(jumpTab.dataset.jumpTab);
+        return;
+      }
+      if (e.target.closest('#hubOpenHangarBtn')) {
+        closeHub();
+        document.getElementById('openHangar')?.click();
+        return;
+      }
+      if (e.target.closest('#hubOpenAdvancedPlanBtn')) {
+        closeHub();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (e.target.closest('#hubFreeFlyBtn')) {
+        const map = [
+          ['hubFfAircraft', 'aircraft'],
+          ['hubFfDeparture', 'departure'],
+          ['hubFfDestination', 'destination'],
+          ['hubFfStartType', 'startType'],
+          ['hubFfWeather', 'weather'],
+          ['hubFfTime', 'time']
+        ];
+        for (const [hid, tid] of map) {
+          const hEl = document.getElementById(hid);
+          const tEl = document.getElementById(tid);
+          if (hEl && tEl) tEl.value = hEl.value;
+        }
+        const les = document.getElementById('lesson');
+        if (les) { les.value = 'free'; les.dispatchEvent(new Event('change')); }
+        closeHub();
+        document.getElementById('fly')?.click();
+        return;
+      }
+      const mpChip = e.target.closest('[data-hub-room]');
+      if (mpChip) {
+        const r = mpChip.dataset.hubRoom;
+        const inp = document.getElementById('hubMpRoom');
+        if (inp) inp.value = r;
+        const realInp = document.getElementById('mpRoomInput');
+        if (realInp) realInp.value = r;
+        hub.querySelectorAll('[data-hub-room]').forEach(b => b.classList.toggle('active', b.dataset.hubRoom === r));
+        return;
+      }
+      if (e.target.closest('#hubMpJoinBtn') || e.target.closest('#hubMpLaunchBtn')) {
+        const launchAfter = Boolean(e.target.closest('#hubMpLaunchBtn'));
+        const hubRoom = document.getElementById('hubMpRoom')?.value?.trim() || '8888';
+        const hubCall = document.getElementById('hubMpCallsign')?.value?.trim() || '';
+        const realRoom = document.getElementById('mpRoomInput');
+        const realCall = document.getElementById('mpCallsignInput');
+        if (realRoom) realRoom.value = hubRoom;
+        if (realCall && hubCall) realCall.value = hubCall;
+        document.getElementById('mpJoinBtn')?.click();
+        if (launchAfter) {
+          closeHub();
+          document.getElementById('fly')?.click();
+        } else {
+          setTimeout(() => renderStage('multiplayer'), 180);
+        }
+        return;
+      }
+      if (e.target.closest('#hubMpCustomBtn')) {
+        document.getElementById('mpCustomRoomBtn')?.click();
+        setTimeout(() => renderStage('multiplayer'), 180);
+        return;
+      }
+      if (e.target.closest('#hubMpCopyBtn')) {
+        document.getElementById('mpCopyUrlBtn')?.click();
+        const fb = document.getElementById('hubMpFeedback');
+        if (fb) fb.textContent = '已複製專屬房間邀請連結！';
+        return;
+      }
+      if (e.target.closest('#hubMpLeaveBtn')) {
+        document.getElementById('mpLeaveBtn')?.click();
+        setTimeout(() => renderStage('multiplayer'), 180);
+        return;
+      }
+      if (e.target.closest('#hubResetControlsBtn')) {
+        document.getElementById('resetControls')?.click();
+        setTimeout(() => renderStage('settings'), 60);
       }
     });
 
@@ -789,7 +864,7 @@
       hideFlightStoryOverlays();
       clearTimeout(hubOpenTimer);
       hubOpenTimer = setTimeout(() => {
-        if (!document.body.classList.contains('flight-ui')) openHub(activeTab || 'campaign');
+        if (!document.body.classList.contains('flight-ui')) openHub(activeTab || 'welcome');
       }, 80);
     });
     const exitInsp = document.getElementById('exitInspection');
@@ -804,9 +879,9 @@
     const brandHeader = document.querySelector('header strong');
     if (brandHeader) {
       brandHeader.style.cursor = 'pointer';
-      brandHeader.title = '回到乾淨首頁主選單';
+      brandHeader.title = '回到首頁主選單';
       brandHeader.addEventListener('click', () => {
-        if (!document.body.classList.contains('flight-ui')) openHub(activeTab || 'campaign');
+        if (!document.body.classList.contains('flight-ui')) openHub('welcome');
       });
     }
   }
@@ -830,6 +905,54 @@
     `;
   }
 
+  function bindSettingsControls() {
+    const syncSelect = (hubId, targetId) => {
+      const h = document.getElementById(hubId);
+      const t = document.getElementById(targetId);
+      if (!h || !t) return;
+      h.value = t.value;
+      h.onchange = () => {
+        t.value = h.value;
+        t.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof t.onchange === 'function') t.onchange();
+      };
+    };
+    const syncRange = (hubId, outId, targetId, formatFn) => {
+      const h = document.getElementById(hubId);
+      const o = document.getElementById(outId);
+      const t = document.getElementById(targetId);
+      if (!h || !t) return;
+      h.value = t.value;
+      if (o) o.textContent = formatFn(h.value);
+      h.oninput = () => {
+        if (o) o.textContent = formatFn(h.value);
+        t.value = h.value;
+        t.dispatchEvent(new Event('input', { bubbles: true }));
+        t.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+    };
+    const syncCheck = (hubId, targetId) => {
+      const h = document.getElementById(hubId);
+      const t = document.getElementById(targetId);
+      if (!h || !t) return;
+      h.checked = t.checked;
+      h.onchange = () => {
+        t.checked = h.checked;
+        t.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+    };
+
+    syncSelect('hubSetQuality', 'quality');
+    syncSelect('hubSetDevice', 'deviceMode');
+    syncRange('hubSetVolume', 'hubSetVolumeVal', 'flightVolume', v => `${Math.round(Number(v))}%`);
+    syncRange('hubSetSens', 'hubSetSensVal', 'sensitivity', v => `${Math.round(Number(v) * 100)}%`);
+    syncRange('hubSetDeadzone', 'hubSetDeadVal', 'deadzone', v => `${Math.round(Number(v) * 100)}%`);
+    syncCheck('hubSetInvert', 'invert');
+    syncCheck('hubSetKeepBank', 'keepBank');
+    syncCheck('hubSetMouse', 'mouse');
+    syncCheck('hubSetRt', 'rtLighting');
+  }
+
   function renderStage(tab = activeTab) {
     activeTab = tab;
     const hub = document.getElementById('titleHub');
@@ -849,23 +972,77 @@
     const totalStars = CHAPTERS.reduce((s, c) => s + (prog[c.id]?.stars || 0), 0);
     const rank = getRankInfo(meta.xp);
     const money = getSimMoney();
+    const mpStatusEl = document.getElementById('mpStatusText');
+    const mpBadgeSide = document.getElementById('hubMpSideBadge');
+    if (mpBadgeSide && mpStatusEl) mpBadgeSide.textContent = mpStatusEl.textContent || '大廳';
 
     if (tab === 'welcome') {
+      const nextChId = Math.min(7, Math.max(1, completedCount + 1));
+      const nextCh = CHAPTERS.find(c => c.id === nextChId) || CHAPTERS[0];
       const dailyDone = meta.dailyDoneDate === todayStr();
       stage.innerHTML = `
-        <div class="hub-welcome-hero">
-          <span class="hub-kicker">TAIWAN NEXT-GEN FLIGHT SIMULATOR</span>
-          <h2>選一項任務，立即起飛</h2>
-          <p>全新《蒼穹守望者》結合 7 章三階段劇情戰役、軍階經驗值、機庫資金獎金，以及每日雙倍派遣與無限耐玩挑戰模式。</p>
-          <div class="hub-hero-stats">
-            <div class="hub-stat-card"><small>目前軍階 · ${rank.current.badge}</small><strong>${rank.current.title}</strong></div>
-            <div class="hub-stat-card"><small>戰役星數 / 勳章</small><strong>★ ${totalStars}/21 · 🏅 ${meta.medals.length}/${MEDALS.length}</strong></div>
-            <div class="hub-stat-card"><small>機庫帳戶資金</small><strong>$${money.toLocaleString()}</strong></div>
+        <div class="hub-home-wrap">
+          <div class="hub-hero-showcase">
+            <img class="hub-hero-bg" src="${nextCh.image}" alt="${nextCh.title}">
+            <div class="hub-hero-overlay">
+              <span class="hub-kicker">SKYBOUND GLOBAL · TAIWAN AVIATION</span>
+              <h2>選好模式，立即升空</h2>
+              <p>${rank.current.badge} ${rank.current.title} · 戰役 ${completedCount}/7 章（★ ${totalStars}/21）· 資金 $${money.toLocaleString()}</p>
+            </div>
           </div>
-          <div class="actions">
-            <button type="button" class="campaign-launch-btn" onclick="window.SkyboundCampaign.selectTab('campaign')">📖 進入劇情戰役 (${completedCount}/7) →</button>
-            <button type="button" class="campaign-launch-btn" style="background:linear-gradient(135deg,#65dcff,#3aa3d8)" onclick="window.SkyboundCampaign.selectTab('challenges')">🏆 ${dailyDone ? '挑戰無限模式' : '領今日雙倍派遣！'}</button>
-            <button type="button" class="hub-back-btn" onclick="window.SkyboundCampaign.closeHub()">✈ 自由飛行規劃</button>
+
+          <div class="hub-primary-modes">
+            <button type="button" class="hub-art-mode-card featured" data-jump-tab="campaign">
+              <img src="assets/campaign/ch1.jpg" alt="故事模式">
+              <div class="hub-art-mode-body">
+                <span class="hub-mode-pill gold">📖 故事模式 · 7 大章節</span>
+                <h3>蒼穹守望者 · 劇情戰役</h3>
+                <p>三階段任務目標、無線電劇情對話與三星評等，賺取機庫購機賞金（下一關：${nextCh.code}）</p>
+              </div>
+            </button>
+            <button type="button" class="hub-art-mode-card featured" data-jump-tab="multiplayer">
+              <img src="assets/campaign/ch6.jpg" alt="線上模式">
+              <div class="hub-art-mode-body">
+                <span class="hub-mode-pill cyan">🌐 線上模式 · ${mpStatusEl ? mpStatusEl.textContent : '多人大廳'}</span>
+                <h3>全台即時連線 · 編隊空戰</h3>
+                <p>加入公共大廳 8888 或自建專屬房號，與好友同空域編隊巡航、無線電通話與實彈對決</p>
+              </div>
+            </button>
+          </div>
+
+          <div class="hub-secondary-modes">
+            <button type="button" class="hub-mini-art-card" data-jump-tab="challenges">
+              <img src="assets/campaign/ch4.jpg" alt="每日任務與挑戰">
+              <div>
+                <span class="hub-action-pill">${dailyDone ? '✓ 今日已完成' : '🔥 2× 今日雙倍'}</span>
+                <strong>🏆 每日與無限挑戰</strong>
+                <small>極速衝刺 · 暴風連勝 · 盲盒</small>
+              </div>
+            </button>
+            <button type="button" class="hub-mini-art-card" data-jump-tab="tactical">
+              <img src="assets/campaign/ch3.jpg" alt="戰術特勤">
+              <div>
+                <span class="hub-action-pill">8 種特勤</span>
+                <strong>🎯 戰術特勤訓練</strong>
+                <small>航艦彈射 · KC-135 加油</small>
+              </div>
+            </button>
+            <button type="button" class="hub-mini-art-card" data-jump-tab="freeflight">
+              <img src="assets/campaign/ch2.jpg" alt="自由飛行">
+              <div>
+                <span class="hub-action-pill">自訂航線</span>
+                <strong>✈ 自由飛行與 3D 機庫</strong>
+                <small>自選機場 · 天候 · 機型塗裝</small>
+              </div>
+            </button>
+            <button type="button" class="hub-mini-art-card" data-jump-tab="settings">
+              <img src="assets/campaign/ch7.jpg" alt="設定">
+              <div>
+                <span class="hub-action-pill">畫質 / 手感</span>
+                <strong>⚙ 畫質與操控設定</strong>
+                <small>解析度 · 靈敏度 · 反鋸齒</small>
+              </div>
+            </button>
           </div>
         </div>`;
       return;
@@ -892,8 +1069,8 @@
         <div class="hub-section-panel">
           <div class="hub-section-head">
             <div>
-              <h2>📖 劇情戰役 · Formosa Wings（${completedCount}/7 章 · ★ ${totalStars}/21）</h2>
-              <p>每章包含「三階段任務目標」與「三星評等」，通關可直接賺取機庫購機金幣與軍階 XP</p>
+              <h2>📖 故事模式 · Formosa Wings（${completedCount}/7 章 · ★ ${totalStars}/21）</h2>
+              <p>每章包含三階段任務目標、即時無線電劇情與三星評等，通關直接入帳機庫金幣</p>
             </div>
           </div>
           <div class="campaign-layout">
@@ -926,6 +1103,52 @@
       return;
     }
 
+    if (tab === 'multiplayer') {
+      const curRoom = document.getElementById('mpRoomInput')?.value || '8888';
+      const curCall = document.getElementById('mpCallsignInput')?.value || '';
+      const curStatus = document.getElementById('mpStatusText')?.textContent || '未連線';
+      const curFeedback = document.getElementById('mpFeedbackMsg')?.textContent || '';
+      const presetRooms = [
+        ['8888', '8888 公共大廳'],
+        ['DOGFIGHT', 'DOGFIGHT 空戰'],
+        ['CARRIER', 'CARRIER 航艦'],
+        ['REFUEL', 'REFUEL 加油'],
+        ['RCSS-01', 'RCSS-01 松山'],
+        ['RCTP-HEAVY', 'RCTP-HEAVY 桃園']
+      ].map(([r, label]) => `<button type="button" class="mp-chip${curRoom === r ? ' active' : ''}" data-hub-room="${r}">${label}</button>`).join('');
+
+      stage.innerHTML = `
+        <div class="hub-section-panel">
+          <div class="hub-online-banner">
+            <img src="assets/campaign/ch6.jpg" alt="線上多人連線">
+            <div class="hub-online-banner-body">
+              <span class="hub-mode-pill cyan">🌐 ONLINE MULTIPLAYER · ${curStatus}</span>
+              <h2>線上模式 · 多人即時連線大廳</h2>
+              <p>加入公共頻道或開立專屬房號，與其他玩家在全台 3D 實景空域編隊、空戰與無線電通報</p>
+            </div>
+          </div>
+          <div class="hub-panel-card">
+            <div style="margin-bottom:10px">
+              <small style="color:#9ec4dc;display:block;margin-bottom:6px">🔥 快速選擇分流房間：</small>
+              <div class="mp-room-chips">${presetRooms}</div>
+            </div>
+            <div class="hub-form-grid">
+              <label>房間號 (Room ID)<input type="text" id="hubMpRoom" value="${curRoom}" placeholder="例如 8888 或 TAIPEI"></label>
+              <label>機長呼號 (Callsign)<input type="text" id="hubMpCallsign" value="${curCall}" placeholder="例如 CAL001 或 VIPER"></label>
+            </div>
+            <div class="actions" style="margin-top:12px">
+              <button type="button" id="hubMpLaunchBtn" class="campaign-launch-btn">🚀 連線房間並立即起飛 →</button>
+              <button type="button" id="hubMpJoinBtn" class="hub-back-btn">僅加入房間</button>
+              <button type="button" id="hubMpCustomBtn" class="hub-back-btn">✨ 自建隨機房號</button>
+              <button type="button" id="hubMpCopyBtn" class="hub-back-btn">🔗 複製邀請連結</button>
+              ${curStatus !== '未連線' ? '<button type="button" id="hubMpLeaveBtn" class="hub-back-btn">退出房間</button>' : ''}
+            </div>
+            <p id="hubMpFeedback" style="font-size:12.5px;color:#7affbe;margin:8px 0 0;min-height:18px">${curFeedback}</p>
+          </div>
+        </div>`;
+      return;
+    }
+
     if (tab === 'challenges') {
       const daily = buildDailyMission();
       const dailyDone = meta.dailyDoneDate === todayStr();
@@ -935,37 +1158,41 @@
           <div class="hub-section-head">
             <div>
               <h2>🏆 每日任務與無限耐玩模式</h2>
-              <p>每天輪替的雙倍獎勵派遣、突破秒數極限的低空競速、連勝暴風盲降與隨機盲盒特勤</p>
+              <p>每天輪替雙倍獎勵派遣、突破秒數極限的低空競速、連勝暴風盲降與隨機盲盒特勤</p>
             </div>
           </div>
-          <div class="hub-cards-grid">
-            <button type="button" class="hub-action-card challenge-card" data-challenge-type="daily">
+          <div class="hub-art-cards-grid">
+            <button type="button" class="hub-art-action-card" data-challenge-type="daily">
+              <img src="${daily.image}" alt="${daily.title}">
               <div>
                 <span class="hub-action-pill">${dailyDone ? '✓ 今日已完成' : '🔥 2× 雙倍獎勵'}</span>
-                <strong style="display:block;margin-top:6px">${daily.title}</strong>
+                <strong>${daily.title}</strong>
+                <small>${daily.targetText}（連續打卡 ${meta.dailyStreak} 天）</small>
               </div>
-              <small>${daily.targetText}（連續打卡 ${meta.dailyStreak} 天）</small>
             </button>
-            <button type="button" class="hub-action-card challenge-card" data-challenge-type="speedrun">
+            <button type="button" class="hub-art-action-card" data-challenge-type="speedrun">
+              <img src="assets/campaign/ch4.jpg" alt="低空峽谷極速衝刺">
               <div>
                 <span class="hub-action-pill">⏱ 最佳紀錄：${speedRec}</span>
-                <strong style="display:block;margin-top:6px">⚡ 低空峽谷極速衝刺</strong>
+                <strong>⚡ 低空峽谷極速衝刺</strong>
+                <small>駕駛 F-16V 壓在 2,800 ft 以下極速衝完 6.0 km，挑戰刷新最快秒數！</small>
               </div>
-              <small>駕駛 F-16V 壓在 2,800 ft 以下極速衝完 6.0 km，挑戰打破自己的最快秒數！</small>
             </button>
-            <button type="button" class="hub-action-card challenge-card" data-challenge-type="storm_gauntlet">
+            <button type="button" class="hub-art-action-card" data-challenge-type="storm_gauntlet">
+              <img src="assets/campaign/ch3.jpg" alt="暴風盲降連勝挑戰">
               <div>
                 <span class="hub-action-pill">🔥 連勝：${meta.streak}（最高 ${meta.bestStreak}）</span>
-                <strong style="display:block;margin-top:6px">🌪️ 暴風盲降連勝挑戰</strong>
+                <strong>🌪️ 暴風盲降連勝挑戰</strong>
+                <small>737 MAX 頂著雷雨風切突破 5.2 km 或落地，每多 1 連勝獎金 +25%！</small>
               </div>
-              <small>737 MAX 頂著雷雨風切突破 5.2 km 或落地，每多 1 連勝獎勵額外 +25%！</small>
             </button>
-            <button type="button" class="hub-action-card challenge-card" data-challenge-type="mystery">
+            <button type="button" class="hub-art-action-card" data-challenge-type="mystery">
+              <img src="assets/campaign/ch7.jpg" alt="隨機盲盒特勤">
               <div>
                 <span class="hub-action-pill">🎲 1.5× 驚喜獎金</span>
-                <strong style="display:block;margin-top:6px">🎲 隨機盲盒特勤派遣</strong>
+                <strong>🎲 隨機盲盒特勤派遣</strong>
+                <small>每次點擊隨機抽出機型、全台航線、天氣與時刻，每次都是新任務！</small>
               </div>
-              <small>每次點擊隨機抽出機型、全台航線、天氣與時刻，永遠都有新鮮飛行組合！</small>
             </button>
           </div>
         </div>`;
@@ -974,31 +1201,63 @@
 
     if (tab === 'tactical') {
       const cards = TACTICAL_CARDS.map(c => `
-        <button type="button" class="hub-action-card" data-hub-quick="${c.quick}">
+        <button type="button" class="hub-art-action-card" data-hub-quick="${c.quick}">
+          <img src="${c.image}" alt="${c.title}">
           <div>
             <span class="hub-action-pill">${c.tag}</span>
-            <strong style="display:block;margin-top:6px">${c.title}</strong>
+            <strong>${c.title}</strong>
+            <small>${c.desc}</small>
           </div>
-          <small>${c.desc}</small>
         </button>`).join('');
       stage.innerHTML = `
         <div class="hub-section-panel">
           <div class="hub-section-head">
             <div><h2>🎯 戰術特勤與高難度訓練</h2><p>點選任一特勤情境即刻載入機位與實戰設定起飛</p></div>
           </div>
-          <div class="hub-cards-grid">${cards}</div>
+          <div class="hub-art-cards-grid">${cards}</div>
+        </div>`;
+      return;
+    }
+
+    if (tab === 'freeflight') {
+      stage.innerHTML = `
+        <div class="hub-section-panel">
+          <div class="hub-online-banner">
+            <img src="assets/campaign/ch2.jpg" alt="自由飛行與 3D 機庫">
+            <div class="hub-online-banner-body">
+              <span class="hub-mode-pill gold">✈ FREE FLIGHT & 3D HANGAR</span>
+              <h2>自由飛行與 3D 機庫</h2>
+              <p>直接在統一選單內配置機型、起降機場、天候與時刻，或進入 3D 機庫買機賞機</p>
+            </div>
+          </div>
+          <div class="hub-panel-card">
+            <div class="hub-form-grid">
+              <label>執飛機型<select id="hubFfAircraft">${cloneOptionsHtml('aircraft')}</select></label>
+              <label>起始狀態<select id="hubFfStartType">${cloneOptionsHtml('startType')}</select></label>
+              <label>出發機場<select id="hubFfDeparture">${cloneOptionsHtml('departure')}</select></label>
+              <label>目的機場<select id="hubFfDestination">${cloneOptionsHtml('destination')}</select></label>
+              <label>天候環境<select id="hubFfWeather">${cloneOptionsHtml('weather')}</select></label>
+              <label>當地時刻<input type="time" id="hubFfTime" value="${document.getElementById('time')?.value || '13:00'}"></label>
+            </div>
+            <div class="actions" style="margin-top:14px">
+              <button type="button" id="hubFreeFlyBtn" class="campaign-launch-btn">✈ 立即起飛 →</button>
+              <button type="button" id="hubOpenHangarBtn" class="hub-back-btn">🏛️ 開啟 3D 機庫與塗裝工坊</button>
+              <button type="button" id="hubOpenAdvancedPlanBtn" class="hub-back-btn">📋 進階載客／貨運／航點編輯</button>
+            </div>
+          </div>
         </div>`;
       return;
     }
 
     if (tab === 'scenery') {
       const cards = SCENERY_CARDS.map(c => `
-        <button type="button" class="hub-action-card" data-hub-inspect="${c.inspect}">
+        <button type="button" class="hub-art-action-card" data-hub-inspect="${c.inspect}">
+          <img src="${c.image}" alt="${c.title}">
           <div>
             <span class="hub-action-pill">${c.tag}</span>
-            <strong style="display:block;margin-top:6px">${c.title}</strong>
+            <strong>${c.title}</strong>
+            <small>${c.desc}</small>
           </div>
-          <small>${c.desc}</small>
         </button>`).join('');
       const medalsHtml = MEDALS.map(m => {
         const unlocked = meta.medals.includes(m.id);
@@ -1010,7 +1269,7 @@
           <div class="hub-section-head">
             <div><h2>🗺️ 全台高精細地景巡覽與勳章牆</h2><p>一鍵前往信義 101 摩天樓群、桃園松山機場，並查看已收集的航空成就勳章</p></div>
           </div>
-          <div class="hub-cards-grid">${cards}</div>
+          <div class="hub-art-cards-grid">${cards}</div>
           <div class="medals-panel">
             <strong style="font-size:13px;color:#ffd976">🏅 航空成就勳章（${meta.medals.length}/${MEDALS.length}）</strong>
             <div class="medals-grid">${medalsHtml}</div>
@@ -1020,6 +1279,42 @@
             <div style="margin-top:6px;font-size:12px;color:#cde4f2">${logHtml}</div>
           </div>
         </div>`;
+      return;
+    }
+
+    if (tab === 'settings') {
+      const hasRt = Boolean(document.getElementById('rtLighting'));
+      stage.innerHTML = `
+        <div class="hub-section-panel">
+          <div class="hub-section-head">
+            <div><h2>⚙ 遊戲設定 · 畫質與操控</h2><p>所有設定會即時生效並自動儲存在目前瀏覽器，電腦版與手機版皆可調整</p></div>
+          </div>
+          <div class="hub-settings-grid">
+            <div class="hub-panel-card">
+              <h3>🎨 畫面品質與裝置模式</h3>
+              <div class="hub-settings-list">
+                <label>渲染畫質（建議「均衡」或「高」）<select id="hubSetQuality">${cloneOptionsHtml('quality')}</select></label>
+                <label>操作介面模式<select id="hubSetDevice">${cloneOptionsHtml('deviceMode')}</select></label>
+                ${hasRt ? '<label class="hub-check-row"><input type="checkbox" id="hubSetRt"> <span>啟用光追光影與體積光效果</span></label>' : ''}
+                <label>主音量 <b id="hubSetVolumeVal">85%</b><input type="range" id="hubSetVolume" min="0" max="100" step="1"></label>
+              </div>
+            </div>
+            <div class="hub-panel-card">
+              <h3>🕹️ 飛行操控與靈敏度</h3>
+              <div class="hub-settings-list">
+                <label>操控靈敏度 <b id="hubSetSensVal">55%</b><input type="range" id="hubSetSens" min="0.2" max="1" step="0.05"></label>
+                <label>搖桿／手把死區 <b id="hubSetDeadVal">12%</b><input type="range" id="hubSetDeadzone" min="0" max="0.35" step="0.01"></label>
+                <label class="hub-check-row"><input type="checkbox" id="hubSetInvert"> <span>反轉上下／俯仰軸向</span></label>
+                <label class="hub-check-row"><input type="checkbox" id="hubSetKeepBank"> <span>放開操控後維持目前傾斜角</span></label>
+                <label class="hub-check-row"><input type="checkbox" id="hubSetMouse"> <span>電腦版按住畫面拖曳操控</span></label>
+              </div>
+              <div class="actions" style="margin-top:12px">
+                <button type="button" id="hubResetControlsBtn" class="hub-back-btn">↺ 恢復平順預設值</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      bindSettingsControls();
     }
   }
 
@@ -1199,7 +1494,7 @@
     const hubBtn = document.createElement('button');
     hubBtn.type = 'button';
     hubBtn.className = 'hub-back-btn';
-    hubBtn.textContent = ch.isChallenge ? '回到挑戰模式' : '回到戰役選單';
+    hubBtn.textContent = ch.isChallenge ? '回到挑戰模式' : '回到主選單';
     hubBtn.onclick = () => {
       modal.hidden = true;
       document.getElementById('menu')?.click();
