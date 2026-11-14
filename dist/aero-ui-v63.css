@@ -856,3 +856,140 @@ body.flight-ui:not(.mobile-mode) #storyRadioBar {
     max-width: none;
   }
 }
+
+/* v0.64 Pilot Career Card, Medals Wall, Debrief Stars & Endless Challenge Cards */
+.hub-career-card {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(12, 30, 48, 0.85);
+  border: 1px solid rgba(112, 210, 255, 0.28);
+}
+
+.hub-career-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  color: #eaf6ff;
+  margin-bottom: 6px;
+}
+
+.hub-career-money {
+  color: #ffd976;
+  font-weight: 800;
+  font-family: monospace;
+}
+
+.hub-xp-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.hub-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #65dcff, #ffd976);
+  transition: width 0.3s ease;
+}
+
+.hub-career-sub {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #8cb7d2;
+}
+
+.medals-panel {
+  background: rgba(9, 23, 36, 0.84);
+  border: 1px solid rgba(140, 200, 235, 0.22);
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+
+.medals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.medal-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(14, 30, 46, 0.72);
+  border: 1px solid rgba(140, 200, 235, 0.14);
+  opacity: 0.45;
+}
+
+.medal-badge.unlocked {
+  opacity: 1;
+  border-color: rgba(248, 199, 81, 0.55);
+  background: rgba(24, 46, 66, 0.9);
+}
+
+.medal-badge > span {
+  font-size: 18px;
+}
+
+.medal-badge strong {
+  display: block;
+  font-size: 12px;
+  color: #eef8ff;
+}
+
+.medal-badge small {
+  display: block;
+  font-size: 10.5px;
+  color: #9ec4dc;
+}
+
+.debrief-stars {
+  font-size: 24px;
+  letter-spacing: 4px;
+  color: #ffd976;
+  margin-bottom: 6px;
+}
+
+.debrief-breakdown {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  color: #9cb9cc;
+}
+
+.debrief-breakdown li.ok {
+  color: #8fffcf;
+}
+
+.debrief-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.reward-chip {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(101, 220, 255, 0.15);
+  border: 1px solid rgba(101, 220, 255, 0.4);
+  color: #dff7ff;
+}
+
+.reward-chip.medal,
+.reward-chip.rank {
+  background: rgba(248, 199, 81, 0.18);
+  border-color: rgba(248, 199, 81, 0.55);
+  color: #ffe28a;
+}
