@@ -1808,21 +1808,29 @@ function initialize(){
     // Mt. Fuji & Hakone highland contour
     {fill:'#6f8576',pts:[[35.22,138.56],[35.49,138.60],[35.52,138.92],[35.20,138.94]].map(([a,o])=>geoPoint(a,o))},
     {fill:'#dce7ec',pts:[[35.32,138.68],[35.40,138.69],[35.40,138.77],[35.32,138.77]].map(([a,o])=>geoPoint(a,o))},
-    // Okinawa Main Island
+    // Japan Kansai / Osaka Bay, Kobe Mt. Rokko, Kyoto & Awaji Island (RJBB)
+    {fill:'#355f4c',pts:[[34.18,135.08],[34.34,135.22],[34.58,135.45],[34.72,135.42],[34.66,135.12],[34.62,134.85],[35.18,134.88],[35.22,136.05],[34.20,135.95]].map(([a,o])=>geoPoint(a,o))},
+    {fill:'#577861',pts:[[34.70,135.12],[34.84,135.16],[34.86,135.38],[34.72,135.35]].map(([a,o])=>geoPoint(a,o))},
+    {fill:'#3f6c56',pts:[[34.24,134.72],[34.60,134.98],[34.56,135.04],[34.22,134.84]].map(([a,o])=>geoPoint(a,o))},
+    // Okinawa Main Island + Yanbaru Highland
     {fill:'#3a6852',pts:[[26.07,127.66],[26.24,127.67],[26.46,127.82],[26.72,128.12],[26.86,128.28],[26.74,128.33],[26.42,128.01],[26.14,127.79]].map(([a,o])=>geoPoint(a,o))},
+    {fill:'#567c64',pts:[[26.52,127.98],[26.78,128.18],[26.72,128.26],[26.48,128.04]].map(([a,o])=>geoPoint(a,o))},
     // Hong Kong: Lantau Island + Chek Lap Kok
     {fill:'#396650',pts:[[22.20,113.85],[22.31,113.90],[22.33,113.95],[22.29,114.05],[22.22,114.01]].map(([a,o])=>geoPoint(a,o))},
     // Hong Kong: Kowloon Peninsula & New Territories + HK Island
     {fill:'#36624d',pts:[[22.30,114.13],[22.48,114.02],[22.54,114.22],[22.36,114.32],[22.29,114.24]].map(([a,o])=>geoPoint(a,o))},
     {fill:'#426e57',pts:[[22.24,114.13],[22.285,114.14],[22.282,114.23],[22.22,114.22]].map(([a,o])=>geoPoint(a,o))},
-    // South Korea: Incheon Yeongjong Island & Seoul / Gyeonggi Peninsula
+    // South Korea: Incheon Yeongjong Island & Seoul / Gyeonggi Peninsula + Bukhansan
     {fill:'#3b6852',pts:[[37.41,126.37],[37.51,126.39],[37.52,126.55],[37.42,126.54]].map(([a,o])=>geoPoint(a,o))},
     {fill:'#355f4b',pts:[[37.26,126.62],[37.55,126.61],[37.77,126.72],[37.78,127.20],[37.26,127.20]].map(([a,o])=>geoPoint(a,o))},
-    // Singapore Main Island
+    {fill:'#5a7c66',pts:[[37.60,126.93],[37.72,126.95],[37.71,127.08],[37.59,127.06]].map(([a,o])=>geoPoint(a,o))},
+    // Singapore Main Island + Sentosa & Batam
     {fill:'#3a6a53',pts:[[1.24,103.62],[1.42,103.68],[1.46,103.84],[1.40,104.04],[1.31,104.02],[1.25,103.82]].map(([a,o])=>geoPoint(a,o))},
     // Philippines: Luzon Manila Bay, Metro Manila & Bataan Peninsula
     {fill:'#3b6750',pts:[[14.42,120.38],[14.84,120.36],[14.86,120.62],[14.44,120.60]].map(([a,o])=>geoPoint(a,o))},
-    {fill:'#35604b',pts:[[14.24,120.96],[14.62,120.97],[14.86,120.88],[14.88,121.35],[14.24,121.35]].map(([a,o])=>geoPoint(a,o))}
+    {fill:'#35604b',pts:[[14.24,120.96],[14.62,120.97],[14.86,120.88],[14.88,121.35],[14.24,121.35]].map(([a,o])=>geoPoint(a,o))},
+    // Thailand: Bangkok Chao Phraya Delta & Upper Gulf of Thailand (VTBS)
+    {fill:'#37634e',pts:[[13.48,100.12],[14.18,100.15],[14.22,101.18],[13.32,101.12],[13.52,100.78],[13.55,100.56]].map(([a,o])=>geoPoint(a,o))}
   ];
   function drawTaiwanMap(context,project){
     const [x,z,width,height]=atlasReady.value?taiwanSatelliteData.overview:[-290*900,-43*900,430*900,440*900];
@@ -1840,6 +1848,63 @@ function initialize(){
       context.closePath();
       context.fill();
       context.stroke();
+    }
+    // Render international urban zones, rivers, cross-sea bridges & landmark star pins
+    if(typeof internationalRegions!=='undefined'&&Array.isArray(internationalRegions)){
+      const [p0x]=project({x:0,z:0}),[p1x]=project({x:10000,z:0});
+      const pxPer10km=Math.abs(p1x-p0x);
+      for(const reg of internationalRegions){
+        if(reg.id==='TW') continue;
+        if(Array.isArray(reg.urbanZones)&&pxPer10km>1.2){
+          for(const uz of reg.urbanZones){
+            const [ux,uy]=project(uz);
+            const ur=Math.max(3,uz.r*(pxPer10km/10000));
+            if(ux+ur<-20||ux-ur>1200||uy+ur<-20||uy-ur>1000) continue;
+            context.fillStyle='rgba(255, 214, 128, 0.16)';
+            context.strokeStyle='rgba(255, 214, 128, 0.36)';
+            context.lineWidth=1;
+            context.beginPath();context.arc(ux,uy,ur,0,Math.PI*2);context.fill();context.stroke();
+          }
+        }
+        if(Array.isArray(reg.rivers)&&pxPer10km>2.5){
+          context.strokeStyle='rgba(76, 198, 245, 0.78)';
+          context.lineWidth=Math.max(1.4,Math.min(4.2,pxPer10km*0.09));
+          for(const rv of reg.rivers){
+            context.beginPath();
+            rv.forEach((pt,i)=>{const [rx,ry]=project(pt);i?context.lineTo(rx,ry):context.moveTo(rx,ry);});
+            context.stroke();
+          }
+        }
+        if(Array.isArray(reg.bridges)&&pxPer10km>4){
+          context.save();
+          context.strokeStyle='rgba(255, 195, 77, 0.85)';
+          context.lineWidth=1.8;
+          context.setLineDash([3,2]);
+          for(const br of reg.bridges){
+            context.beginPath();
+            br.forEach((pt,i)=>{const [bx,by]=project(pt);i?context.lineTo(bx,by):context.moveTo(bx,by);});
+            context.stroke();
+          }
+          context.restore();
+        }
+        if(Array.isArray(reg.landmarks)&&pxPer10km>10){
+          context.font='bold 10px system-ui';
+          context.textBaseline='middle';
+          for(const lm of reg.landmarks){
+            const [lx,ly]=project(lm);
+            if(lx<10||lx>900||ly<10||ly>700) continue;
+            context.fillStyle='#ffd166';
+            context.fillText('★',lx-4,ly);
+            if(pxPer10km>18){
+              context.strokeStyle='rgba(9, 24, 36, 0.9)';
+              context.lineWidth=2.5;
+              context.strokeText(lm.name,lx+6,ly);
+              context.fillStyle='#ffe8a3';
+              context.fillText(lm.name,lx+6,ly);
+            }
+          }
+        }
+      }
     }
     context.restore();
   }
@@ -1962,7 +2027,7 @@ function initialize(){
       }
       planPreviewAirport=departure;
       const points=isClimb?[departure,...route]:[departure,...route,destination];
-      const overseas=isVoyage||[departure,destination].some(a=>['RJAA','RJTT','VHHH','ROAH','RKSI','WSSS','RPLL'].includes(a.code));
+      const overseas=isVoyage||[departure,destination].some(a=>['RJAA','RJTT','VHHH','ROAH','RKSI','WSSS','RPLL','RJBB','VTBS'].includes(a.code));
       const planCanvas=planMap.canvas;
       const planDpr=Math.min(window.devicePixelRatio||1,2);
       const planW=430,planH=440;
@@ -2005,7 +2070,7 @@ function initialize(){
         const [px,py]=project(a);
         return px>=16&&px<=planW-16&&py>=16&&py<=planH-16;
       }):taiwanAirports;
-      const majorSet=new Set(['RCTP','RCSS','RCMQ','RCKH','RCYU','RCFN','RCBS','RCQC','RJAA','RJTT','VHHH','ROAH','RKSI','WSSS','RPLL']);
+      const majorSet=new Set(['RCTP','RCSS','RCMQ','RCKH','RCYU','RCFN','RCBS','RCQC','RJAA','RJTT','VHHH','ROAH','RKSI','WSSS','RPLL','RJBB','VTBS']);
       const sortedAirports=[...rawAirports].sort((a,b)=>{
         const pa=a===destination?4:a===departure?3:majorSet.has(a.code)?2:1;
         const pb=b===destination?4:b===departure?3:majorSet.has(b.code)?2:1;
@@ -2040,15 +2105,16 @@ function initialize(){
         }
       }
       // Draw VOR Stations Overlay after prioritizing airports
-      if(!overseas&&typeof airwaysNav!=='undefined'&&typeof airwaysNav.getVORStations==='function'){
+      if(typeof airwaysNav!=='undefined'&&typeof airwaysNav.getVORStations==='function'){
         airwaysNav.ensureVORCoordinates?.(geoPoint);
-        const vors=airwaysNav.getVORStations()||[];
+        const vors=(typeof airwaysNav.getAllVORStations==='function'?airwaysNav.getAllVORStations():airwaysNav.getVORStations())||[];
         planMap.save();
         planMap.font='bold 9px monospace';
         planMap.textBaseline='middle';
         for(const v of vors){
           if(!Number.isFinite(v.x)||!Number.isFinite(v.z)) continue;
           const [vx,vy]=project(v);
+          if(vx<10||vx>planW-10||vy<10||vy>planH-12) continue;
           planMap.strokeStyle='rgba(0, 229, 163, 0.72)';
           planMap.lineWidth=1.2;
           planMap.beginPath();
@@ -4232,8 +4298,22 @@ function initialize(){
         <button type="button" id="radar3dBtn" title="切換 3D 戰術空域俯瞰圖">🗺 3D</button>
       </div>
       <div class="radar-direct-row">
-        <span>🧭 直飛導航</span>
+        <span>🧭 直飛</span>
         <select id="radarDirectSelect" aria-label="GPS 即時直飛導航目的地"></select>
+        <span>🌍 區域</span>
+        <select id="radarRegionSelect" aria-label="地圖國家區域快速切換">
+          <option value="auto">📍 飛機位置</option>
+          <option value="TW">🇹🇼 台灣</option>
+          <option value="JP_TYO">🇯🇵 東京關東</option>
+          <option value="JP_KIX">🇯🇵 大阪關西</option>
+          <option value="JP_OKA">🇯🇵 沖繩那霸</option>
+          <option value="HK_HKG">🇭🇰 香港維港</option>
+          <option value="KR_ICN">🇰🇷 首爾仁川</option>
+          <option value="SG_SIN">🇸🇬 新加坡</option>
+          <option value="PH_MNL">🇵🇭 馬尼拉灣</option>
+          <option value="TH_BKK">🇹🇭 曼谷湄南河</option>
+          <option value="WORLD">🌏 亞太全覽</option>
+        </select>
       </div>
     `;
     navPanel.insertBefore(bar,radar.canvas);
@@ -4248,6 +4328,30 @@ function initialize(){
       sel.onchange=()=>{
         const ap=airports.find(a=>a.id===sel.value);
         if(ap) setDirectToAirport(ap);
+      };
+    }
+    const regSel=byId('radarRegionSelect');
+    if(regSel){
+      regSel.onchange=()=>{
+        const val=regSel.value;
+        if(val==='auto'){
+          radarCustomRange=0;radarPanX=0;radarPanZ=0;radarZoomIdx=0;
+          taiwanOverview?.resetView?.();
+          return;
+        }
+        if(val==='WORLD'){
+          radarCustomRange=1600000;radarPanX=0;radarPanZ=0;
+          taiwanOverview?.centerOnCoords?.(0,0,0.65);
+          return;
+        }
+        const reg=(typeof internationalRegions!=='undefined'&&Array.isArray(internationalRegions))?internationalRegions.find(r=>r.id===val):null;
+        if(reg){
+          const fX=flight?.x||0,fZ=flight?.z||0;
+          radarCustomRange=Math.round((reg.bounds?.[2]||95000)*0.52);
+          radarPanX=reg.center.x-fX;
+          radarPanZ=reg.center.z-fZ;
+          taiwanOverview?.centerOnCoords?.(reg.center.x,reg.center.z,1.35);
+        }
       };
     }
     const stepZoom=factor=>{
@@ -4444,7 +4548,8 @@ function initialize(){
     // VOR Stations overlay on airborne radar (placed after airports to prevent overlap)
     if(!f.ground&&typeof airwaysNav!=='undefined'){
       airwaysNav.ensureVORCoordinates(geoPoint);
-      const vors=typeof airwaysNav.getVORStations==='function'?airwaysNav.getVORStations():(airwaysNav.taiwanVORStations||[]);
+      const baseVors=typeof airwaysNav.getVORStations==='function'?airwaysNav.getVORStations():(airwaysNav.taiwanVORStations||[]);
+      const vors=airwaysNav.internationalVORStations?[...baseVors,...airwaysNav.internationalVORStations]:baseVors;
       radar.save();
       radar.font='bold 9px monospace';
       radar.textAlign='left';
@@ -4467,6 +4572,41 @@ function initialize(){
         if(vSlot){
           radar.fillStyle='#a8ecff';
           radar.fillText(vor.id,vSlot.x,vSlot.y);
+        }
+      }
+      radar.restore();
+    }
+    // Active Mission Sky Gates overlay on #radar
+    if(typeof window!=='undefined'&&Array.isArray(window.__skyboundActiveMissionGates)&&window.__skyboundActiveMissionGates.length){
+      radar.save();
+      radar.font='bold 10px system-ui';
+      radar.textAlign='left';
+      radar.textBaseline='middle';
+      const gates=window.__skyboundActiveMissionGates;
+      const nextGate=gates.find(g=>!g.passed);
+      if(nextGate){
+        const [gx,gy]=project(nextGate);
+        radar.strokeStyle='rgba(255, 209, 102, 0.72)';
+        radar.lineWidth=1.6;
+        radar.setLineDash([4,3]);
+        radar.beginPath();radar.moveTo(ownX,ownY);radar.lineTo(gx,gy);radar.stroke();
+        radar.setLineDash([]);
+      }
+      for(const gate of gates){
+        const [gx,gy]=project(gate);
+        if(gx<8||gx>width-8||gy<8||gy>height-12) continue;
+        const isNext=gate===nextGate;
+        radar.strokeStyle=gate.passed?'#34d399':isNext?'#ffd166':'#6ee7ff';
+        radar.lineWidth=isNext?2.2:1.4;
+        radar.beginPath();radar.arc(gx,gy,isNext?5.5:4,0,Math.PI*2);radar.stroke();
+        if(!gate.passed){
+          const gLabel=(isNext?'◎ ':'')+gate.name;
+          const gw=radar.measureText(gLabel).width+4;
+          const gSlot=placeCanvasLabel(placedRadarBoxes,gx,gy,gw,13,width,height,3);
+          if(gSlot){
+            radar.fillStyle=isNext?'#ffd166':'#bae6fd';
+            radar.fillText(gLabel,gSlot.x,gSlot.y);
+          }
         }
       }
       radar.restore();
@@ -5145,6 +5285,61 @@ function initialize(){
       first=false;
     }
     Object.assign(progress,{along,cross,y:f.y});
+  }
+  // 3D Mission Sky Gates Corridor (Story & Challenge Checkpoints)
+  const missionSkyGatesGroup=new THREE.Group();
+  scene.add(missionSkyGatesGroup);
+  const skyGateRingGeo=new THREE.TorusGeometry(62,2.6,8,12);
+  const skyGateInnerGeo=new THREE.RingGeometry(52,55.5,8);
+  const skyGateBeamGeo=new THREE.CylinderGeometry(2.2,6.5,580,8);
+  const skyGateNextMat=new THREE.MeshBasicMaterial({color:0xffd166,transparent:true,opacity:0.9,toneMapped:false,side:THREE.DoubleSide});
+  const skyGateLaterMat=new THREE.MeshBasicMaterial({color:0x6ee7ff,transparent:true,opacity:0.46,toneMapped:false,side:THREE.DoubleSide});
+  const skyGateBeamMat=new THREE.MeshBasicMaterial({color:0xffd166,transparent:true,opacity:0.22,toneMapped:false,depthWrite:false});
+  const skyGatePool=[];
+  for(let i=0;i<8;i++){
+    const g=new THREE.Group();
+    const torus=new THREE.Mesh(skyGateRingGeo,skyGateLaterMat);
+    const inner=new THREE.Mesh(skyGateInnerGeo,skyGateLaterMat);
+    const beam=new THREE.Mesh(skyGateBeamGeo,skyGateBeamMat);
+    beam.position.y=-290;
+    g.add(torus,inner,beam);
+    g.userData={torus,inner,beam};
+    g.visible=false;
+    missionSkyGatesGroup.add(g);
+    skyGatePool.push(g);
+  }
+  function drawMissionSkyGates(f,now){
+    const gates=(typeof window!=='undefined'&&Array.isArray(window.__skyboundActiveMissionGates))?window.__skyboundActiveMissionGates:[];
+    if(!f||f.ended||f.finished||replay||overviewActive||!gates.length){
+      missionSkyGatesGroup.visible=false;
+      return;
+    }
+    missionSkyGatesGroup.visible=true;
+    const nextGate=gates.find(g=>!g.passed);
+    for(let i=0;i<skyGatePool.length;i++){
+      const meshGroup=skyGatePool[i];
+      const gate=gates[i];
+      if(!gate||gate.passed){
+        meshGroup.visible=false;
+        continue;
+      }
+      const dist=Math.hypot(gate.x-f.x,gate.z-f.z);
+      if(dist>85000){
+        meshGroup.visible=false;
+        continue;
+      }
+      meshGroup.visible=true;
+      const gY=Math.max(gate.y||280,(typeof regionalHeight==='function'?Math.max(0,regionalHeight(gate.x,gate.z)):0)+140);
+      meshGroup.position.set(gate.x,gY,gate.z);
+      meshGroup.lookAt(f.x,gY,f.z);
+      const isNext=gate===nextGate;
+      const pulse=isNext?1+0.08*Math.sin((now||0)*0.005):1;
+      meshGroup.scale.setScalar(pulse*clamp(dist/2400,0.85,3.2));
+      meshGroup.userData.inner.rotation.z=(now||0)*0.0012*(isNext?1.6:0.7);
+      meshGroup.userData.torus.material=isNext?skyGateNextMat:skyGateLaterMat;
+      meshGroup.userData.inner.material=isNext?skyGateNextMat:skyGateLaterMat;
+      meshGroup.userData.beam.visible=isNext;
+    }
   }
   function animateCargoDoors(data,noseOpen,sideOpen,dt){
     const blend=Math.min(1,dt*2.8);
@@ -5841,6 +6036,7 @@ function initialize(){
     drawMouseYoke();
     updateTaiwanOverview(flight);
     drawAirportLabel(flight);
+    drawMissionSkyGates(flight,now);
     const weather=byId('weather').value;
     scene.fog.density=weather==='storm'?.00035:weather==='fog'?.00064:weather==='wet'?.000065:
       THREE.MathUtils.lerp(.000034,.000007,clamp(((flight?.y||0)-2400)/6600,0,1));

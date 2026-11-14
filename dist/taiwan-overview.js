@@ -80,6 +80,47 @@ function createTaiwanOverview(){
   const distantTerrain=overviewTerrain.clone();
   distantTerrain.position.y=-40;
 
+  // 3D Relief Terrain Patches for All 8 International Regions (Tokyo, Osaka, Okinawa, Hong Kong, Seoul, Singapore, Manila, Bangkok)
+  const intlTerrainGroup=new THREE.Group();
+  scene.add(intlTerrainGroup);
+  if(typeof internationalRegions!=='undefined'&&Array.isArray(internationalRegions)){
+    const intlMat=new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false});
+    const urbanCol=new THREE.Color(0x5b6b7a);
+    for(const reg of internationalRegions){
+      if(reg.id==='TW'||!Array.isArray(reg.bounds)) continue;
+      const [rLeft,rTop,rW,rH]=reg.bounds;
+      const rStep=2400;
+      const rGeo=new THREE.PlaneGeometry(rW,rH,Math.max(8,Math.ceil(rW/rStep)),Math.max(8,Math.ceil(rH/rStep)));
+      rGeo.rotateX(-Math.PI/2);
+      rGeo.translate(rLeft+rW/2,0,rTop+rH/2);
+      const rPts=rGeo.attributes.position;
+      const rCols=new Float32Array(rPts.count*3);
+      for(let i=0;i<rPts.count;i++){
+        const x=rPts.getX(i),z=rPts.getZ(i),h=regionalHeight(x,z);
+        rPts.setY(i,h*2.2); // Slight vertical exaggeration for crisp 3D tactical relief
+        if(h<1.2){
+          color.copy(sea);
+        }else{
+          color.copy(coast).lerp(forest,Math.min(1,h/420));
+          if(h>650) color.lerp(ridge,Math.min(1,(h-650)/1200));
+          if(Array.isArray(reg.urbanZones)){
+            for(const uz of reg.urbanZones){
+              const d=Math.hypot(x-uz.x,z-uz.z);
+              if(d<uz.r){
+                color.lerp(urbanCol,(1-d/uz.r)*0.55);
+              }
+            }
+          }
+          const shade=(h-regionalHeight(x-rStep,z-rStep))/rStep;
+          color.multiplyScalar(Math.max(.74,Math.min(1.26,.98+shade*1.45)));
+        }
+        color.toArray(rCols,i*3);
+      }
+      rGeo.setAttribute('color',new THREE.BufferAttribute(rCols,3));
+      intlTerrainGroup.add(new THREE.Mesh(rGeo,intlMat));
+    }
+  }
+
   // 3D Label Sprite Helper for Airports, VORs, and Multiplayer Callsigns
   function createTagSprite(text, borderColor='#6ee7ff', textColor='#ffffff', bgColor='rgba(9, 23, 36, 0.86)'){
     if(typeof document==='undefined') return null;
@@ -129,7 +170,7 @@ function createTaiwanOverview(){
   const airportMeshes=new Map();
   const airportPillars=new Map();
   const airportLabels=new Map();
-  const majorHubs=new Set(['RCTP','RCSS','RCMQ','RCKH','RCYU','RCFN','RCBS','RCQC','RCGI','RCLY']);
+  const majorHubs=new Set(['RCTP','RCSS','RCMQ','RCKH','RCYU','RCFN','RCBS','RCQC','RCGI','RCLY','RJTT','RJAA','RJBB','ROAH','VHHH','RKSI','WSSS','RPLL','VTBS']);
   const pillarGeo=new THREE.CylinderGeometry(360,520,9000,6);
   const airportPillarMat=new THREE.MeshBasicMaterial({color:0x5ce1ff,transparent:true,opacity:0.42,toneMapped:false});
   const destPillarMat=new THREE.MeshBasicMaterial({color:0xffcf5e,transparent:true,opacity:0.78,toneMapped:false});
@@ -163,7 +204,7 @@ function createTaiwanOverview(){
   const vorById=new Map();
   if(typeof airwaysNav!=='undefined'&&typeof airwaysNav.getVORStations==='function'){
     airwaysNav.ensureVORCoordinates?.(geoPoint);
-    const vors=airwaysNav.getVORStations()||[];
+    const vors=(typeof airwaysNav.getAllVORStations==='function'?airwaysNav.getAllVORStations():airwaysNav.getVORStations())||[];
     const vorGeo=new THREE.RingGeometry(0.6,1.1,6);
     vorGeo.rotateX(-Math.PI/2);
     const vorMat=new THREE.MeshBasicMaterial({color:0x00e5a3,toneMapped:false,side:THREE.DoubleSide});
@@ -303,14 +344,28 @@ function createTaiwanOverview(){
     return {zoom:viewState.zoom,scalePx:applyFrustum()};
   }
 
+  let userPanned=false;
   function panBy(dxPx,dyPx){
+    userPanned=true;
     const worldPerPx=spriteScaleBase||400;
-    viewState.panX=Math.max(-220000,Math.min(220000,viewState.panX-dxPx*worldPerPx));
-    viewState.panZ=Math.max(-260000,Math.min(260000,viewState.panZ-dyPx*worldPerPx));
+    viewState.panX=Math.max(-3500000,Math.min(3500000,viewState.panX-dxPx*worldPerPx));
+    viewState.panZ=Math.max(-3500000,Math.min(3500000,viewState.panZ-dyPx*worldPerPx));
     updateCameraTransform();
   }
 
+  function centerOnCoords(wx,wz,zoomVal){
+    if(Number.isFinite(wx)&&Number.isFinite(wz)){
+      userPanned=true;
+      viewState.panX=wx-center.x;
+      viewState.panZ=wz-center.z;
+      if(Number.isFinite(zoomVal)) viewState.zoom=Math.max(0.55,Math.min(5.2,zoomVal));
+      updateCameraTransform();
+      applyFrustum();
+    }
+  }
+
   function resetView(){
+    userPanned=false;
     viewState.zoom=1;
     viewState.panX=0;
     viewState.panZ=0;
@@ -405,6 +460,16 @@ function createTaiwanOverview(){
   }
 
   function draw(renderer,f){
+    if(!userPanned&&Number.isFinite(f?.x)&&Number.isFinite(f?.z)){
+      const isOverseas=Math.abs(f.x-center.x)>360000||Math.abs(f.z-center.z)>360000;
+      const targetPanX=isOverseas?(f.x-center.x):0;
+      const targetPanZ=isOverseas?(f.z-center.z):0;
+      if(Math.hypot(viewState.panX-targetPanX,viewState.panZ-targetPanZ)>8000){
+        viewState.panX=targetPanX;
+        viewState.panZ=targetPanZ;
+        updateCameraTransform();
+      }
+    }
     const acAlt=Math.max(9200, (f.y||0)+4000);
     markerGroup.position.set(f.x,acAlt,f.z);
     markerGroup.rotation.y=-f.heading;
@@ -521,7 +586,7 @@ function createTaiwanOverview(){
     renderer.render(scene,camera);
   }
   return {
-    distantTerrain,resize,draw,airportLabels,peerLabels,vorLabels,
-    viewState,setViewMode,zoomBy,panBy,resetView,declutterLabels
+    distantTerrain,intlTerrainGroup,resize,draw,airportLabels,peerLabels,vorLabels,
+    viewState,setViewMode,zoomBy,panBy,centerOnCoords,resetView,declutterLabels
   };
 }

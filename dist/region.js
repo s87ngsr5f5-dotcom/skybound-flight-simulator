@@ -25,11 +25,13 @@ const taiwanAirports=[
 const internationalAirports=[
   airport('RJAA','東京成田',35+(45+31.88/60)/60,140+(22+46.255/60)/60,329.51,4000,60,41,'34L','16R',-205),
   airport('RJTT','東京羽田',35.5494,139.7798,337.0,3360,60,6.4,'34R','16L',-195),
+  airport('RJBB','大阪關西',34.4347,135.2440,59.0,4000,60,5.2,'06R','24L',-190),
   airport('VHHH','香港赤鱲角',22+(18+29/60)/60,113+(55+6/60)/60,71.0,3800,60,9,'07L','25R',185),
   airport('ROAH','沖繩那霸',26+(11+45/60)/60,127+(38+45/60)/60,183.0,3000,45,3.5,'18R','36L',-170),
   airport('RKSI','首爾仁川',37.4602,126.4407,333.0,4000,60,7.0,'33L','15R',-200),
   airport('WSSS','新加坡樟宜',1.3592,103.9893,23.0,4000,60,6.7,'02L','20R',190),
-  airport('RPLL','馬尼拉尼諾伊',14.5086,121.0194,61.0,3737,60,22.9,'06','24',-185)
+  airport('RPLL','馬尼拉尼諾伊',14.5086,121.0194,61.0,3737,60,22.9,'06','24',-185),
+  airport('VTBS','曼谷蘇凡納布',13.6900,100.7501,15.0,4000,60,2.1,'01R','19L',-195)
 ];
 var allAirports=[...taiwanAirports,...internationalAirports];
 function runwayCoordinates(x,z,r){
@@ -50,6 +52,35 @@ function regionalRoute(from,to){
   const finish=[{name:'進場定位點',...airportPoint(to,-6600,0)},
     {name:to.name+' '+to.designator+' 跑道',...airportPoint(to,-to.length/2+200,0)}];
   if(from.code==='RCSS'&&to.code==='RCYU') return [...regionalWaypoints,...finish];
+  if(from.code==='RJTT'&&to.code==='RJAA') return [
+    {name:'東京灣彩虹大橋航點',...geoPoint(35.6366,139.7633)},
+    {name:'東京鐵塔與丸之內天際線',...geoPoint(35.6586,139.7454)},
+    {name:'東京晴空塔導航點',...geoPoint(35.7101,139.8107)},
+    {name:'船橋幕張灣岸航點',...geoPoint(35.68,140.05)},
+    ...finish
+  ];
+  if(from.code==='RJBB'&&to.code==='RJTT') return [
+    {name:'關西跨海聯絡橋離場點',...geoPoint(34.415,135.300)},
+    {name:'大阪城天守閣與梅田天際線',...geoPoint(34.6873,135.5262)},
+    {name:'伊勢灣與名古屋南航段',...geoPoint(34.85,136.85)},
+    {name:'富士山南麓觀景航點',...geoPoint(35.22,138.75)},
+    {name:'東京灣彩虹大橋進場點',...geoPoint(35.52,139.80)},
+    ...finish
+  ];
+  if(to.code==='RJBB') return [
+    {name:'東海航段',...geoPoint(27.55,126.30)},
+    {name:'四國足摺岬外海',...geoPoint(32.55,133.10)},
+    {name:'淡路島明石海峽進場點',...geoPoint(34.32,134.95)},
+    {name:'大阪灣關西人工島進場走廊',...geoPoint(34.38,135.16)},
+    ...finish
+  ];
+  if(to.code==='VTBS') return [
+    {name:'南海西沙北航段',...geoPoint(19.20,113.50)},
+    {name:'中南半島峴港航段',...geoPoint(15.80,107.50)},
+    {name:'曼谷湄南河大皇宮觀景航點',...geoPoint(13.745,100.505)},
+    {name:'曼谷像素大廈進場走廊',...geoPoint(13.723,100.560)},
+    ...finish
+  ];
   if(to.code==='RJAA'||to.code==='RJTT') return [
     {name:'東海航段',...geoPoint(27.55,126.30)},
     {name:'琉球東方航段',...geoPoint(29.68,131.37)},
@@ -93,6 +124,12 @@ function regionalRoute(from,to){
     {name:'彭佳嶼東北下降點',...geoPoint(26.00,122.50)},
     ...finish
   ];
+  if(from.code==='RJBB') return [
+    {name:'大阪灣離場航點',...geoPoint(34.58,135.38)},
+    {name:'四國南岸航段',...geoPoint(32.55,133.10)},
+    {name:'琉球東方航段',...geoPoint(28.50,128.50)},
+    ...finish
+  ];
   if(from.code==='VHHH') return [
     {name:'大嶼山出發航段',...geoPoint(22.25,114.15)},
     {name:'東沙北航段',...geoPoint(22.60,116.20)},
@@ -120,6 +157,12 @@ function regionalRoute(from,to){
   if(from.code==='RPLL') return [
     {name:'馬尼拉灣離場點',...geoPoint(14.75,120.80)},
     {name:'呂宋海峽航段',...geoPoint(19.50,120.90)},
+    ...finish
+  ];
+  if(from.code==='VTBS') return [
+    {name:'湄南河大皇宮離場點',...geoPoint(13.745,100.505)},
+    {name:'暹羅灣北航點',...geoPoint(13.20,100.85)},
+    {name:'南海西南航段',...geoPoint(10.50,108.50)},
     ...finish
   ];
   return finish;
@@ -241,8 +284,216 @@ function internationalTerrainHeight(x,z){
     const sierra=lon>121.12?(lon-121.12)*2400+noise*35:0;
     return Math.max(8,16+noise*6+sierra);
   }
+  // 7. Japan Osaka Bay / Kansai / Kobe / Mt. Rokko / Awaji Island (RJBB)
+  if(lat>=34.15&&lat<=34.92&&lon>=134.82&&lon<=135.82){
+    const kixKm=Math.hypot((lat-34.4347)*111,(lon-135.2440)*91.5);
+    if(kixKm<3.8) return 5.2;
+    const awajiKm=Math.hypot((lat-34.34)*111,(lon-134.88)*91.5);
+    if(awajiKm<12.5) return Math.max(8,520*Math.exp(-Math.pow(awajiKm/6.2,1.75))+noise*12);
+    const inOsakaBay=lat>=34.30&&lat<=34.68&&lon>=135.02&&lon<=135.42&&!(lat>=34.62&&lon>=135.38);
+    if(inOsakaBay) return 0;
+    const rokko=931*Math.exp(-Math.pow(Math.hypot((lat-34.778)*111,(lon-135.264)*91.5)/6.2,1.75));
+    const ikoma=642*Math.exp(-Math.pow(Math.hypot((lat-34.679)*111,(lon-135.680)*91.5)/5.8,1.75));
+    const izumi=780*Math.exp(-Math.pow(Math.hypot((lat-34.32)*111,(lon-135.45)*91.5)/8.5,1.75));
+    return Math.max(6,14+noise*6+rokko+ikoma+izumi);
+  }
+  // 8. Thailand Bangkok / Chao Phraya River Delta & Suvarnabhumi (VTBS)
+  if(lat>=13.38&&lat<=14.08&&lon>=100.32&&lon<=101.05){
+    if(lat<13.50&&lon<100.82) return 0; // Upper Gulf of Thailand
+    const riverLon=100.515+Math.sin((lat-13.50)*26)*0.032;
+    const riverDistKm=Math.abs(lon-riverLon)*108.0;
+    if(riverDistKm<0.42&&lat<13.95) return 0;
+    const khaoKhiao=645*Math.exp(-Math.pow(Math.hypot((lat-13.42)*111,(lon-100.98)*108.0)/6.8,1.75));
+    return Math.max(2.5,7.5+noise*3.5+khaoKhiao);
+  }
   return 0;
 }
+
+const internationalRegions=[
+  {
+    id:'TW', name:'🇹🇼 臺灣本島與離島', airportCode:'RCTP',
+    centerLat:24.10, centerLon:120.95, spanKm:380,
+    landmarks:[
+      {name:'台北 101',lat:25.0339,lon:121.5645},
+      {name:'玉山主峰 3952m',lat:23.4700,lon:120.9573},
+      {name:'高雄 85 大樓',lat:22.6111,lon:120.3035},
+      {name:'台中歌劇院',lat:24.1628,lon:120.6404}
+    ]
+  },
+  {
+    id:'JP_TYO', name:'🇯🇵 日本東京灣與富士山', airportCode:'RJTT',
+    centerLat:35.58, centerLon:139.78, spanKm:145,
+    box:{s:34.65,n:36.25,w:138.45,e:140.75},
+    urbanZones:[
+      {lat:35.67,lon:139.76,rKm:18,label:'東京都心 23 區'},
+      {lat:35.45,lon:139.64,rKm:11,label:'橫濱港未來'},
+      {lat:35.61,lon:140.11,rKm:10,label:'千葉幕張'}
+    ],
+    rivers:[
+      [[35.78,139.72],[35.71,139.80],[35.66,139.78],[35.62,139.77]],
+      [[35.79,139.85],[35.70,139.85],[35.64,139.84]]
+    ],
+    bridges:[
+      {name:'彩虹大橋',pts:[[35.641,139.754],[35.632,139.773]]},
+      {name:'東京灣跨海公路 Aqualine',pts:[[35.518,139.785],[35.442,139.928]]}
+    ],
+    landmarks:[
+      {name:'東京晴空塔 634m',lat:35.7101,lon:139.8107},
+      {name:'東京鐵塔 333m',lat:35.6586,lon:139.7454},
+      {name:'彩虹大橋',lat:35.6366,lon:139.7633},
+      {name:'富士山 3776m',lat:35.3606,lon:138.7274},
+      {name:'成田山新勝寺',lat:35.7858,lon:140.3183}
+    ]
+  },
+  {
+    id:'JP_KIX', name:'🇯🇵 日本大阪關西與神戶港', airportCode:'RJBB',
+    centerLat:34.56, centerLon:135.36, spanKm:95,
+    box:{s:34.18,n:34.90,w:134.84,e:135.78},
+    urbanZones:[
+      {lat:34.69,lon:135.50,rKm:15,label:'大阪梅田·難波都心'},
+      {lat:34.69,lon:135.19,rKm:9,label:'神戶三宮港區'},
+      {lat:34.41,lon:135.32,rKm:7,label:'泉佐野臨空城'}
+    ],
+    rivers:[
+      [[34.82,135.65],[34.72,135.52],[34.66,135.42]]
+    ],
+    bridges:[
+      {name:'關西機場聯絡橋',pts:[[34.434,135.258],[34.412,135.298]]},
+      {name:'明石海峽大橋',pts:[[34.632,135.022],[34.598,135.012]]}
+    ],
+    landmarks:[
+      {name:'大阪城天守閣',lat:34.6873,lon:135.5262},
+      {name:'梅田藍天大廈',lat:34.7055,lon:135.4896},
+      {name:'關西跨海聯絡橋',lat:34.4230,lon:135.2780},
+      {name:'六甲山夜景 931m',lat:34.7780,lon:135.2640}
+    ]
+  },
+  {
+    id:'JP_OKA', name:'🇯🇵 沖繩那霸與慶良間諸島', airportCode:'ROAH',
+    centerLat:26.25, centerLon:127.72, spanKm:82,
+    box:{s:26.02,n:26.86,w:127.15,e:128.32},
+    urbanZones:[
+      {lat:26.215,lon:127.685,rKm:8.5,label:'那霸國際通都會區'},
+      {lat:26.335,lon:127.800,rKm:7.0,label:'沖繩北谷美國村'}
+    ],
+    rivers:[],
+    bridges:[
+      {name:'古宇利大橋',pts:[[26.678,128.015],[26.696,128.018]]}
+    ],
+    landmarks:[
+      {name:'首里城正殿',lat:26.2170,lon:127.7195},
+      {name:'那霸國際通',lat:26.2145,lon:127.6840},
+      {name:'慶良間珊瑚礁海',lat:26.1850,lon:127.3600}
+    ]
+  },
+  {
+    id:'HK_HKG', name:'🇭🇰 香港維多利亞港與大嶼山', airportCode:'VHHH',
+    centerLat:22.31, centerLon:114.08, spanKm:68,
+    box:{s:22.16,n:22.54,w:113.85,e:114.34},
+    urbanZones:[
+      {lat:22.282,lon:114.165,rKm:7.5,label:'香港島中環·灣仔'},
+      {lat:22.318,lon:114.172,rKm:9.5,label:'九龍尖沙咀·旺角'},
+      {lat:22.289,lon:113.942,rKm:5.5,label:'東涌新市鎮'}
+    ],
+    rivers:[],
+    bridges:[
+      {name:'青馬大橋',pts:[[22.348,114.058],[22.356,114.092]]},
+      {name:'港珠澳大橋香港段',pts:[[22.305,113.945],[22.265,113.865]]}
+    ],
+    landmarks:[
+      {name:'中環 IFC & 中銀大廈',lat:22.2852,lon:114.1581},
+      {name:'九龍 ICC 484m',lat:22.3034,lon:114.1602},
+      {name:'青馬大橋',lat:22.3514,lon:114.0736},
+      {name:'太平山頂 552m',lat:22.2759,lon:114.1455},
+      {name:'大嶼山鳳凰山 934m',lat:22.2460,lon:113.9220}
+    ]
+  },
+  {
+    id:'KR_ICN', name:'🇰🇷 韓國首爾漢江與仁川港', airportCode:'RKSI',
+    centerLat:37.50, centerLon:126.76, spanKm:96,
+    box:{s:37.26,n:37.76,w:126.36,e:127.20},
+    urbanZones:[
+      {lat:37.55,lon:126.99,rKm:16,label:'首爾江南·光化門都心'},
+      {lat:37.40,lon:126.65,rKm:10,label:'仁川松島國際都市'},
+      {lat:37.52,lon:126.92,rKm:7,label:'汝矣島金融特區'}
+    ],
+    rivers:[
+      [[37.55,127.18],[37.52,127.02],[37.53,126.92],[37.58,126.80],[37.68,126.64]]
+    ],
+    bridges:[
+      {name:'仁川跨海大橋',pts:[[37.432,126.492],[37.396,126.628]]},
+      {name:'永宗大橋',pts:[[37.515,126.525],[37.562,126.625]]}
+    ],
+    landmarks:[
+      {name:'樂天世界塔 555m',lat:37.5125,lon:127.1025},
+      {name:'N首爾塔 239m',lat:37.5512,lon:126.9882},
+      {name:'仁川跨海大橋',lat:37.4138,lon:126.5655},
+      {name:'松島國際摩天群',lat:37.4420,lon:126.4860}
+    ]
+  },
+  {
+    id:'SG_SIN', name:'🇸🇬 新加坡濱海灣與樟宜', airportCode:'WSSS',
+    centerLat:1.33, centerLon:103.89, spanKm:58,
+    box:{s:1.21,n:1.48,w:103.61,e:104.05},
+    urbanZones:[
+      {lat:1.285,lon:103.855,rKm:9.5,label:'濱海灣金融中心 CBD'},
+      {lat:1.352,lon:103.945,rKm:7.5,label:'淡濱尼與樟宜城區'}
+    ],
+    rivers:[
+      [[1.305,103.835],[1.288,103.852],[1.282,103.868]]
+    ],
+    bridges:[
+      {name:'薛爾思跨海大橋',pts:[[1.289,103.862],[1.294,103.876]]},
+      {name:'新柔長堤',pts:[[1.445,103.769],[1.461,103.764]]}
+    ],
+    landmarks:[
+      {name:'濱海灣金沙酒店 MBS',lat:1.2834,lon:103.8607},
+      {name:'濱海灣花園超級擎天樹',lat:1.2816,lon:103.8636},
+      {name:'星耀樟宜與控制塔',lat:1.3592,lon:103.9893},
+      {name:'武吉知馬山 163m',lat:1.3547,lon:103.7764}
+    ]
+  },
+  {
+    id:'PH_MNL', name:'🇵🇭 菲律賓馬尼拉灣與馬卡蒂', airportCode:'RPLL',
+    centerLat:14.54, centerLon:120.99, spanKm:76,
+    box:{s:14.26,n:14.86,w:120.42,e:121.32},
+    urbanZones:[
+      {lat:14.555,lon:121.025,rKm:11,label:'馬卡蒂 & BGC 金融特區'},
+      {lat:14.595,lon:120.985,rKm:9,label:'馬尼拉王城區與海灣'}
+    ],
+    rivers:[
+      [[14.595,120.960],[14.588,121.015],[14.555,121.085]]
+    ],
+    bridges:[
+      {name:'CCLEX 宿霧馬尼拉海灣走廊',pts:[[14.525,120.982],[14.485,120.955]]}
+    ],
+    landmarks:[
+      {name:'馬尼拉灣摩天輪 & BGC',lat:14.5350,lon:121.0020},
+      {name:'巴丹山脈 1388m',lat:14.5200,lon:120.4800}
+    ]
+  },
+  {
+    id:'TH_BKK', name:'🇹🇭 泰國曼谷湄南河與大皇宮', airportCode:'VTBS',
+    centerLat:13.72, centerLon:100.62, spanKm:78,
+    box:{s:13.40,n:14.04,w:100.35,e:101.02},
+    urbanZones:[
+      {lat:13.745,lon:100.535,rKm:14,label:'曼谷暹羅·是隆摩天都會區'},
+      {lat:13.700,lon:100.735,rKm:8.5,label:'蘇凡納布空港新城'}
+    ],
+    rivers:[
+      [[13.96,100.52],[13.84,100.51],[13.75,100.49],[13.70,100.51],[13.64,100.54],[13.54,100.58]]
+    ],
+    bridges:[
+      {name:'拉瑪八世斜張橋',pts:[[13.769,100.494],[13.768,100.503]]},
+      {name:'普密蓬跨河雙橋',pts:[[13.665,100.535],[13.655,100.548]]}
+    ],
+    landmarks:[
+      {name:'曼谷大皇宮與鄭王廟',lat:13.7500,lon:100.4913},
+      {name:'MahaNakhon 像素大廈 314m',lat:13.7236,lon:100.5283},
+      {name:'拉瑪八世斜張橋',lat:13.7688,lon:100.4982}
+    ]
+  }
+];
 function regionalHeight(x,z){
   let height=0;
   if(x>=-18000&&x<=18000&&z>=-18000&&z<=18000){
@@ -291,6 +542,6 @@ function regionalHeight(x,z){
   }
   return height;
 }
-if(typeof module!=='undefined') Object.assign(globalThis,{geoPoint,latLon,taiwanAirports,internationalAirports,allAirports,airportPoint,parkingPoint,runwayCoordinates,regionalRoute,regionalHeight});
+if(typeof module!=='undefined') Object.assign(globalThis,{geoPoint,latLon,taiwanAirports,internationalAirports,allAirports,internationalRegions,internationalTerrainHeight,airportPoint,parkingPoint,runwayCoordinates,regionalRoute,regionalHeight});
 
 

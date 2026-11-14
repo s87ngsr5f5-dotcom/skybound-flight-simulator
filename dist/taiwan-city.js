@@ -244,10 +244,19 @@ function createTaiwanCity(scene,ground,airports){
     {name:'新加坡濱海灣金沙酒店 Marina Bay Sands',lat:1.28340,lon:103.86070,radius:180,type:'sg_mbs'},
     {name:'新加坡樟宜星耀與金融區摩天樓群',lat:1.34500,lon:103.96200,radius:165,type:'intl_city_cluster',seed:401,count:86,span:2300,maxH:210},
     {name:'馬尼拉灣摩天輪與 BGC 金融摩天樓群',lat:14.53500,lon:121.00200,radius:175,type:'manila_skyline'},
+    {name:'大阪城天守閣與商業園區 OBP',lat:34.68730,lon:135.52620,radius:165,type:'osaka_castle'},
+    {name:'大阪梅田藍天大廈與中之島摩天樓群',lat:34.70550,lon:135.48960,radius:180,type:'osaka_umeda'},
+    {name:'關西國際機場聯絡橋 Sky Gate Bridge',lat:34.42300,lon:135.27800,radius:240,type:'suspension_bridge'},
+    {name:'泉佐野臨空城塔與關西灣岸都會區',lat:34.41100,lon:135.30100,radius:165,type:'intl_city_cluster',seed:601,count:86,span:2300,maxH:256},
+    {name:'曼谷大皇宮金塔與鄭王廟河岸群',lat:13.75000,lon:100.49130,radius:175,type:'bangkok_palace'},
+    {name:'曼谷王權 MahaNakhon 像素大廈與是隆金融區',lat:13.72360,lon:100.52830,radius:185,type:'bangkok_mahanakhon'},
+    {name:'曼谷蘇凡納布空港新城都會群',lat:13.71500,lon:100.71800,radius:160,type:'intl_city_cluster',seed:701,count:84,span:2300,maxH:165},
     {name:'東京灣國際貨櫃港與跨海航道船隊',lat:35.60200,lon:139.77800,radius:180,type:'harbor_fleet',seed:501},
     {name:'香港維多利亞港郵輪與貨櫃船隊',lat:22.29350,lon:114.16650,radius:180,type:'harbor_fleet',seed:502},
     {name:'新加坡海峽錨地超級貨輪船隊',lat:1.26800,lon:103.87800,radius:180,type:'harbor_fleet',seed:503},
     {name:'馬尼拉灣海港船隊',lat:14.55200,lon:120.97200,radius:180,type:'harbor_fleet',seed:504},
+    {name:'大阪灣神戶港國際貨櫃船隊',lat:34.56500,lon:135.34500,radius:180,type:'harbor_fleet',seed:505},
+    {name:'暹羅灣曼谷海港貨輪船隊',lat:13.45500,lon:100.62500,radius:180,type:'harbor_fleet',seed:506},
     {name:'Formosa Aero Secret Sanctum',lat:25.05850,lon:121.58200,radius:40,type:'secret_monolith'}
   ];
 
@@ -269,11 +278,11 @@ function createTaiwanCity(scene,ground,airports){
     return false;
   }
 
-  function placeGroundedBuilding(g,baseY,siteX,siteZ,matPick,bw,bh,bd,bx,bz,groupId,withCrown=false){
+  function placeGroundedBuilding(g,baseY,siteX,siteZ,bx,bz,bw,bh,bd,matPick,withCrown=false,groupId='intl:city'){
     const wx=siteX+bx,wz=siteZ+bz;
     if(isInAirportSafetyZone(wx,wz)) return false;
     const gy=ground(wx,wz);
-    if(gy<1.35) return false; // Never place land buildings in the sea
+    if(!Number.isFinite(gy)||gy<1.35) return false; // Never place land buildings in the sea
     const ly=gy-baseY;
     const plinth=6;
     box(g,matPick,bw,bh+plinth,bd,bx,ly+(bh-plinth)/2,bz);
@@ -285,6 +294,12 @@ function createTaiwanCity(scene,ground,airports){
       BuildingCollision.add(groupId,wx-bw*.45,wz-bd*.45,wx+bw*.45,wz+bd*.45,gy+bh,gy-plinth);
     }
     return true;
+  }
+
+  function addObstacleBox(wx,wz,w,h,d,groupId='tw:landmarks'){
+    if(typeof BuildingCollision==='undefined'||isInAirportSafetyZone(wx,wz)) return;
+    const gy=Math.max(1.2,ground(wx,wz));
+    BuildingCollision.add(groupId,wx-w*.5,wz-d*.5,wx+w*.5,wz+d*.5,gy+h,gy-2);
   }
 
   for(const site of landmarkSites){
@@ -548,8 +563,86 @@ function createTaiwanCity(scene,ground,airports){
         const matPick=i%3===0?darkGlass:i%2?officeGlass:wall;
         placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,bw,bh,bw,matPick,bh>150,'intl:manila');
       }
+    }else if(site.type==='osaka_castle'){
+      // Osaka Castle Tenshukaku: stone fortress wall + 5-tier white/gold castle keep + surrounding park towers
+      box(g,stone,140,18,140,0,7,0);
+      box(g,darkBasalt,110,12,110,0,22,0);
+      for(let t=0;t<5;t++){
+        const w=68-t*10,y=28+t*11;
+        box(g,whiteFrame,w,10,w,0,y+5,0);
+        box(g,pagodaGreen,w+10,2.6,w+10,0,y+10.5,0);
+        box(g,gold,w*0.35,1.8,w+11,0,y+8,0);
+      }
+      cyl(g,gold,1.2,3.5,10,8,0,88,0);
+      addObstacleBox(site.x,site.z,130,92,130,'landmark:osaka_castle');
+      for(let i=0;i<36;i++){
+        const a=i*2.39996,r=220+((i*67)%920);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=48+((i*41)%155);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,26,bh,24,i%2?officeGlass:darkGlass,bh>130,'intl:osaka_castle');
+      }
+    }else if(site.type==='osaka_umeda'){
+      // Umeda Sky Building (Twin Towers + Floating Garden Observatory Ring) + Abeno Harukas supertall
+      box(g,officeGlass,28,175,28,-28,85,0);
+      box(g,officeGlass,28,175,28,28,85,0);
+      box(g,whiteFrame,88,12,56,0,164,0);
+      cyl(g,gold,18,18,14,20,0,164,0);
+      addObstacleBox(site.x,site.z,92,178,60,'landmark:osaka_umeda');
+      // Abeno Harukas 300m stepped glass tower nearby
+      box(g,darkGlass,54,140,48,180,68,-140);
+      box(g,officeGlass,44,240,40,180,118,-140);
+      box(g,officeGlass,34,300,32,180,148,-140);
+      addObstacleBox(site.x+180,site.z-140,56,304,50,'landmark:abeno_harukas');
+      for(let i=0;i<54;i++){
+        const a=i*2.39996,r=150+((i*73)%1180);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=55+((i*47)%185);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,26,bh,26,i%3===0?darkGlass:officeGlass,bh>145,'intl:osaka_umeda');
+      }
+    }else if(site.type==='bangkok_palace'){
+      // Wat Arun (Temple of Dawn) & Grand Palace Golden Chedis along Chao Phraya River
+      box(g,stone,130,10,130,0,3,0);
+      // Central Khmer-style Prang spire (82m) + 4 corner satellite prangs
+      for(let t=0;t<6;t++){
+        const r=32-t*4.5,y=8+t*11.5;
+        cyl(g,whiteFrame,r*0.72,r,12,12,0,y+6,0);
+        cyl(g,gold,r*0.8,r*0.85,2.4,12,0,y+11,0);
+      }
+      cyl(g,gold,0.8,3.2,18,10,0,86,0);
+      for(const [cx,cz] of [[-48,-48],[48,-48],[-48,48],[48,48]]){
+        cyl(g,whiteFrame,6,14,38,10,cx,22,cz);
+        cyl(g,gold,1,4,12,8,cx,46,cz);
+      }
+      // Golden Grand Palace Spire nearby
+      cyl(g,gold,2,22,68,16,135,36,-75);
+      box(g,pagodaRed,58,18,36,135,14,10);
+      box(g,gold,64,6,42,135,25,10);
+      addObstacleBox(site.x,site.z,140,95,140,'landmark:bangkok_palace');
+      for(let i=0;i<42;i++){
+        const a=i*2.39996,r=210+((i*69)%1050);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=38+((i*43)%140);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,24,bh,24,i%2?wall:officeGlass,bh>120,'intl:bangkok_palace');
+      }
+    }else if(site.type==='bangkok_mahanakhon'){
+      // King Power Mahanakhon (314m Pixelated Ribbon Glass Skyscraper) + Silom/Sathorn CBD
+      box(g,darkGlass,46,110,46,0,53,0);
+      box(g,officeGlass,38,95,38,5,152,-4);
+      box(g,darkGlass,44,110,44,0,252,0);
+      box(g,whiteFrame,48,10,48,0,310,0);
+      addObstacleBox(site.x,site.z,52,316,52,'landmark:bangkok_mahanakhon');
+      for(let i=0;i<58;i++){
+        const a=i*2.39996,r=115+((i*73)%1280);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=52+((i*53)%195);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,26,bh,26,i%2?officeGlass:darkGlass,bh>150,'intl:bangkok_cbd');
+      }
     }else if(site.type==='intl_city_cluster'){
       const cnt=site.count||80,span=site.span||2200,maxH=site.maxH||180,sd=site.seed||101;
+      // Add urban arterial boulevard cross-grid on solid ground
+      if(baseY>=1.0&&!isInAirportSafetyZone(site.x,site.z)){
+        const roadLen=Math.min(1800,span*0.62);
+        box(g,roadMat,roadLen,0.6,22,0,0.4,0);
+        box(g,roadMat,22,0.6,roadLen,0,0.4,0);
+        box(g,gold,roadLen*0.92,0.7,1.4,0,0.5,0);
+        box(g,gold,1.4,0.7,roadLen*0.92,0,0.5,0);
+      }
       if(site.pagoda&&!isInAirportSafetyZone(site.x,site.z)&&baseY>=1.2){
         box(g,stone,32,10,32,0,-1,0);
         for(let t=0;t<5;t++){

@@ -24,7 +24,9 @@
     { id: 'campaign_hero', icon: '🏆', name: '蒼穹七章傳奇', desc: '通關全部 7 章《蒼穹守望者》戰役' },
     { id: 'perfectionist', icon: '🌟', name: '三星大師', desc: '在任一章節拿到 ★★★ 滿星評價' },
     { id: 'daily_pilot', icon: '📅', name: '每日值勤官', desc: '完成一次「今日緊急派遣」任務' },
-    { id: 'speed_demon', icon: '⚡', name: '低空極速狂人', desc: '完成一次「低空峽谷極速衝刺」' }
+    { id: 'speed_demon', icon: '⚡', name: '低空極速狂人', desc: '完成一次「低空峽谷極速衝刺」' },
+    { id: 'world_conqueror', icon: '🌏', name: '跨國遠征王', desc: '完成任一跨國都會遠征章節 (WP.08–WP.15) 或跨國巡迴賽' },
+    { id: 'aerobatic_ace', icon: '🎪', name: '雷虎特技王牌', desc: '完成「雷虎特技飛行公演」或達成 360° 特技支線目標' }
   ];
 
   const CHAPTERS = [
@@ -571,10 +573,157 @@
         }
       ],
       winCondition: (f, st) => !f.ended && !f.ground && f.y >= 360 && st.flownM >= 6600
+    },
+    {
+      id: 14,
+      isWorld: true,
+      code: 'WP.14',
+      title: '關西蒼穹：大阪灣跨海大橋與天守閣巡禮',
+      subtitle: '日本大阪關西 (RJBB) · 臨空跨海大橋、大阪城天守閣與梅田藍天大廈',
+      image: 'assets/campaign/ch2.jpg',
+      aircraft: 'b38m',
+      departure: 'RJBB',
+      destination: 'RJTT',
+      lesson: 'free',
+      startType: 'runway',
+      weather: '0',
+      time: '16:40',
+      objectiveDistM: 6400,
+      parTimeS: 115,
+      rewardMoney: 52000,
+      rewardXp: 1050,
+      maxSafeG: 3.5,
+      targetText: '① 關西人工島 06R 起飛 ② 飛越臨空跨海大橋與大阪灣 (> 1,100 ft) ③ 俯瞰大阪城天守閣與梅田雙塔 6.4 km',
+      story: '夕陽映照在大阪灣人工島與六甲山脈之間。你將駕駛 737 MAX 8 自關西國際機場起飛，沿著壯觀的跨海連絡橋飛向大阪市心，俯瞰白牆金瓦的大阪城天守閣、阿倍野 Harukas 與梅田空中庭園雙塔！',
+      radio: [
+        { delay: 1.3, speaker: '關西塔台 · KANSAI TWR', text: '「Formosa-814，關西 06R 跑道允許起飛，離場後沿大阪灣北上目視大阪城與梅田天際線！」' }
+      ],
+      stages: [
+        {
+          label: '階段 1/3 · 關西人工島起飛越過跨海大橋 (> 550 ft)',
+          check: f => !f.ended && !f.ground && f.y >= 170,
+          radio: { speaker: '關西離場台 · KANSAI DEP', text: '「已飛越關西連絡橋與臨空塔！左前方即為神戶六甲山與大阪港貨櫃船隊！」' }
+        },
+        {
+          label: '階段 2/3 · 穿越淀川與大阪城天守閣走廊 (> 1,100 ft · 3.4 km)',
+          check: (f, st) => !f.ended && f.y >= 335 && st.flownM >= 3400,
+          radio: { speaker: '副機長 · FIRST OFFICER', text: '「機長你看！大阪城天守閣的金飾與梅田藍天大廈的空中圓環清晰可見！」' }
+        },
+        {
+          label: '階段 3/3 · 穩定切入東海道東京航路 (6.4 km)',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 350 && st.flownM >= 6400
+        }
+      ],
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 350 && st.flownM >= 6400
+    },
+    {
+      id: 15,
+      isWorld: true,
+      code: 'WP.15',
+      title: '暹羅金輝：曼谷湄南河與像素大廈夕照',
+      subtitle: '泰國曼谷蘇凡納布 (VTBS) · 鄭王廟金塔、大皇宮與 314m 像素大廈',
+      image: 'assets/campaign/ch1.jpg',
+      aircraft: 'a320neo',
+      departure: 'VTBS',
+      destination: 'WSSS',
+      lesson: 'free',
+      startType: 'runway',
+      weather: 'clouds',
+      time: '17:50',
+      objectiveDistM: 6800,
+      parTimeS: 118,
+      rewardMoney: 58000,
+      rewardXp: 1180,
+      maxSafeG: 3.5,
+      targetText: '① 曼谷蘇凡納布 01R 起飛 ② 掠過湄南河大曲流與鄭王廟金塔 (> 1,150 ft) ③ 穿越曼谷像素大廈天際線 6.8 km',
+      story: '金色暮光灑落暹羅灣與蜿蜒的湄南河。你將駕駛 A320neo 自曼谷蘇凡納布國際機場升空，飛越金碧輝煌的鄭王廟（黎明寺）與大皇宮尖塔，並在 314 公尺高的王權像素大廈玻璃帷幕旁劃過天際！',
+      radio: [
+        { delay: 1.3, speaker: '曼谷塔台 · SUVARNABHUMI TWR', text: '「Siam-320，Sawasdee Krub！01R 跑道允許起飛，離場後可飽覽湄南河與鄭王廟金色夕照！」' }
+      ],
+      stages: [
+        {
+          label: '階段 1/3 · 蘇凡納布跑道起飛爬升 (> 550 ft)',
+          check: f => !f.ended && !f.ground && f.y >= 170,
+          radio: { speaker: '曼谷近場台 · BANGKOK APP', text: '「Siam-320 雷達接觸！前方進入是隆金融區與王權像素大廈空域，保持 1,150 ft 以上！」' }
+        },
+        {
+          label: '階段 2/3 · 巡禮湄南河曲流與鄭王廟金塔 (> 1,150 ft · 3.6 km)',
+          check: (f, st) => !f.ended && f.y >= 350 && st.flownM >= 3600,
+          radio: { speaker: '客艙廣播 · CAPTAIN PA', text: '「各位旅客，下方蜿蜒發光的正是曼谷母親河——湄南河與鄭王廟高塔！」' }
+        },
+        {
+          label: '階段 3/3 · 飛越暹羅灣切入南洋國際航路 (6.8 km)',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 360 && st.flownM >= 6800
+        }
+      ],
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 360 && st.flownM >= 6800
     }
   ];
 
   const ALL_CHAPTERS = [...CHAPTERS, ...WORLD_CHAPTERS];
+
+  function getBonusObjective(ch) {
+    if (ch.bonusObj) return ch.bonusObj;
+    const isFighter = ['sf16', 'm2000'].includes(ch.aircraft);
+    if (isFighter) {
+      return {
+        label: '🎖 支線挑戰：完成 1 次桶滾／觔斗特技或通過 2 座 3D 導航光門 (+$5,000)',
+        rewardMoney: 5000,
+        rewardXp: 120,
+        check: st => (st.aerobaticDone || (st.gatesPassed || 0) >= 2)
+      };
+    }
+    return {
+      label: '🎖 支線挑戰：通過至少 2 座 3D 導航光門且最大過載 ≤ 2.4G (+$5,000)',
+      rewardMoney: 5000,
+      rewardXp: 120,
+      check: st => ((st.gatesPassed || 0) >= 2 && (st.maxG || 1) <= 2.4)
+    };
+  }
+
+  function buildMissionSkyGates(ch) {
+    if (typeof allAirports === 'undefined' || !Array.isArray(allAirports)) return [];
+    const dep = allAirports.find(a => a.code === ch.departure) || allAirports[0];
+    const dst = allAirports.find(a => a.code === ch.destination) || dep;
+    if (!dep) return [];
+    const hdg = typeof dep.heading === 'number' ? dep.heading : 0;
+    const fwdX = Math.sin(hdg), fwdZ = -Math.cos(hdg);
+    const toDstX = dst && dst !== dep ? (dst.x - dep.x) : fwdX * 12000;
+    const toDstZ = dst && dst !== dep ? (dst.z - dep.z) : fwdZ * 12000;
+    const toDstLen = Math.max(1, Math.hypot(toDstX, toDstZ));
+    const dirX = toDstX / toDstLen, dirZ = toDstZ / toDstLen;
+    const elev = dep.elevation || 0;
+    const distTotal = ch.objectiveDistM || 5200;
+    return [
+      {
+        id: 1,
+        name: 'GATE 1 · 離場爬升門',
+        x: Math.round(dep.x + fwdX * Math.min(1800, distTotal * 0.28)),
+        y: Math.round(elev + 210),
+        z: Math.round(dep.z + fwdZ * Math.min(1800, distTotal * 0.28)),
+        radius: 950,
+        passed: false
+      },
+      {
+        id: 2,
+        name: 'GATE 2 · 地標巡航門',
+        x: Math.round(dep.x + (fwdX * 0.55 + dirX * 0.45) * (distTotal * 0.56)),
+        y: Math.round(elev + 340),
+        z: Math.round(dep.z + (fwdZ * 0.55 + dirZ * 0.45) * (distTotal * 0.56)),
+        radius: 1050,
+        passed: false
+      },
+      {
+        id: 3,
+        name: 'GATE 3 · 終點衝線門',
+        x: Math.round(dep.x + (fwdX * 0.35 + dirX * 0.65) * (distTotal * 0.86)),
+        y: Math.round(elev + 410),
+        z: Math.round(dep.z + (fwdZ * 0.35 + dirZ * 0.65) * (distTotal * 0.86)),
+        radius: 1150,
+        passed: false
+      }
+    ];
+  }
 
   const UPGRADES_KEY = 'skybound.upgrades.v1';
   const UPGRADE_TRACKS = [
@@ -969,6 +1118,105 @@
         winCondition: (f, st) => !f.ended && ((f.finished && f.landed) || (f.y >= 425 && st.flownM >= 5200))
       };
     }
+    if (type === 'aerobatic_show') {
+      return {
+        id: 105,
+        isChallenge: true,
+        challengeType: 'aerobatic_show',
+        code: 'AERO',
+        title: '🎪 雷虎特技飛行公演 · 360° 迴旋與桶滾挑戰',
+        subtitle: '全角度 360° 垂直觔斗與副翼桶滾實戰驗收 · 高額特技賞金',
+        image: 'assets/campaign/ch6.jpg',
+        aircraft: 'sf16',
+        departure: 'RCSS',
+        destination: 'RCTP',
+        lesson: 'free',
+        startType: 'runway',
+        weather: '0',
+        time: '16:30',
+        objectiveDistM: 4800,
+        parTimeS: 95,
+        rewardMoney: 22000,
+        rewardXp: 520,
+        maxSafeG: 9.0,
+        targetText: '① 全推力升空爬升 (> 900 ft) ② 完成 360° 桶滾或垂直大迴旋特技 ③ 飛越 4.8 km 公演空域',
+        radio: [
+          { delay: 1.0, speaker: '雷虎領隊 · THUNDER TIGER 1', text: '「雷虎公演開始！離地爬升至 1,000 ft 以上，拉桿或壓副翼展現 360° 垂直觔斗或桶滾特技！」' }
+        ],
+        stages: [
+          {
+            label: '階段 1/3 · 起飛爬升進入特技高度 (> 800 ft)',
+            check: f => !f.ended && !f.ground && f.y >= 245,
+            radio: { speaker: '地面觀禮台 · AIRSHOW PA', text: '「戰機已進入公演高度！現在請長按 ↑ 拉出 360° 垂直觔斗，或長按 ←/→ 完成 360° 桶滾！」' }
+          },
+          {
+            label: '階段 2/3 · 完成 360° 桶滾／垂直觔斗或高機動通過光門',
+            check: (f, st) => !f.ended && (st.aerobaticDone || Math.abs(f.pitch || 0) > 1.05 || Math.abs(f.bank || 0) > 1.85 || st.flownM >= 2600),
+            radio: { speaker: '雷虎領隊 · THUNDER TIGER 1', text: '「太精采的 360° 姿態機動！全場歡呼雷動，繼續加速衝過 4.8 km 終點門！」' }
+          },
+          {
+            label: '階段 3/3 · 華麗謝幕完成 4.8 km 特技公演',
+            check: (f, st) => !f.ended && !f.ground && st.flownM >= 4800
+          }
+        ],
+        winCondition: (f, st) => !f.ended && !f.ground && st.flownM >= 4800
+      };
+    }
+    if (type === 'world_tour') {
+      const worldHubs = [
+        { dep: 'RJTT', dst: 'RJAA', city: '日本東京灣・晴空塔', ac: 'a223', acName: 'A220-300', img: 'assets/campaign/ch1.jpg' },
+        { dep: 'RJBB', dst: 'RJTT', city: '日本大阪關西・天守閣', ac: 'b38m', acName: '737 MAX 8', img: 'assets/campaign/ch2.jpg' },
+        { dep: 'VHHH', dst: 'RCKH', city: '香港維多利亞港・雙塔', ac: 'b38m', acName: '737 MAX 8', img: 'assets/campaign/ch3.jpg' },
+        { dep: 'ROAH', dst: 'RCYU', city: '沖繩那霸・首里城珊瑚海', ac: 'sf16', acName: 'F-16V', img: 'assets/campaign/ch6.jpg' },
+        { dep: 'RKSI', dst: 'RCTP', city: '韓國首爾仁川・樂天世界塔', ac: 'sf748', acName: '747-8F', img: 'assets/campaign/ch7.jpg' },
+        { dep: 'WSSS', dst: 'RPLL', city: '新加坡濱海灣金沙・擎天樹', ac: 'a223', acName: 'A220-300', img: 'assets/campaign/ch2.jpg' },
+        { dep: 'RPLL', dst: 'RCKH', city: '菲律賓馬尼拉灣・BGC 天際線', ac: 'm2000', acName: 'Mirage 2000', img: 'assets/campaign/ch5.jpg' },
+        { dep: 'VTBS', dst: 'WSSS', city: '泰國曼谷湄南河・鄭王廟像素大廈', ac: 'a320neo', acName: 'A320neo', img: 'assets/campaign/ch1.jpg' }
+      ];
+      const pick = worldHubs[Math.floor(Math.random() * worldHubs.length)];
+      return {
+        id: 106,
+        isChallenge: true,
+        challengeType: 'world_tour',
+        code: 'WORLD',
+        title: `🌏 跨國地標巡迴賽 · ${pick.city}`,
+        subtitle: `駕駛 ${pick.acName} 自 ${pick.dep} 起飛 · 1.8× 跨國巡迴賞金`,
+        image: pick.img,
+        aircraft: pick.ac,
+        departure: pick.dep,
+        destination: pick.dst,
+        lesson: 'free',
+        startType: 'runway',
+        weather: '0',
+        time: '17:15',
+        objectiveDistM: 5200,
+        parTimeS: 108,
+        rewardMoney: 25000,
+        rewardXp: 580,
+        maxSafeG: 6.5,
+        targetText: `自 ${pick.dep} 起飛穿越 3D 黃金導航光門，巡禮「${pick.city}」完成 5.2 km 航段`,
+        radio: [
+          { delay: 1.2, speaker: '跨國巡迴賽總監 · WORLD TOUR', text: `「歡迎來到『${pick.city}』分站！跟隨前方 3D 黃金光門巡禮國際地標，衝刺 5.2 km！」` }
+        ],
+        stages: [
+          {
+            label: '階段 1/3 · 起飛通過 GATE 1 離場光門 (> 450 ft)',
+            check: f => !f.ended && !f.ground && f.y >= 140,
+            radio: { speaker: '國際航管 · INTL ATC', text: '「離場姿態完美！前方地標建築群已載入，對準下一座 3D 光門推進！」' }
+          },
+          {
+            label: '階段 2/3 · 飛越國際都會地標空域 (2.8 km)',
+            check: (f, st) => !f.ended && f.y >= 280 && st.flownM >= 2800,
+            radio: { speaker: '副駕駛 · COPILOT', text: '「跨國地標與海灣大橋盡收眼底！維持速度衝過終點線！」' }
+          },
+          {
+            label: '階段 3/3 · 完成 5.2 km 跨國地標巡迴賽',
+            check: (f, st) => !f.ended && !f.ground && st.flownM >= 5200
+          }
+        ],
+        winCondition: (f, st) => !f.ended && !f.ground && st.flownM >= 5200
+      };
+    }
 
     const acList = [
       { id: 'c172s', name: 'Cessna 172S', g: 3.5 },
@@ -1067,19 +1315,19 @@
       <aside class="hub-sidebar">
         <div>
           <div class="hub-brand">
-            <span class="hub-kicker">SKYBOUND GLOBAL · v0.66</span>
+            <span class="hub-kicker">SKYBOUND GLOBAL · v0.69</span>
             <h1 class="hub-title">蒼穹守望者</h1>
-            <p class="hub-subtitle">Formosa Wings · 故事模式 · 線上連線 · 每日挑戰</p>
+            <p class="hub-subtitle">Formosa Wings · 故事模式 · 跨國地圖 · 特技挑戰</p>
           </div>
           <div id="hubCareerCard" class="hub-career-card"></div>
           <ul class="hub-menu-list" role="tablist">
             <li><button type="button" class="hub-menu-btn" data-hub-tab="welcome"><div class="hub-menu-btn-main"><span>🏠 主首頁 · Home</span><span class="hub-menu-btn-sub">故事模式 · 線上模式 · 性能改裝</span></div></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="campaign"><div class="hub-menu-btn-main"><span>📖 故事模式 · Story Mode</span><span class="hub-menu-btn-sub">臺灣 7 章主線 + 6 大跨國遠征</span></div><span class="hub-menu-badge">13 章</span></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="campaign"><div class="hub-menu-btn-main"><span>📖 故事模式 · Story Mode</span><span class="hub-menu-btn-sub">臺灣 7 章主線 + 8 大跨國遠征</span></div><span class="hub-menu-badge">15 章</span></button></li>
             <li><button type="button" class="hub-menu-btn" data-hub-tab="upgrades"><div class="hub-menu-btn-main"><span>🔧 飛機性能改裝 · Upgrades</span><span class="hub-menu-btn-sub">引擎推力 · 翼面敏捷 · 油箱 · 煞車 · 火控</span></div><span class="hub-menu-badge">工坊</span></button></li>
             <li><button type="button" class="hub-menu-btn" data-hub-tab="multiplayer"><div class="hub-menu-btn-main"><span>🌐 線上模式 · Online</span><span class="hub-menu-btn-sub">即時房號編隊 · 戰機空戰與無線電</span></div><span class="hub-menu-badge" id="hubMpSideBadge">大廳</span></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="challenges"><div class="hub-menu-btn-main"><span>🏆 每日與無限挑戰</span><span class="hub-menu-btn-sub">雙倍派遣 · 低空競速 · 暴風連勝 · 盲盒</span></div><span class="hub-menu-badge">耐玩</span></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="challenges"><div class="hub-menu-btn-main"><span>🏆 每日與無限挑戰</span><span class="hub-menu-btn-sub">雙倍派遣 · 360°特技 · 跨國巡迴 · 盲盒</span></div><span class="hub-menu-badge">6 模式</span></button></li>
             <li><button type="button" class="hub-menu-btn" data-hub-tab="tactical"><div class="hub-menu-btn-main"><span>🎯 戰術特勤訓練</span><span class="hub-menu-btn-sub">航艦彈射 · 空中加油 · 雷暴進場</span></div></button></li>
-            <li><button type="button" class="hub-menu-btn" data-hub-tab="freeflight"><div class="hub-menu-btn-main"><span>✈ 自由飛行 · 跨國航線</span><span class="hub-menu-btn-sub">台灣 · 東京 · 香港 · 首爾 · 新加坡 · 馬尼拉</span></div></button></li>
+            <li><button type="button" class="hub-menu-btn" data-hub-tab="freeflight"><div class="hub-menu-btn-main"><span>✈ 自由飛行 · 9 大區域</span><span class="hub-menu-btn-sub">台灣 · 東京 · 大阪 · 香港 · 首爾 · 新加坡 · 曼谷</span></div></button></li>
             <li><button type="button" class="hub-menu-btn" data-hub-tab="scenery"><div class="hub-menu-btn-main"><span>🗺️ 地景巡覽與勳章</span><span class="hub-menu-btn-sub">101 夜景 · 車流高架 · 成就勳章牆</span></div></button></li>
             <li><button type="button" class="hub-menu-btn" data-hub-tab="settings"><div class="hub-menu-btn-main"><span>⚙ 遊戲設定</span><span class="hub-menu-btn-sub">畫質 · 操控靈敏度 · 音效 · 操作模式</span></div></button></li>
           </ul>
@@ -1120,6 +1368,29 @@
       if (chBtn) {
         selectedChapterId = Number(chBtn.dataset.chapterId);
         renderStage('campaign');
+        return;
+      }
+      const filterBtn = e.target.closest('[data-campaign-filter]');
+      if (filterBtn) {
+        ensureDOM._campaignFilter = filterBtn.dataset.campaignFilter || 'all';
+        renderStage('campaign');
+        return;
+      }
+      const worldHubBtn = e.target.closest('[data-world-hub]');
+      if (worldHubBtn) {
+        const depCode = worldHubBtn.dataset.worldHub;
+        const dstCode = worldHubBtn.dataset.worldDst || 'RCTP';
+        const acCode = worldHubBtn.dataset.worldAc || 'a223';
+        const depEl = document.getElementById('hubFfDeparture');
+        const dstEl = document.getElementById('hubFfDestination');
+        const acEl = document.getElementById('hubFfAircraft');
+        if (depEl) depEl.value = depCode;
+        if (dstEl) dstEl.value = dstCode;
+        if (acEl) acEl.value = acCode;
+        hub.querySelectorAll('[data-world-hub]').forEach(b => b.classList.toggle('active', b === worldHubBtn));
+        if (worldHubBtn.dataset.instantFly === '1') {
+          document.getElementById('hubFreeFlyBtn')?.click();
+        }
         return;
       }
       if (e.target.closest('#hubLaunchChapterBtn')) {
@@ -1364,6 +1635,78 @@
     syncCheck('hubSetRt', 'rtLighting');
   }
 
+  function drawCampaignRoutePreview(ch) {
+    const canvas = document.getElementById('campaignRouteCanvas');
+    if (!canvas || typeof canvas.getContext !== 'function') return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width = 480;
+    const h = canvas.height = 148;
+    ctx.fillStyle = '#0c2336';
+    ctx.fillRect(0, 0, w, h);
+    // Subtle radar grid
+    ctx.strokeStyle = 'rgba(110, 215, 242, 0.14)';
+    ctx.lineWidth = 1;
+    for (let x = 40; x < w; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 30; y < h; y += 36) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+    const dep = (typeof allAirports !== 'undefined' && Array.isArray(allAirports)) ? allAirports.find(a => a.code === ch.departure) : null;
+    const dst = (typeof allAirports !== 'undefined' && Array.isArray(allAirports)) ? allAirports.find(a => a.code === ch.destination) : null;
+    const gates = buildMissionSkyGates(ch);
+    const pts = [dep, ...gates, dst].filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.z));
+    if (pts.length >= 2) {
+      const xs = pts.map(p => p.x), zs = pts.map(p => p.z);
+      const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
+      const spanX = Math.max(8000, maxX - minX), spanZ = Math.max(5000, maxZ - minZ);
+      const scale = Math.min((w - 110) / spanX, (h - 54) / spanZ);
+      const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+      const proj = p => [w / 2 + (p.x - cx) * scale, h / 2 + (p.z - cz) * scale];
+
+      // Draw corridor line
+      ctx.save();
+      ctx.strokeStyle = 'rgba(110, 231, 255, 0.78)';
+      ctx.lineWidth = 2.2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      pts.forEach((p, idx) => { const [px, py] = proj(p); idx ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw Sky Gates
+      gates.forEach((g, idx) => {
+        const [gx, gy] = proj(g);
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(gx, gy, 6, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#ffe8a3';
+        ctx.font = 'bold 10px system-ui';
+        ctx.fillText(`◎ G${idx + 1}`, gx - 12, gy - 10);
+      });
+
+      if (dep) {
+        const [dx, dy] = proj(dep);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(dx - 4, dy - 4, 8, 8);
+        ctx.fillStyle = '#e0f2fe';
+        ctx.font = 'bold 11px system-ui';
+        ctx.fillText(`🛫 ${dep.code}`, Math.max(8, Math.min(w - 75, dx - 18)), Math.min(h - 10, dy + 17));
+      }
+      if (dst) {
+        const [tx, ty] = proj(dst);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(tx - 4, ty - 4, 8, 8);
+        ctx.fillStyle = '#fef3c7';
+        ctx.font = 'bold 11px system-ui';
+        ctx.fillText(`🛬 ${dst.code}`, Math.max(8, Math.min(w - 75, tx - 18)), Math.max(16, ty - 10));
+      }
+    }
+    ctx.fillStyle = 'rgba(9, 23, 36, 0.86)';
+    ctx.fillRect(8, 6, 210, 20);
+    ctx.fillStyle = '#78effe';
+    ctx.font = 'bold 11px system-ui';
+    ctx.fillText(`🧭 3D 黃金光門走廊預覽 · ${ch.departure} → ${ch.destination}`, 14, 19);
+  }
+
   function renderStage(tab = activeTab) {
     activeTab = tab;
     const hub = document.getElementById('titleHub');
@@ -1398,7 +1741,7 @@
           <div class="hub-hero-showcase">
             <img class="hub-hero-bg" src="${nextCh.image}" alt="${nextCh.title}">
             <div class="hub-hero-overlay">
-              <span class="hub-kicker">SKYBOUND GLOBAL · TAIWAN & WORLD AVIATION</span>
+              <span class="hub-kicker">SKYBOUND GLOBAL · TAIWAN & 8 WORLD METROPOLISES</span>
               <h2>選好模式，立即升空</h2>
               <p>${rank.current.badge} ${rank.current.title} · 戰役 ${completedCount}/${ALL_CHAPTERS.length} 章（★ ${totalStars}/${ALL_CHAPTERS.length * 3}）· 資金 $${money.toLocaleString()}</p>
             </div>
@@ -1408,9 +1751,9 @@
             <button type="button" class="hub-art-mode-card featured" data-jump-tab="campaign">
               <img src="assets/campaign/ch1.jpg" alt="故事模式">
               <div class="hub-art-mode-body">
-                <span class="hub-mode-pill gold">📖 故事模式 · 台灣 7 章 + 跨國 6 章</span>
-                <h3>蒼穹守望者 · 劇情與跨國遠征</h3>
-                <p>台灣本島與東京、香港、沖繩、首爾、新加坡、馬尼拉 3D 實景戰役（下一關：${nextCh.code}）</p>
+                <span class="hub-mode-pill gold">📖 故事模式 · 台灣 7 章 + 跨國 8 章</span>
+                <h3>蒼穹守望者 · 15 章劇情與跨國遠征</h3>
+                <p>台灣本島與東京、大阪、香港、沖繩、首爾、新加坡、馬尼拉、曼谷 3D 光門戰役（下一關：${nextCh.code}）</p>
               </div>
             </button>
             <button type="button" class="hub-art-mode-card featured" data-jump-tab="multiplayer">
@@ -1435,17 +1778,17 @@
             <button type="button" class="hub-mini-art-card" data-jump-tab="challenges">
               <img src="assets/campaign/ch4.jpg" alt="每日任務與挑戰">
               <div>
-                <span class="hub-action-pill">${dailyDone ? '✓ 今日已完成' : '🔥 2× 今日雙倍'}</span>
-                <strong>🏆 每日與無限挑戰</strong>
-                <small>極速衝刺 · 暴風連勝 · 盲盒</small>
+                <span class="hub-action-pill">${dailyDone ? '✓ 今日已完成' : '🔥 6 大挑戰模式'}</span>
+                <strong>🏆 每日挑戰 · 360°特技 · 跨國巡迴</strong>
+                <small>雷虎特技公演 · 跨國地標賽 · 極速衝刺 · 盲盒</small>
               </div>
             </button>
             <button type="button" class="hub-mini-art-card" data-jump-tab="freeflight">
               <img src="assets/campaign/ch2.jpg" alt="自由飛行與跨國航線">
               <div>
-                <span class="hub-action-pill">🌍 7 國都會地標</span>
+                <span class="hub-action-pill">🌍 9 大國家都會區</span>
                 <strong>✈ 跨國自由飛行與 3D 機庫</strong>
-                <small>台灣 · 東京 · 香港 · 首爾 · 新加坡 · 馬尼拉</small>
+                <small>台灣 · 東京 · 大阪 · 香港 · 首爾 · 新加坡 · 曼谷</small>
               </div>
             </button>
             <button type="button" class="hub-mini-art-card" data-jump-tab="settings">
@@ -1464,6 +1807,8 @@
     if (tab === 'campaign') {
       const ch = ALL_CHAPTERS.find(c => c.id === selectedChapterId) || CHAPTERS[0];
       const chStars = prog[ch.id]?.stars || 0;
+      const bonusObj = getBonusObjective(ch);
+      const curFilter = ensureDOM._campaignFilter || 'all';
       const renderChBtn = item => {
         const s = prog[item.id]?.stars || 0;
         const starsStr = s ? '★'.repeat(s) + '☆'.repeat(3 - s) : 'NEW';
@@ -1477,19 +1822,24 @@
             <span class="campaign-stars">${starsStr}</span>
           </button>`;
       };
+      const showTw = curFilter === 'all' || curFilter === 'tw';
+      const showWorld = curFilter === 'all' || curFilter === 'world';
       const cardsHtml = `
-        <div class="campaign-group-label" style="font-size:11.5px;color:#ffd976;font-weight:700;padding:2px 6px;">🇹🇼 臺灣本島主線戰役（EP.01 – EP.07）</div>
-        ${CHAPTERS.map(renderChBtn).join('')}
-        <div class="campaign-group-label" style="font-size:11.5px;color:#72e5ff;font-weight:700;padding:8px 6px 2px;">🌍 跨國都會遠征戰役（WP.08 – WP.13 · 東京 / 香港 / 沖繩 / 首爾 / 新加坡 / 馬尼拉）</div>
-        ${WORLD_CHAPTERS.map(renderChBtn).join('')}
+        <div class="mp-room-chips" style="margin-bottom:6px;">
+          <button type="button" class="mp-chip${curFilter === 'all' ? ' active' : ''}" data-campaign-filter="all">全部 (${ALL_CHAPTERS.length}章)</button>
+          <button type="button" class="mp-chip${curFilter === 'tw' ? ' active' : ''}" data-campaign-filter="tw">🇹🇼 台灣主線 (7章)</button>
+          <button type="button" class="mp-chip${curFilter === 'world' ? ' active' : ''}" data-campaign-filter="world">🌍 跨國遠征 (8章)</button>
+        </div>
+        ${showTw ? `<div class="campaign-group-label" style="font-size:11.5px;color:#ffd976;font-weight:700;padding:2px 6px;">🇹🇼 臺灣本島主線戰役（EP.01 – EP.07）</div>${CHAPTERS.map(renderChBtn).join('')}` : ''}
+        ${showWorld ? `<div class="campaign-group-label" style="font-size:11.5px;color:#72e5ff;font-weight:700;padding:8px 6px 2px;">🌍 跨國都會遠征戰役（WP.08 – WP.15 · 東京 / 大阪 / 香港 / 沖繩 / 首爾 / 新加坡 / 馬尼拉 / 曼谷）</div>${WORLD_CHAPTERS.map(renderChBtn).join('')}` : ''}
       `;
 
       stage.innerHTML = `
         <div class="hub-section-panel">
           <div class="hub-section-head">
             <div>
-              <h2>📖 故事模式 · 台灣主線 & 跨國遠征（${completedCount}/${ALL_CHAPTERS.length} 章 · ★ ${totalStars}/${ALL_CHAPTERS.length * 3}）</h2>
-              <p>每章包含三階段任務目標、即時無線電劇情對話與三星評等，通關直接入帳機庫改裝資金</p>
+              <h2>📖 故事模式 · 台灣主線 & 8 國都會遠征（${completedCount}/${ALL_CHAPTERS.length} 章 · ★ ${totalStars}/${ALL_CHAPTERS.length * 3}）</h2>
+              <p>每章搭載 3D 黃金光門導航走廊（每門額外 +$2,000）、支線特技目標與無線電劇情</p>
             </div>
           </div>
           <div class="campaign-layout">
@@ -1508,9 +1858,11 @@
                   <span class="campaign-chip">✈ 機型：${ch.aircraft.toUpperCase()}</span>
                   <span class="campaign-chip">🛫 航點：${ch.departure} → ${ch.destination}</span>
                   <span class="campaign-chip">⏱ 黃金時間：${ch.parTimeS}s</span>
-                  <span class="campaign-chip">💰 報酬：+$${ch.rewardMoney.toLocaleString()} · +${ch.rewardXp} XP</span>
+                  <span class="campaign-chip">💰 主線報酬：+$${ch.rewardMoney.toLocaleString()} · +${ch.rewardXp} XP</span>
                   <span class="campaign-chip">🎯 ${ch.targetText}</span>
+                  <span class="campaign-chip" style="border-color:rgba(255,209,102,0.55);color:#ffe8a3;">${bonusObj.label}</span>
                 </div>
+                <canvas id="campaignRouteCanvas" style="width:100%;height:110px;border-radius:10px;border:1px solid rgba(110,215,242,0.28);margin:6px 0;" aria-label="任務航路與 3D 光門預覽圖"></canvas>
                 <div class="campaign-feature-actions">
                   <button type="button" id="hubLaunchChapterBtn" class="campaign-launch-btn">▶ 立即出發執飛 ${ch.code} →</button>
                   <button type="button" class="hub-back-btn" data-jump-tab="upgrades">🔧 前往性能改裝工坊</button>
@@ -1520,6 +1872,7 @@
             <div class="campaign-chapter-list" aria-label="章節列表">${cardsHtml}</div>
           </div>
         </div>`;
+      drawCampaignRoutePreview(ch);
       return;
     }
 
@@ -1634,8 +1987,8 @@
         <div class="hub-section-panel">
           <div class="hub-section-head">
             <div>
-              <h2>🏆 每日任務與無限耐玩模式</h2>
-              <p>每天輪替雙倍獎勵派遣、突破秒數極限的低空競速、連勝暴風盲降與隨機盲盒特勤</p>
+              <h2>🏆 每日任務與 6 大無限挑戰模式</h2>
+              <p>每天輪替雙倍獎勵派遣、360° 雷虎特技公演、跨國地標巡迴賽、低空競速、連勝暴風盲降與隨機盲盒</p>
             </div>
           </div>
           <div class="hub-art-cards-grid">
@@ -1645,6 +1998,22 @@
                 <span class="hub-action-pill">${dailyDone ? '✓ 今日已完成' : '🔥 2× 雙倍獎勵'}</span>
                 <strong>${daily.title}</strong>
                 <small>${daily.targetText}（連續打卡 ${meta.dailyStreak} 天）</small>
+              </div>
+            </button>
+            <button type="button" class="hub-art-action-card" data-challenge-type="aerobatic_show">
+              <img src="assets/campaign/ch6.jpg" alt="雷虎特技飛行公演">
+              <div>
+                <span class="hub-action-pill">🎪 360° 迴旋 & 桶滾</span>
+                <strong>🎪 雷虎特技飛行公演</strong>
+                <small>駕駛 F-16V 展現 360° 垂直大迴旋觔斗或桶滾特技，通過 3D 黃金光門贏取 +$22,000！</small>
+              </div>
+            </button>
+            <button type="button" class="hub-art-action-card" data-challenge-type="world_tour">
+              <img src="assets/campaign/ch1.jpg" alt="跨國地標巡迴大獎賽">
+              <div>
+                <span class="hub-action-pill">🌏 1.8× 跨國巡迴賞金</span>
+                <strong>🌏 跨國八大都會巡迴賽</strong>
+                <small>隨機抽中東京、大阪、香港、沖繩、首爾、新加坡、馬尼拉或曼谷地標光門走廊！</small>
               </div>
             </button>
             <button type="button" class="hub-art-action-card" data-challenge-type="speedrun">
@@ -1697,17 +2066,32 @@
     }
 
     if (tab === 'freeflight') {
+      const worldQuickHubs = [
+        { dep: 'RCSS', dst: 'RCTP', ac: 'a223', label: '🇹🇼 台灣台北 (RCSS)' },
+        { dep: 'RJTT', dst: 'RJAA', ac: 'a223', label: '🇯🇵 日本東京 (RJTT)' },
+        { dep: 'RJBB', dst: 'RJTT', ac: 'b38m', label: '🇯🇵 日本大阪 (RJBB)' },
+        { dep: 'ROAH', dst: 'RCYU', ac: 'sf16', label: '🇯🇵 沖繩那霸 (ROAH)' },
+        { dep: 'VHHH', dst: 'RCKH', ac: 'b38m', label: '🇭🇰 香港維港 (VHHH)' },
+        { dep: 'RKSI', dst: 'RCTP', ac: 'sf748', label: '🇰🇷 韓國首爾 (RKSI)' },
+        { dep: 'WSSS', dst: 'RPLL', ac: 'a223', label: '🇸🇬 新加坡 (WSSS)' },
+        { dep: 'RPLL', dst: 'RCKH', ac: 'm2000', label: '🇵🇭 馬尼拉 (RPLL)' },
+        { dep: 'VTBS', dst: 'WSSS', ac: 'a320neo', label: '🇹🇭 泰國曼谷 (VTBS)' }
+      ].map(h => `<button type="button" class="mp-chip" data-world-hub="${h.dep}" data-world-dst="${h.dst}" data-world-ac="${h.ac}">${h.label}</button>`).join('');
       stage.innerHTML = `
         <div class="hub-section-panel">
           <div class="hub-online-banner">
             <img src="assets/campaign/ch2.jpg" alt="自由飛行與 3D 機庫">
             <div class="hub-online-banner-body">
-              <span class="hub-mode-pill gold">✈ FREE FLIGHT & 3D HANGAR</span>
-              <h2>自由飛行與 3D 機庫</h2>
-              <p>直接在統一選單內配置機型、起降機場、天候與時刻，或進入 3D 機庫買機賞機</p>
+              <span class="hub-mode-pill gold">✈ FREE FLIGHT · 9 REGIONS & 3D HANGAR</span>
+              <h2>跨國自由飛行與 3D 機庫</h2>
+              <p>一鍵切換台灣與 8 大國際都會機場起降，自由探索各國 3D 摩天樓、跨海大橋、港口船隊與地標</p>
             </div>
           </div>
           <div class="hub-panel-card">
+            <div style="margin-bottom:10px;">
+              <small style="color:#9ec4dc;display:block;margin-bottom:6px;">🌍 點擊快速帶入各國代表性起降航線：</small>
+              <div class="mp-room-chips">${worldQuickHubs}</div>
+            </div>
             <div class="hub-form-grid">
               <label>執飛機型<select id="hubFfAircraft">${cloneOptionsHtml('aircraft')}</select></label>
               <label>起始狀態<select id="hubFfStartType">${cloneOptionsHtml('startType')}</select></label>
@@ -1819,6 +2203,7 @@
     if (o) o.hidden = true;
     if (r) r.hidden = true;
     if (d) d.hidden = true;
+    if (typeof globalScope !== 'undefined') globalScope.__skyboundActiveMissionGates = [];
     if (radioHideTimer) { clearTimeout(radioHideTimer); radioHideTimer = null; }
   }
 
@@ -1841,6 +2226,25 @@
     let moneyEarned = ch.rewardMoney || 6000;
     let xpEarned = ch.rewardXp || 200;
 
+    const bonusObj = getBonusObjective(ch);
+    const bonusDone = Boolean(bonusObj && bonusObj.check(st));
+    if (bonusObj) {
+      evalRes.criteria.push({
+        ok: bonusDone,
+        label: `${bonusObj.label.replace(/^🎖\s*/, '')}`
+      });
+      if (bonusDone) {
+        moneyEarned += bonusObj.rewardMoney || 5000;
+        xpEarned += bonusObj.rewardXp || 120;
+      }
+    }
+    if ((st.gatesPassed || 0) > 0) {
+      evalRes.criteria.push({
+        ok: true,
+        label: `通過 ${st.gatesPassed} 座 3D 黃金導航光門（額外領取 +$${(st.gatesPassed * 2000).toLocaleString()}）`
+      });
+    }
+
     if (!ch.isChallenge) {
       const prevStars = loadProgress()[ch.id]?.stars || 0;
       if (prevStars === 0) {
@@ -1849,6 +2253,7 @@
       }
       markChapterComplete(ch.id, evalRes.stars);
       if (evalRes.stars === 3) grantMedal(meta, 'perfectionist', newlyUnlocked);
+      if (ch.isWorld) grantMedal(meta, 'world_conqueror', newlyUnlocked);
       const chapterMedals = { 2: 'skyline_ace', 3: 'storm_breaker', 4: 'carrier_hawk', 5: 'fuel_master', 6: 'sky_guardian' };
       if (chapterMedals[ch.id]) grantMedal(meta, chapterMedals[ch.id], newlyUnlocked);
       const progAfter = loadProgress();
@@ -1876,11 +2281,20 @@
         const mult = 1 + Math.min(2, (meta.streak - 1) * 0.25);
         moneyEarned = Math.round(moneyEarned * mult);
         xpEarned = Math.round(xpEarned * mult);
+      } else if (ch.challengeType === 'aerobatic_show') {
+        moneyEarned = Math.round(moneyEarned * 1.5);
+        xpEarned = Math.round(xpEarned * 1.5);
+        grantMedal(meta, 'aerobatic_ace', newlyUnlocked);
+      } else if (ch.challengeType === 'world_tour') {
+        moneyEarned = Math.round(moneyEarned * 1.8);
+        xpEarned = Math.round(xpEarned * 1.6);
+        grantMedal(meta, 'world_conqueror', newlyUnlocked);
       } else if (ch.challengeType === 'mystery') {
         moneyEarned = Math.round(moneyEarned * 1.5);
         xpEarned = Math.round(xpEarned * 1.5);
       }
     }
+    if (st.aerobaticDone) grantMedal(meta, 'aerobatic_ace', newlyUnlocked);
 
     const oldRank = getRankInfo(meta.xp).current.title;
     meta.xp += xpEarned;
@@ -2016,8 +2430,16 @@
       if (optExists) acSel.value = ch.aircraft;
     }
 
+    const gates = buildMissionSkyGates(ch);
+    if (typeof globalScope !== 'undefined') {
+      globalScope.__skyboundActiveMissionGates = gates;
+    }
+
     activeMission = {
       ch,
+      gates,
+      gatesPassed: 0,
+      aerobaticDone: false,
       startedAt: performance.now(),
       flownM: 0,
       lastX: null,
@@ -2077,8 +2499,28 @@
     activeMission.lastX = f.x;
     activeMission.lastZ = f.z;
     if (typeof f.g === 'number') activeMission.maxG = Math.max(activeMission.maxG, Math.abs(f.g));
+    if (!f.ground && (Math.abs(f.bank || 0) > 2.25 || Math.abs(f.pitch || 0) > 1.15)) {
+      if (!activeMission.aerobaticDone) {
+        activeMission.aerobaticDone = true;
+        showRadio('特技判定 · AEROBATIC BONUS', '「達成 360° 特技姿態機動！已解鎖特技支線加成！」', 4500);
+      }
+    }
 
     const ch = activeMission.ch;
+    // Check 3D Sky Gate passes
+    if (Array.isArray(activeMission.gates) && !f.ground) {
+      for (const gate of activeMission.gates) {
+        if (gate.passed) continue;
+        const dHoriz = Math.hypot(f.x - gate.x, f.z - gate.z);
+        if (dHoriz <= (gate.radius || 950)) {
+          gate.passed = true;
+          activeMission.gatesPassed = (activeMission.gatesPassed || 0) + 1;
+          awardSimMoney(2000);
+          showRadio('導航光門 · SKY GATE', `「通過 ${gate.name}！精準導航賞金 +$2,000！」`, 4200);
+        }
+      }
+    }
+
     for (let i = 0; i < (ch.radio?.length || 0); i++) {
       const line = ch.radio[i];
       if (!activeMission.triggeredRadio.has(i) && elapsedS >= line.delay) {
@@ -2097,12 +2539,20 @@
       flownM: activeMission.flownM,
       elapsedS,
       maxG: activeMission.maxG,
-      warnings: activeMission.warnings
+      warnings: activeMission.warnings,
+      gatesPassed: activeMission.gatesPassed || 0,
+      aerobaticDone: Boolean(activeMission.aerobaticDone)
     };
 
     const stages = ch.stages || [];
     while (activeMission.stageIdx < stages.length && stages[activeMission.stageIdx].check(f, st)) {
       const completedStage = stages[activeMission.stageIdx];
+      // Also auto-pass corresponding Sky Gate so stages & gates stay synchronized
+      if (Array.isArray(activeMission.gates) && activeMission.gates[activeMission.stageIdx] && !activeMission.gates[activeMission.stageIdx].passed) {
+        activeMission.gates[activeMission.stageIdx].passed = true;
+        activeMission.gatesPassed = (activeMission.gatesPassed || 0) + 1;
+        awardSimMoney(2000);
+      }
       activeMission.stageIdx += 1;
       if (completedStage.radio) {
         showRadio(completedStage.radio.speaker, completedStage.radio.text, 6500);
@@ -2115,7 +2565,9 @@
       const altFt = Math.max(0, Math.round((f.y || 0) * 3.28084));
       const curStage = stages[Math.min(activeMission.stageIdx, Math.max(0, stages.length - 1))];
       const stagePrefix = curStage ? curStage.label : ch.title;
-      objHud.textContent = `${ch.code} · ${stagePrefix} (${pct}% · ${altFt} ft)`;
+      const nextGate = Array.isArray(activeMission.gates) ? activeMission.gates.find(g => !g.passed) : null;
+      const gateHint = nextGate ? ` · ◎ ${(Math.hypot(nextGate.x - f.x, nextGate.z - f.z) / 1000).toFixed(1)}km` : '';
+      objHud.textContent = `${ch.code} · ${stagePrefix} (${pct}% · ${altFt} ft${gateHint})`;
     }
 
     if (f.ended && !activeMission.settled) {

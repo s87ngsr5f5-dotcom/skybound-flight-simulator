@@ -17,18 +17,32 @@
     { id: 'HCN', name: '恆春 VOR/DME', freq: '113.5', channel: '82X', lat: 22.0400, lon: 120.7290, elevation: 35, magVar: -3.3 }
   ];
 
+  // International VOR/DME Stations Database across Asia-Pacific Hubs
+  const internationalVORStations = [
+    { id: 'HND', name: '東京羽田 VOR/DME', freq: '112.2', channel: '59X', lat: 35.5522, lon: 139.7805, elevation: 12, magVar: -7.5, intl: true },
+    { id: 'NRE', name: '東京成田 VOR/DME', freq: '117.9', channel: '126X', lat: 35.7720, lon: 140.3860, elevation: 45, magVar: -7.6, intl: true },
+    { id: 'KMC', name: '大阪關西 VOR/DME', freq: '111.8', channel: '55X', lat: 34.4310, lon: 135.2380, elevation: 10, magVar: -7.2, intl: true },
+    { id: 'NHC', name: '沖繩那霸 VORTAC', freq: '116.5', channel: '112X', lat: 26.2080, lon: 127.6460, elevation: 18, magVar: -5.2, intl: true },
+    { id: 'CHC', name: '香港長洲 VOR/DME', freq: '112.3', channel: '70X', lat: 22.2190, lon: 114.0300, elevation: 95, magVar: -2.8, intl: true },
+    { id: 'SEL', name: '首爾仁川 VOR/DME', freq: '115.5', channel: '102X', lat: 37.4130, lon: 126.9280, elevation: 180, magVar: -8.5, intl: true },
+    { id: 'VJB', name: '新加坡樟宜 VOR/DME', freq: '116.5', channel: '112X', lat: 1.4150, lon: 104.0220, elevation: 24, magVar: 0.4, intl: true },
+    { id: 'MIA', name: '馬尼拉 VOR/DME', freq: '113.8', channel: '85X', lat: 14.5080, lon: 121.0210, elevation: 28, magVar: -1.6, intl: true },
+    { id: 'BKK', name: '曼谷蘇凡納布 VOR/DME', freq: '117.7', channel: '124X', lat: 13.8930, lon: 100.5960, elevation: 8, magVar: -0.7, intl: true }
+  ];
+
   // Civil Aviation High/Low Altitude Airways Corridors
   const civilAirways = [
-    { id: 'W4', name: 'W4 航線 (松山 - 後龍 - 馬公)', fixes: ['TNA', 'HLG', 'MKG'], color: 0x38e8ac, mea: 5000, widthKm: 8 },
-    { id: 'B591', name: 'B591 西部低空幹線 (鞍部 - 後龍 - 台南 - 恆春)', fixes: ['APU', 'HLG', 'TNN', 'HCN'], color: 0x4ac7ff, mea: 7000, widthKm: 10 },
-    { id: 'A1', name: 'A1 東部外海大動脈 (恆春 - 綠島 - 花蓮外海)', fixes: ['HCN', 'GID', 'RCYU'], color: 0xffd557, mea: 11000, widthKm: 14 }
+    { id: 'W4', name: 'W4 航線 (松山 - 後龍 - 馬公)', fixes: ['TNA', 'HLG', 'MKG'], waypoints: ['TNA', 'HLG', 'MKG'], color: 0x38e8ac, mea: 5000, widthKm: 8 },
+    { id: 'B591', name: 'B591 西部低空幹線 (鞍部 - 後龍 - 台南 - 恆春)', fixes: ['APU', 'HLG', 'TNN', 'HCN'], waypoints: ['APU', 'HLG', 'TNN', 'HCN'], color: 0x4ac7ff, mea: 7000, widthKm: 10 },
+    { id: 'A1', name: 'A1 東部外海大動脈 (恆春 - 綠島 - 花蓮外海)', fixes: ['HCN', 'GID', 'RCYU'], waypoints: ['HCN', 'GID', 'NHC'], color: 0xffd557, mea: 11000, widthKm: 14 },
+    { id: 'G581', name: 'G581 琉球關西東京幹線', fixes: ['APU', 'NHC', 'KMC', 'HND', 'NRE'], waypoints: ['APU', 'NHC', 'KMC', 'HND', 'NRE'], color: 0xfbbf24, mea: 15000, widthKm: 16 }
   ];
 
   // Cache projected simulation coordinates
   let coordsInitialized = false;
   function ensureVORCoordinates(geoPointFn) {
     if (coordsInitialized || typeof geoPointFn !== 'function') return;
-    for (const v of taiwanVORStations) {
+    for (const v of [...taiwanVORStations, ...internationalVORStations]) {
       const p = geoPointFn(v.lat, v.lon);
       v.x = p.x;
       v.z = p.z;
@@ -38,7 +52,7 @@
 
   // Calculate VOR Radial & DME Distance from any aircraft point
   function tuneVOR(vorId, aircraftPos) {
-    const vor = taiwanVORStations.find(v => v.id === vorId);
+    const vor = taiwanVORStations.find(v => v.id === vorId) || internationalVORStations.find(v => v.id === vorId);
     if (!vor || !aircraftPos) return null;
     const dx = aircraftPos.x - vor.x;
     const dz = aircraftPos.z - vor.z;
@@ -326,9 +340,15 @@
     return taiwanVORStations;
   }
 
+  function getAllVORStations() {
+    return [...taiwanVORStations, ...internationalVORStations];
+  }
+
   const airwaysNavModule = {
     taiwanVORStations,
+    internationalVORStations,
     getVORStations,
+    getAllVORStations,
     civilAirways,
     ensureVORCoordinates,
     tuneVOR,
