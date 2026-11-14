@@ -13,5 +13,6 @@
   },
   "specialUnlocks": 6,
   "modelTier": "parametric-prototypes-and-existing-models",
-  "highFidelityFleetComplete": false
+  "highFidelityFleetComplete": false,
+  "releaseChannel": "production"
 }
