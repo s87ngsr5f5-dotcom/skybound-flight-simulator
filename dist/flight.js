@@ -1475,6 +1475,7 @@ function initialize(){
   const cockpitOrientation=new THREE.Quaternion(), lookRotation=new THREE.Quaternion();
   const cockpitAngles=new THREE.Euler(0,0,0,'YXZ');
   const visualPosition=new THREE.Vector3(),visualForward=new THREE.Vector3();
+  const chaseFwd=new THREE.Vector3(0,0,-1),chaseUp=new THREE.Vector3(0,1,0);
   const previousPose={};
   let poseFlight=null,chaseHeading=null,chaseBank=0,chasePitch=0,chaseGHead=0,wasGround=true;
   function rememberPose(f){
@@ -4130,10 +4131,14 @@ function initialize(){
     const touch=touchControls.input,touchAxes=touchControls.axes();
     const controlAxes=touchAxes!==touch&&byId('hud').dataset.mobilePanel?touch:touchAxes;
     const touchGain=Math.min(1.25,.80+settings.sensitivity*.45);
-    const rawRoll=axis('ArrowRight','ArrowLeft')+axis('Numpad6','Numpad4')+(throttleKeys().includes('KeyA')?0:axis('KeyD','KeyA'))+padAxis(pad?.axes[0])+(pointer.active?padAxis(pointer.x):0)+gamepadAxis(controlAxes.roll,.06)*touchGain;
-    const rawPitch=axis('ArrowUp','ArrowDown')+axis('Numpad8','Numpad2')-padAxis(pad?.axes[1])+(pointer.active?padAxis(pointer.y):0)+gamepadAxis(controlAxes.pitch,.06)*touchGain;
+    const kbRoll=axis('ArrowRight','ArrowLeft')+axis('Numpad6','Numpad4')+(throttleKeys().includes('KeyA')?0:axis('KeyD','KeyA'));
+    const kbPitch=axis('ArrowUp','ArrowDown')+axis('Numpad8','Numpad2');
+    const kbRudder=axis('KeyE','KeyQ')+axis('NumpadEnter','Numpad0');
+    const kbBoost=1/Math.max(.35,Number(settings.sensitivity)||.55)*.92;
+    const rawRoll=kbRoll*kbBoost+padAxis(pad?.axes[0])+(pointer.active?padAxis(pointer.x):0)+gamepadAxis(controlAxes.roll,.06)*touchGain;
+    const rawPitch=kbPitch*kbBoost-padAxis(pad?.axes[1])+(pointer.active?padAxis(pointer.y):0)+gamepadAxis(controlAxes.pitch,.06)*touchGain;
     const manual=manualAxes({pitch:rawPitch,roll:rawRoll,
-      rudder:axis('KeyE','KeyQ')+axis('NumpadEnter','Numpad0')+padAxis(pad?.axes[2])+gamepadAxis(touch.rudder,.06)*touchGain},settings);
+      rudder:kbRudder*kbBoost+padAxis(pad?.axes[2])+gamepadAxis(touch.rudder,.06)*touchGain},settings);
     let {roll,pitch}=manual;
     let assistedRudder;
     const auxThrottleUp=keys.has('ShiftLeft')||keys.has('ShiftRight')||keys.has('PageUp')||keys.has('NumpadAdd');
@@ -4184,8 +4189,9 @@ function initialize(){
         }
       }
     }
-    return {autoLevel:!settings.keepBank||Boolean(f.levelWings),response:settings.sensitivity,yokeDamping:settings.mouse&&!f.hold&&!f.tactical?.aimAssist&&Math.abs(manual.pitch)<.07,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
-      rudder:assistedRudder??clamp(manual.rudder+(f.ground?roll:0),-1,1),
+    const turnCoordRudder=f.ground?roll:(Math.abs(manual.rudder)<.05&&Math.cos(f.bank||0)>.15?roll*.22*Math.cos(f.bank||0):0);
+    return {autoLevel:!settings.keepBank||Boolean(f.levelWings),response:Math.max(.72,settings.sensitivity),yokeDamping:settings.mouse&&!f.hold&&!f.tactical?.aimAssist&&Math.abs(manual.pitch)<.07,maneuver:f.hold?1:(f.ground?1:1.20-.38*clamp((f.speed-100)/200,0,1)),pitch:clamp(pitch,-1,1),roll:clamp(roll,-1,1),
+      rudder:assistedRudder??clamp(manual.rudder+turnCoordRudder,-1,1),
       throttle,
       trim:axis('KeyX','KeyZ')*.22,brake:touch.brake||keys.has('Space')||keys.has('NumpadDecimal')||Boolean(buttons[0]?.pressed)};
   }
@@ -5228,7 +5234,10 @@ function initialize(){
                 f.ended=true;f.finished=true;
               }
             }
-            if(!preBuildingHit) stepTrainer(f,smoothControls(f,autopilotInput||input,simTick));
+            if(!preBuildingHit){
+              stepTrainer(f,smoothControls(f,autopilotInput||input,simTick));
+              if(f.loopWrapped) rememberPose(f);
+            }
             if(typeof carrierOps!=='undefined'){
               carrierOps.stepCatapult(f,simTick,showPill);
               carrierOps.stepArrestor(f,simTick,showPill);
@@ -5530,22 +5539,42 @@ function initialize(){
           camera.position.set(cx,Math.max(pos.y+8.5,groundAtCam+4.8),cz);
           camera.lookAt(pos.x,pos.y+1.5,pos.z);
         }else{
-          if(chaseHeading===null||!continuous||replay){chaseHeading=heading;chaseBank=bank;chasePitch=pitch;}
-          chaseHeading+=wrapAngle(heading-chaseHeading)*(1-Math.exp(-dt*6.2));
-          chaseBank+=wrapAngle(bank-chaseBank)*(1-Math.exp(-dt*4.5));
-          chasePitch+=(pitch-chasePitch)*(1-Math.exp(-dt*5.0));
+          const cosP=Math.cos(pitch),sinP=Math.sin(pitch);
+          const fwdX=Math.sin(heading)*cosP,fwdY=sinP,fwdZ=-Math.cos(heading)*cosP;
+          const roofSign=Math.cos(bank)>=0?1:-1;
+          const upX=-Math.sin(heading)*sinP*roofSign;
+          const upY=Math.max(.18,Math.abs(cosP));
+          const upZ=Math.cos(heading)*sinP*roofSign;
+          if(chaseHeading===null||!continuous||replay){
+            chaseHeading=heading;chaseBank=bank;chasePitch=pitch;
+            chaseFwd.set(fwdX,fwdY,fwdZ).normalize();
+            chaseUp.set(upX,upY,upZ).normalize();
+          }else{
+            chaseHeading+=wrapAngle(heading-chaseHeading)*(1-Math.exp(-dt*6.2));
+            chaseBank+=wrapAngle(bank-chaseBank)*(1-Math.exp(-dt*4.5));
+            chasePitch+=(pitch-chasePitch)*(1-Math.exp(-dt*5.0));
+            const fwdBlend=1-Math.exp(-dt*6.8);
+            const upBlend=1-Math.exp(-dt*6.0);
+            chaseFwd.x+=(fwdX-chaseFwd.x)*fwdBlend;
+            chaseFwd.y+=(fwdY-chaseFwd.y)*fwdBlend;
+            chaseFwd.z+=(fwdZ-chaseFwd.z)*fwdBlend;
+            chaseFwd.normalize();
+            chaseUp.x+=(upX-chaseUp.x)*upBlend;
+            chaseUp.y+=(upY-chaseUp.y)*upBlend;
+            chaseUp.z+=(upZ-chaseUp.z)*upBlend;
+            chaseUp.normalize();
+          }
           const speedBoost=clamp(((f.speed||0)-25)/220,0,1);
           const distance=profile.geometry[0]*(profile.helicopter?3.1:profile.id==='b773'?2.7:5)*(1+speedBoost*0.09);
-          const bankLagX=Math.sin(chaseBank)*(profile.geometry[0]*0.32);
-          const rightCamX=Math.cos(chaseHeading),rightCamZ=Math.sin(chaseHeading);
-          const camHeight=profile.helicopter?pos.y+profile.gearHeight*2.55-chasePitch*1.5:pos.y+profile.gearHeight*3.9-chasePitch*(profile.geometry[0]*0.42);
+          const elevOffset=profile.helicopter?profile.gearHeight*2.55:profile.gearHeight*3.9;
           camera.position.set(
-            pos.x-Math.sin(chaseHeading)*distance+rightCamX*bankLagX,
-            camHeight,
-            pos.z+Math.cos(chaseHeading)*distance+rightCamZ*bankLagX
+            pos.x-chaseFwd.x*distance+chaseUp.x*elevOffset,
+            pos.y-chaseFwd.y*distance+chaseUp.y*elevOffset,
+            pos.z-chaseFwd.z*distance+chaseUp.z*elevOffset
           );
-          const lookY=profile.helicopter?pos.y+1.1+Math.sin(pitch)*2.8:pos.y+Math.sin(pitch)*9;
-          camera.lookAt(pos.x+dir.x*14,lookY,pos.z+dir.z*14);
+          const lookAhead=profile.helicopter?11:14;
+          const lookBaseY=profile.helicopter?1.1:.55;
+          camera.lookAt(pos.x+fwdX*lookAhead,pos.y+lookBaseY+fwdY*9,pos.z+fwdZ*lookAhead);
         }
       }else{
         const airliner=twoSeats(profile);
