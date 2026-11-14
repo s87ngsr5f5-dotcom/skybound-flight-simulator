@@ -175,19 +175,19 @@ function initialize(){
     const natural=regionalHeight(x,z);
     for(const airport of airports){
       const half=airport.length/2;
-      if(Math.abs(x-airport.x)>half+950||Math.abs(z-airport.z)>half+950) continue;
+      if(Math.abs(x-airport.x)>half+1150||Math.abs(z-airport.z)>half+1150) continue;
       const {along,cross}=runwayCoordinates(x,z,airport);
       if(airport.shortField){
         // A 120 m terrain triangle can span the runway even when its vertices are outside the strip.
-        const blend=shortFieldBlend(airport,along,cross,natural>airport.elevation?180:72);
+        const blend=shortFieldBlend(airport,along,cross,natural>airport.elevation?210:90);
         if(blend>0) return natural+(airport.elevation-natural)*blend;
         continue;
       }
-      // Clear a terrain-grid cell around paved surfaces so coarse triangles
-      // cannot bury a flat runway threshold or the edge of the apron.
-      const apronLimit=Math.sign(airport.apron)*cross>0?Math.abs(airport.apron)+135:airport.width/2+9;
-      const edge=Math.max(Math.abs(along)-half-355,Math.abs(cross)-apronLimit-355);
-      const blend=1-clamp(edge/185,0,1);
+      // Clear a wide terrain-grid margin around paved surfaces and terminals so coarse triangles
+      // never poke through a flat runway threshold, taxiway, or apron.
+      const apronLimit=Math.sign(airport.apron)*cross>0?Math.abs(airport.apron)+185:airport.width/2+36;
+      const edge=Math.max(Math.abs(along)-half-420,Math.abs(cross)-apronLimit-420);
+      const blend=1-clamp(edge/220,0,1);
       if(blend>0) return natural+(airport.elevation-natural)*blend;
     }
     return natural;
@@ -249,7 +249,7 @@ function initialize(){
           vec3 photo=texture2D(taipeiImage,vec2(imageUV.x,1.0-imageUV.y)).rgb;
           diffuseColor.rgb=mix(diffuseColor.rgb,photo*1.12,smoothstep(0.0,0.035,imageEdge));
         }
-        float closeFade=1.0-smoothstep(1800.0,15000.0,length(vViewPosition));
+        float closeFade=1.0-smoothstep(2200.0,18500.0,length(vViewPosition));
         if(closeFade>0.005){
           vec2 parcel=abs(fract(terrainXZ*0.0075)-0.5)*2.0;
           vec2 blockGrid=abs(fract(terrainXZ*0.022)-0.5)*2.0;
@@ -259,27 +259,46 @@ function initialize(){
             +sin((terrainXZ.x*0.43-terrainXZ.y*0.37))*0.30
             +cos((terrainXZ.x+terrainXZ.y)*0.85)*0.15;
           float coarsePatch=sin(terrainXZ.x*0.029+cos(terrainXZ.y*0.021)*2.0)*cos(terrainXZ.y*0.031);
-          float detailGain=1.0+closeFade*(fine*0.12+coarsePatch*0.08-parcelEdge*0.07-blockEdge*0.055);
+          float detailGain=1.0+closeFade*(fine*0.13+coarsePatch*0.09-parcelEdge*0.065-blockEdge*0.05);
           diffuseColor.rgb=clamp(diffuseColor.rgb*detailGain,0.0,1.0);
         }
+        if(terrainWorldPos.y>0.1&&terrainWorldPos.y<3.6&&diffuseColor.b<=diffuseColor.r*1.38){
+          float beachMix=1.0-smoothstep(0.4,3.4,terrainWorldPos.y);
+          diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.82,0.77,0.64),beachMix*0.52);
+        }
+        if(terrainWorldPos.y>3050.0){
+          float snowMix=smoothstep(3050.0,3480.0,terrainWorldPos.y+sin(terrainXZ.x*0.008)*85.0);
+          diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.95,0.97,1.0),snowMix*0.88);
+        }
         if(diffuseColor.b>diffuseColor.r*1.45&&diffuseColor.b>0.35){
-          vec2 waveCoord=terrainXZ*0.0065;
-          float wave=sin(waveCoord.x*2.4+waveCoord.y*1.7+seaSkyTime*0.45)*cos(waveCoord.y*2.1-waveCoord.x*1.3-seaSkyTime*0.32);
-          float waveDetail=sin(waveCoord.x*6.8-waveCoord.y*5.1+seaSkyTime*0.9)*0.5+0.5;
-          vec3 deepSea=vec3(0.06,0.26,0.52);
-          vec3 shallowSea=vec3(0.16,0.52,0.78);
-          diffuseColor.rgb=mix(deepSea,shallowSea,clamp(wave*0.22+waveDetail*0.14+0.52,0.0,1.0));
+          vec2 waveCoord=terrainXZ*0.0068;
+          float wave1=sin(waveCoord.x*2.4+waveCoord.y*1.7+seaSkyTime*0.48)*cos(waveCoord.y*2.1-waveCoord.x*1.3-seaSkyTime*0.35);
+          float wave2=sin(waveCoord.x*6.8-waveCoord.y*5.1+seaSkyTime*0.95)*0.5+0.5;
+          float wave3=sin(waveCoord.x*15.5+waveCoord.y*12.2-seaSkyTime*1.45)*0.5+0.5;
+          vec3 abyssSea=vec3(0.03,0.18,0.42);
+          vec3 deepSea=vec3(0.06,0.28,0.56);
+          vec3 shallowSea=vec3(0.14,0.58,0.79);
+          float coastalShelf=clamp(1.0-length(fract(terrainXZ*0.00018)-0.5)*1.4,0.0,1.0);
+          vec3 waterBase=mix(abyssSea,deepSea,clamp(wave1*0.32+0.55,0.0,1.0));
+          diffuseColor.rgb=mix(waterBase,shallowSea,clamp(wave1*0.18+wave2*0.16+coastalShelf*0.24,0.0,1.0));
+          float whitecap=smoothstep(0.74,0.93,wave1*0.45+wave2*0.35+wave3*0.28);
+          diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.90,0.96,1.0)*max(0.25,seaDayRatio),whitecap*0.42);
           if(seaRtEnabled>0.5){
             vec3 viewVec=normalize(cameraPosition-terrainWorldPos);
-            vec3 waveN=normalize(vec3(cos(waveCoord.x*2.4+seaSkyTime*0.7)*0.07+cos(waveCoord.x*6.8-seaSkyTime*1.1)*0.04,1.0,sin(waveCoord.y*2.1+seaSkyTime*0.6)*0.07+sin(waveCoord.y*5.1-seaSkyTime*0.9)*0.04));
+            vec3 waveN=normalize(vec3(
+              cos(waveCoord.x*2.4+seaSkyTime*0.7)*0.075+cos(waveCoord.x*6.8-seaSkyTime*1.1)*0.045+sin(waveCoord.x*15.5+seaSkyTime*1.5)*0.02,
+              1.0,
+              sin(waveCoord.y*2.1+seaSkyTime*0.6)*0.075+sin(waveCoord.y*5.1-seaSkyTime*0.9)*0.045+cos(waveCoord.y*12.2-seaSkyTime*1.4)*0.02
+            ));
             vec3 reflDir=reflect(-viewVec,waveN);
-            float fresnel=pow(1.0-max(0.0,viewVec.y),3.0);
-            diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.48,0.78,0.98)*max(0.16,seaDayRatio),fresnel*0.46);
+            float fresnel=pow(1.0-max(0.0,viewVec.y),3.2);
+            vec3 skyRefl=mix(vec3(0.95,0.62,0.42),vec3(0.46,0.78,0.98),smoothstep(0.15,0.55,seaDayRatio));
+            diffuseColor.rgb=mix(diffuseColor.rgb,skyRefl*max(0.16,seaDayRatio),fresnel*0.52);
             float glintDot=max(0.0,dot(reflDir,normalize(seaSunDir)));
-            float sunTrail=pow(glintDot,34.0)*0.95+pow(glintDot,128.0)*1.95;
-            diffuseColor.rgb+=vec3(1.0,0.92,0.74)*sunTrail*seaDayRatio;
+            float sunTrail=pow(glintDot,28.0)*0.85+pow(glintDot,140.0)*2.35;
+            diffuseColor.rgb+=vec3(1.0,0.93,0.76)*sunTrail*seaDayRatio;
             float moonTrail=pow(max(0.0,dot(reflDir,normalize(vec3(-seaSunDir.x,abs(seaSunDir.y)+.35,seaSunDir.z)))),28.0);
-            diffuseColor.rgb+=vec3(0.38,0.48,0.68)*moonTrail*(1.0-seaDayRatio)*0.55;
+            diffuseColor.rgb+=vec3(0.42,0.54,0.76)*moonTrail*(1.0-seaDayRatio)*0.62;
           }
         }
       `).replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
@@ -390,9 +409,9 @@ function initialize(){
           visible.add(key);
           const mountain=Boolean(centralMountainTile(col,row));
           const near=Math.max(Math.abs(col-cx),Math.abs(row-cz))<=1;
-          const island=airports.some(airport=>airport.shortField&&Math.abs(airport.x-(col+.5)*span)<span*.8&&
-            Math.abs(airport.z-(row+.5)*span)<span*.8);
-          const step=(mountain||island)&&near?120:terrainStep(col,row);
+          const nearAirport=airports.some(airport=>Math.abs(airport.x-(col+.5)*span)<span*.85&&
+            Math.abs(airport.z-(row+.5)*span)<span*.85);
+          const step=(mountain||nearAirport)&&near?120:terrainStep(col,row);
           const old=terrainChunks.get(key)?.userData;
           if(old?.colorRevision!==terrainColorRevision||old.step!==step){
             terrainQueue.push({col,row,key,step,mountain,distance:(x/span-col-.5)**2+(z/span-row-.5)**2});
@@ -426,20 +445,23 @@ function initialize(){
       for(let i=terrainBuild.index;i<end;i++){
         const worldX=px+pos.getX(i),worldZ=pz+Math.round(pos.getZ(i));
         const height=stitchedHeight(worldX,worldZ,step);
-        pos.setY(i,height-.14);
+        pos.setY(i,height-.24);
         const forest=height>=1.5&&height<=3500?(treeCover(worldX,worldZ)||0):0;
         const urban=height<160&&worldX>-9000&&worldX<11000&&worldZ>-4500&&worldZ<9500;
-        if(height<.7) colors.setXYZ(i,.17,.42,.83);
-        else if(mountain&&height>350){
+        if(height<.7) colors.setXYZ(i,.15,.44,.84);
+        else if(height>3150){
+          const snow=clamp((height-3150)/420,0,1);
+          colors.setXYZ(i,.68+.26*snow,.66+.29*snow,.62+.35*snow);
+        }else if(mountain&&height>350){
           const slope=Math.hypot(terrainVertex(worldX+120,worldZ)-height,terrainVertex(worldX,worldZ+120)-height)/120;
-          const rock=Math.max(clamp((height-2800)/1200,0,1)*.66,clamp((slope-.7)/1.1,0,.86));
-          const canopy=height<3300?Math.max(forest,.52):.25;
-          const r=.69-.39*canopy,g=.85-.42*canopy,b=.64-.34*canopy;
+          const rock=Math.max(clamp((height-2650)/1100,0,1)*.68,clamp((slope-.68)/1.05,0,.88));
+          const canopy=height<3150?Math.max(forest,.54):.25;
+          const r=.67-.39*canopy,g=.84-.42*canopy,b=.62-.34*canopy;
           colors.setXYZ(i,r+(.66-r)*rock,g+(.64-g)*rock,b+(.58-b)*rock);
-        }else if(forest>.08) colors.setXYZ(i,.76-.44*forest,.90-.45*forest,.76-.47*forest);
-        else if(height>1000) colors.setXYZ(i,.71,.77,.72);
+        }else if(forest>.08) colors.setXYZ(i,.74-.43*forest,.89-.44*forest,.73-.46*forest);
+        else if(height>1000) colors.setXYZ(i,.69,.76,.70);
         else if(urban) colors.setXYZ(i,.68,.72,.72);
-        else colors.setXYZ(i,.78,.92,.77);
+        else colors.setXYZ(i,.76,.91,.75);
       }
       terrainBuild.index=end;
       if(end===pos.count){
@@ -479,6 +501,9 @@ function initialize(){
   }
   asphalt.map=pavementTexture(false);concrete.map=pavementTexture(true);
   asphalt.color.set('#d3d7d7');concrete.color.set('#d4d6d1');
+  asphalt.polygonOffset=true;asphalt.polygonOffsetFactor=-1;asphalt.polygonOffsetUnits=-2;
+  concrete.polygonOffset=true;concrete.polygonOffsetFactor=-1;concrete.polygonOffsetUnits=-1;
+  white.polygonOffset=true;white.polygonOffsetFactor=-2;white.polygonOffsetUnits=-4;
   const glass = material('#53758b'), roof = material('#a4afac');
   const airportGroups=[],airportDetails=[],jetwayWalls=new Map();
   const jetwayPaint=material('#b4c0c7'), jetwayDark=material('#36464d');
@@ -542,7 +567,7 @@ function initialize(){
   for(const airport of airports){
     const half=airport.length/2, width=airport.width, apron=airport.apron, sideOfApron=Math.sign(apron);
     const local=airport.shortField, apronZ=local?-airport.parkingAlong:-65;
-    const large=['RCTP','RJAA','RCKH'].includes(airport.code);
+    const large=['RCTP','RJAA','RCKH','RJTT','VHHH','ROAH','RKSI','WSSS','RPLL'].includes(airport.code);
     const gates=local?1:large?7:['RCSS','RCMQ'].includes(airport.code)?5:3;
     const gatePitch=local?27:large?73:51, apronLength=gates*gatePitch+(local?55:80);
     const terminalX=apron+sideOfApron*(local?22:large?112:88);
@@ -559,6 +584,7 @@ function initialize(){
     if(!local) box(group,concrete,24,.10,airport.length-180,apron,0,0);
     box(group,concrete,local?34:large?150:113,.11,apronLength,apron+(local?0:sideOfApron*30),0,apronZ);
     const lane=material('#dbad49');
+    lane.polygonOffset=true;lane.polygonOffsetFactor=-2;lane.polygonOffsetUnits=-4;
     if(!local) box(group,lane,.26,.03,airport.length-190,apron,.07,0);
     for(const z of local?[apronZ]:[half-135,-440,-950]){
       box(group,concrete,Math.abs(apron),.10,18,apron/2,0,z);
@@ -718,14 +744,14 @@ function initialize(){
   for(const [lat,lon,width,depth,height,tone] of cityLiteVolumes){
     if(taipeiCity.inside(lat,lon))continue;
     const {x,z}=geoPoint(lat,lon),ground=renderedGround(x,z);
-    if(ground<.5||airports.some(a=>{
-      const reach=a.length/2+Math.max(width,depth)+220;
+    if(ground<.8||airports.some(a=>{
+      const reach=a.length/2+Math.max(width,depth)+460;
       if(Math.abs(a.x-x)>reach||Math.abs(a.z-z)>reach) return false;
       const {along,cross}=runwayCoordinates(x,z,a);
-      return Math.abs(along)<reach&&Math.abs(cross)<Math.abs(a.apron)+240;
+      return Math.abs(along)<reach&&Math.abs(cross)<Math.abs(a.apron)+340;
     })) continue;
-    dummy.position.set(x,ground+height/2,z);
-    dummy.scale.set(width,height,depth);
+    dummy.position.set(x,ground+height/2-1.5,z);
+    dummy.scale.set(width,height+3,depth);
     dummy.updateMatrix();
     blocks.setMatrixAt(blocks.count,dummy.matrix);
     blocks.setColorAt(blocks.count++,new THREE.Color(cityTones[tone]??cityTones[0]));
@@ -1775,11 +1801,46 @@ function initialize(){
       terrainPreviewInk.fillRect(x,y,2,2);
     }
   }
+  const overseasLandPolygons=[
+    // Japan Honshu Kanto & Tokyo Bay + Boso & Izu Peninsula
+    {fill:'#355f4c',pts:[[34.62,138.32],[35.12,138.52],[35.28,139.15],[35.15,139.62],[35.32,139.74],[35.62,139.77],[35.66,139.98],[35.42,139.96],[35.18,139.82],[34.92,139.88],[35.18,140.38],[35.74,140.86],[36.45,140.68],[36.48,138.55]].map(([a,o])=>geoPoint(a,o))},
+    // Mt. Fuji & Hakone highland contour
+    {fill:'#6f8576',pts:[[35.22,138.56],[35.49,138.60],[35.52,138.92],[35.20,138.94]].map(([a,o])=>geoPoint(a,o))},
+    {fill:'#dce7ec',pts:[[35.32,138.68],[35.40,138.69],[35.40,138.77],[35.32,138.77]].map(([a,o])=>geoPoint(a,o))},
+    // Okinawa Main Island
+    {fill:'#3a6852',pts:[[26.07,127.66],[26.24,127.67],[26.46,127.82],[26.72,128.12],[26.86,128.28],[26.74,128.33],[26.42,128.01],[26.14,127.79]].map(([a,o])=>geoPoint(a,o))},
+    // Hong Kong: Lantau Island + Chek Lap Kok
+    {fill:'#396650',pts:[[22.20,113.85],[22.31,113.90],[22.33,113.95],[22.29,114.05],[22.22,114.01]].map(([a,o])=>geoPoint(a,o))},
+    // Hong Kong: Kowloon Peninsula & New Territories + HK Island
+    {fill:'#36624d',pts:[[22.30,114.13],[22.48,114.02],[22.54,114.22],[22.36,114.32],[22.29,114.24]].map(([a,o])=>geoPoint(a,o))},
+    {fill:'#426e57',pts:[[22.24,114.13],[22.285,114.14],[22.282,114.23],[22.22,114.22]].map(([a,o])=>geoPoint(a,o))},
+    // South Korea: Incheon Yeongjong Island & Seoul / Gyeonggi Peninsula
+    {fill:'#3b6852',pts:[[37.41,126.37],[37.51,126.39],[37.52,126.55],[37.42,126.54]].map(([a,o])=>geoPoint(a,o))},
+    {fill:'#355f4b',pts:[[37.26,126.62],[37.55,126.61],[37.77,126.72],[37.78,127.20],[37.26,127.20]].map(([a,o])=>geoPoint(a,o))},
+    // Singapore Main Island
+    {fill:'#3a6a53',pts:[[1.24,103.62],[1.42,103.68],[1.46,103.84],[1.40,104.04],[1.31,104.02],[1.25,103.82]].map(([a,o])=>geoPoint(a,o))},
+    // Philippines: Luzon Manila Bay, Metro Manila & Bataan Peninsula
+    {fill:'#3b6750',pts:[[14.42,120.38],[14.84,120.36],[14.86,120.62],[14.44,120.60]].map(([a,o])=>geoPoint(a,o))},
+    {fill:'#35604b',pts:[[14.24,120.96],[14.62,120.97],[14.86,120.88],[14.88,121.35],[14.24,121.35]].map(([a,o])=>geoPoint(a,o))}
+  ];
   function drawTaiwanMap(context,project){
     const [x,z,width,height]=atlasReady.value?taiwanSatelliteData.overview:[-290*900,-43*900,430*900,440*900];
     const image=atlasReady.value?atlasImage.value.image:terrainPreview;
     const [left,top]=project({x,z}),[right,bottom]=project({x:x+width,z:z+height});
     context.drawImage(image,left,top,right-left,bottom-top);
+    context.save();
+    context.strokeStyle='rgba(110, 215, 242, 0.48)';
+    context.lineWidth=1.15;
+    for(const poly of overseasLandPolygons){
+      const pts=poly.pts.map(p=>project(p));
+      context.fillStyle=poly.fill;
+      context.beginPath();
+      pts.forEach(([px,py],idx)=>idx?context.lineTo(px,py):context.moveTo(px,py));
+      context.closePath();
+      context.fill();
+      context.stroke();
+    }
+    context.restore();
   }
   // Shared 2D canvas label collision-avoidance helper for #planMap & #radar
   function placeCanvasLabel(placed, ax, ay, w, h, maxW, maxH, pad=3){
@@ -1938,8 +1999,12 @@ function initialize(){
       mapPath(planMap,points,project,'#6ceaff');
       planMap.font='bold 12px system-ui, sans-serif';
       const hitTargets=[];
-      const rawAirports=overseas?[departure,destination]:taiwanAirports;
-      const majorSet=new Set(['RCTP','RCSS','RCMQ','RCKH','RCYU','RCFN','RCBS','RCQC']);
+      const rawAirports=overseas?airports.filter(a=>{
+        if(a===departure||a===destination) return true;
+        const [px,py]=project(a);
+        return px>=16&&px<=planW-16&&py>=16&&py<=planH-16;
+      }):taiwanAirports;
+      const majorSet=new Set(['RCTP','RCSS','RCMQ','RCKH','RCYU','RCFN','RCBS','RCQC','RJAA','RJTT','VHHH','ROAH','RKSI','WSSS','RPLL']);
       const sortedAirports=[...rawAirports].sort((a,b)=>{
         const pa=a===destination?4:a===departure?3:majorSet.has(a.code)?2:1;
         const pb=b===destination?4:b===departure?3:majorSet.has(b.code)?2:1;
@@ -5278,6 +5343,13 @@ function initialize(){
         THREE.MathUtils.lerp(previousPose.x,f.x,blend),
         THREE.MathUtils.lerp(previousPose.y,f.y,blend),
         THREE.MathUtils.lerp(previousPose.z,f.z,blend));
+      if(!f.ended){
+        const gBelow=renderedGround(pos.x,pos.z);
+        const pitchPad=f.ground?Math.sin(Math.abs(pitch))*(profile.geometry[0]*0.32):0;
+        const bankPad=(f.ground||pos.y-gBelow<profile.gearHeight+4.5)?Math.sin(Math.abs(bank))*(profile.geometry[2]*0.55):0;
+        const minGroundY=gBelow+profile.gearHeight+0.05+pitchPad+bankPad;
+        if(pos.y<minGroundY) pos.y=minGroundY;
+      }
       const dir=visualForward.set(Math.sin(heading),0,-Math.cos(heading));
       updateTerrain(f.x,f.z);
       taxiLamp.intensity=f.voyage&&f.ground&&f.battery&&f.lights?470:0;
@@ -5526,7 +5598,10 @@ function initialize(){
         camera.lookAt(pos.clone().addScaledVector(dir,11).add(new THREE.Vector3(0,.44,0)));
       }
       if(cameraMode===0||f.ended){
-        camera.position.y=Math.max(camera.position.y,renderedGround(camera.position.x,camera.position.z)+1.6);
+        const camFloor=renderedGround(camera.position.x,camera.position.z)+2.2;
+        const camHit=(typeof BuildingCollision!=='undefined'&&BuildingCollision.test)?BuildingCollision.test(camera.position.x,camera.position.y,camera.position.z,2.5):null;
+        const camRoof=camHit?camHit.top+2.2:-1e9;
+        camera.position.y=Math.max(camera.position.y,camFloor,camRoof);
       }
       const speeds=flightSpeeds(f);
       const knots=Math.round(speeds.ias*knotsPerMps), live=!f.regional||f.battery;

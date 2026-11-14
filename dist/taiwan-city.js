@@ -244,6 +244,10 @@ function createTaiwanCity(scene,ground,airports){
     {name:'新加坡濱海灣金沙酒店 Marina Bay Sands',lat:1.28340,lon:103.86070,radius:180,type:'sg_mbs'},
     {name:'新加坡樟宜星耀與金融區摩天樓群',lat:1.34500,lon:103.96200,radius:165,type:'intl_city_cluster',seed:401,count:86,span:2300,maxH:210},
     {name:'馬尼拉灣摩天輪與 BGC 金融摩天樓群',lat:14.53500,lon:121.00200,radius:175,type:'manila_skyline'},
+    {name:'東京灣國際貨櫃港與跨海航道船隊',lat:35.60200,lon:139.77800,radius:180,type:'harbor_fleet',seed:501},
+    {name:'香港維多利亞港郵輪與貨櫃船隊',lat:22.29350,lon:114.16650,radius:180,type:'harbor_fleet',seed:502},
+    {name:'新加坡海峽錨地超級貨輪船隊',lat:1.26800,lon:103.87800,radius:180,type:'harbor_fleet',seed:503},
+    {name:'馬尼拉灣海港船隊',lat:14.55200,lon:120.97200,radius:180,type:'harbor_fleet',seed:504},
     {name:'Formosa Aero Secret Sanctum',lat:25.05850,lon:121.58200,radius:40,type:'secret_monolith'}
   ];
 
@@ -252,9 +256,41 @@ function createTaiwanCity(scene,ground,airports){
   function box(parent,mat,w,h,d,x,y,z){return addMesh(parent,new THREE.BoxGeometry(w,h,d),mat,x,y,z);}
   function cyl(parent,mat,rt,rb,h,seg,x,y,z){return addMesh(parent,new THREE.CylinderGeometry(rt,rb,h,seg),mat,x,y,z);}
 
+  function isInAirportSafetyZone(wx,wz){
+    if(!Array.isArray(airports)) return false;
+    for(const ap of airports){
+      const dx=wx-ap.x,dz=wz-ap.z;
+      const reach=(ap.length||3000)/2+1100;
+      if(Math.abs(dx)>reach||Math.abs(dz)>reach) continue;
+      const s=Math.sin(ap.heading||0),c=Math.cos(ap.heading||0);
+      const along=dx*s-dz*c,cross=dx*c+dz*s;
+      if(Math.abs(along)<(ap.length||3000)/2+920&&Math.abs(cross)<Math.abs(ap.apron||180)+390) return true;
+    }
+    return false;
+  }
+
+  function placeGroundedBuilding(g,baseY,siteX,siteZ,matPick,bw,bh,bd,bx,bz,groupId,withCrown=false){
+    const wx=siteX+bx,wz=siteZ+bz;
+    if(isInAirportSafetyZone(wx,wz)) return false;
+    const gy=ground(wx,wz);
+    if(gy<1.35) return false; // Never place land buildings in the sea
+    const ly=gy-baseY;
+    const plinth=6;
+    box(g,matPick,bw,bh+plinth,bd,bx,ly+(bh-plinth)/2,bz);
+    if(withCrown||bh>115){
+      box(g,whiteFrame,bw+1.6,3.2,bd+1.6,bx,ly+bh+1.6,bz);
+      box(g,beaconMat,1.9,1.9,1.9,bx,ly+bh+4.2,bz);
+    }
+    if(typeof BuildingCollision!=='undefined'&&bh>26){
+      BuildingCollision.add(groupId,wx-bw*.45,wz-bd*.45,wx+bw*.45,wz+bd*.45,gy+bh,gy-plinth);
+    }
+    return true;
+  }
+
   for(const site of landmarkSites){
     const p=geoPoint(site.lat,site.lon);site.x=p.x;site.z=p.z;
-    const g=new THREE.Group();g.name=site.name;g.position.set(p.x,ground(p.x,p.z),p.z);
+    const baseY=site.type==='harbor_fleet'||site.type==='suspension_bridge'?0:Math.max(1.2,ground(p.x,p.z));
+    const g=new THREE.Group();g.name=site.name;g.position.set(p.x,baseY,p.z);
     landmarks.add(g);landmarkGroups.push(g);
     if(site.type==='k85'){
       box(g,stone,98,34,64,0,17,0);
@@ -432,61 +468,60 @@ function createTaiwanCity(scene,ground,airports){
       }
     }else if(site.type==='hk_central'){
       // IFC 2 (415m) + Bank of China prism (367m) + Central Harbourfront towers
-      box(g,stone,74,26,74,0,13,0);
+      box(g,stone,74,30,74,0,11,0);
       box(g,officeGlass,52,375,52,0,200,0);
       for(const s of [-25,25])box(g,whiteFrame,4.5,398,14,s,206,0);
       cyl(g,metal,12,26,24,8,0,400,0);
       box(g,beaconMat,2.8,2.8,2.8,0,415,0);
       // Bank of China Tower nearby
-      box(g,darkGlass,44,295,44,125,148,45);
-      cyl(g,whiteFrame,2,28,72,4,125,331,45).rotation.y=Math.PI/4;
-      cyl(g,metal,.8,1.6,38,6,125,368,45);
+      placeGroundedBuilding(g,baseY,site.x,site.z,125,45,44,295,44,darkGlass,true,'intl:hk_central');
       for(let i=0;i<36;i++){
         const a=i*2.39996,r=140+((i*53)%780);
         const bx=Math.cos(a)*r,bz=Math.sin(a)*r;
         const bh=65+((i*41)%195),bw=24+((i*17)%22);
-        box(g,i%2?officeGlass:darkGlass,bw,bh,bw,bx,bh/2,bz);
-        if(bh>140)box(g,beaconMat,1.8,1.8,1.8,bx,bh+1.5,bz);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,bw,bh,bw,i%2?officeGlass:darkGlass,bh>140,'intl:hk_central');
       }
     }else if(site.type==='hk_icc'){
-      box(g,stone,82,32,82,0,16,0);
+      box(g,stone,82,36,82,0,14,0);
       box(g,officeGlass,58,438,58,0,235,0);
       box(g,whiteFrame,60,18,60,0,462,0);
       box(g,beaconMat,3,3,3,0,484,0);
       for(let i=0;i<32;i++){
         const a=i*2.39996,r=135+((i*61)%680);
         const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=58+((i*37)%165);
-        box(g,i%3?officeGlass:wall,26,bh,24,bx,bh/2,bz);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,26,bh,24,i%3?officeGlass:wall,bh>140,'intl:hk_icc');
       }
     }else if(site.type==='okinawa_naha'){
       // Shuri Castle vermilion hall + Naha Kokusai-dori city blocks
-      box(g,stone,74,12,56,0,6,0);
+      box(g,stone,74,16,56,0,4,0);
       box(g,pagodaRed,48,18,32,0,21,0);
       cyl(g,pagodaRed,16,32,10,4,0,35,0).rotation.y=Math.PI/4;
       cyl(g,gold,1.2,2.5,6,6,0,42,0);
       for(let i=0;i<54;i++){
         const a=i*2.39996,r=120+((i*73)%1350);
         const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=24+((i*29)%88),bw=22+((i*13)%18);
-        box(g,i%3===0?officeGlass:wall,bw,bh,bw,bx,bh/2,bz);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,bw,bh,bw,i%3===0?officeGlass:wall,false,'intl:okinawa');
       }
-      box(g,roadMat,1800,1.2,18,0,1.2,90);
+      box(g,roadMat,1400,1.4,18,0,0.8,90);
     }else if(site.type==='seoul_lotte'){
+      box(g,stone,78,24,78,0,6,0);
       cyl(g,officeGlass,11,36,515,16,0,258,0);
       cyl(g,whiteFrame,10,13,40,12,0,535,0);
       box(g,beaconMat,3,3,3,0,556,0);
       for(let i=0;i<38;i++){
         const a=i*2.39996,r=140+((i*67)%860);
         const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=55+((i*43)%155);
-        box(g,i%2?officeGlass:darkGlass,26,bh,26,bx,bh/2,bz);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,26,bh,26,i%2?officeGlass:darkGlass,bh>130,'intl:seoul_lotte');
       }
     }else if(site.type==='seoul_ntower'){
-      box(g,stone,44,18,44,0,9,0);
+      box(g,stone,44,24,44,0,6,0);
       cyl(g,whiteFrame,7.5,9.5,145,16,0,82,0);
       cyl(g,officeGlass,18,16,18,20,0,162,0);
       cyl(g,metal,1.2,3.2,68,10,0,204,0);
       box(g,beaconMat,2.4,2.4,2.4,0,239,0);
     }else if(site.type==='sg_mbs'){
       // Marina Bay Sands 3 iconic towers + SkyPark ship deck + Supertrees + CBD
+      box(g,stone,200,12,72,0,0,0);
       for(const sx of [-68,0,68]){
         box(g,officeGlass,28,194,46,sx,97,0);
         box(g,whiteFrame,30,194,4,sx,97,22);
@@ -501,22 +536,22 @@ function createTaiwanCity(scene,ground,airports){
       for(let i=0;i<44;i++){
         const a=i*2.39996,r=160+((i*71)%980);
         const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=75+((i*47)%185);
-        box(g,i%2?officeGlass:darkGlass,28,bh,26,bx,bh/2,bz);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,28,bh,26,i%2?officeGlass:darkGlass,bh>145,'intl:sg_mbs');
       }
     }else if(site.type==='manila_skyline'){
       // MOA Eye Ferris Wheel + Makati/BGC high-rises
       cyl(g,whiteFrame,55,55,4,24,-120,62,80).rotation.x=Math.PI/2;
-      box(g,metal,6,65,12,-120,32,80);
+      box(g,metal,6,70,12,-120,30,80);
       for(let i=0;i<68;i++){
         const a=i*2.39996,r=85+((i*79)%1450);
         const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=42+((i*53)%195),bw=24+((i*19)%22);
-        box(g,i%3===0?darkGlass:i%2?officeGlass:wall,bw,bh,bw,bx,bh/2,bz);
-        if(bh>150)box(g,beaconMat,1.8,1.8,1.8,bx,bh+1.5,bz);
+        const matPick=i%3===0?darkGlass:i%2?officeGlass:wall;
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,bw,bh,bw,matPick,bh>150,'intl:manila');
       }
-      box(g,roadMat,2100,1.2,20,0,1.2,0);
     }else if(site.type==='intl_city_cluster'){
       const cnt=site.count||80,span=site.span||2200,maxH=site.maxH||180,sd=site.seed||101;
-      if(site.pagoda){
+      if(site.pagoda&&!isInAirportSafetyZone(site.x,site.z)&&baseY>=1.2){
+        box(g,stone,32,10,32,0,-1,0);
         for(let t=0;t<5;t++){
           const y=4+t*8.5,r=14-t*1.6;
           box(g,pagodaRed,r*1.5,5.5,r*1.5,0,y+2.5,0);
@@ -524,8 +559,6 @@ function createTaiwanCity(scene,ground,airports){
         }
         cyl(g,gold,.5,1.8,12,8,0,52,0);
       }
-      box(g,roadMat,span*.85,1.2,18,0,1.0,0);
-      box(g,roadMat,18,1.2,span*.85,0,1.0,0);
       for(let i=1;i<=cnt;i++){
         const h1=Math.sin(i*12.9898+sd)*43758.5453,u1=h1-Math.floor(h1);
         const h2=Math.sin(i*78.233+sd*1.7)*43758.5453,u2=h2-Math.floor(h2);
@@ -537,14 +570,34 @@ function createTaiwanCity(scene,ground,airports){
         const bh=Math.round(22+(maxH-22)*Math.pow(u3,1.35)*(0.45+0.55*distRatio));
         const bw=18+Math.round((u1*22)%18),bd=18+Math.round((u2*22)%18);
         const matPick=bh>95?(i%2?officeGlass:darkGlass):(i%3===0?officeGlass:wall);
-        box(g,matPick,bw,bh,bd,bx,bh/2,bz);
-        if(bh>115){
-          box(g,whiteFrame,bw+1.5,3,bd+1.5,bx,bh+1.5,bz);
-          box(g,beaconMat,1.8,1.8,1.8,bx,bh+4,bz);
-        }
-        if(typeof BuildingCollision!=='undefined'&&bh>28){
-          const wx=site.x+bx,wz=site.z+bz,gy=ground(wx,wz);
-          BuildingCollision.add('intl:'+site.seed,wx-bw*.45,wz-bd*.45,wx+bw*.45,wz+bd*.45,gy+bh,gy-2);
+        placeGroundedBuilding(g,baseY,site.x,site.z,bx,bz,bw,bh,bd,matPick,bh>115,'intl:'+sd);
+      }
+    }else if(site.type==='harbor_fleet'){
+      // 3D International Harbor Fleet: Container ships, cruise liners & illuminated wakes on water
+      const seaY=-baseY,sd=site.seed||401,cnt=site.count||8;
+      for(let i=0;i<cnt;i++){
+        const a=i*(Math.PI*2/cnt)+(sd%7)*0.35;
+        const r=180+((i*230+sd*31)%1150);
+        const sx=Math.cos(a)*r,sz=Math.sin(a)*r;
+        const wx=site.x+sx,wz=site.z+sz;
+        if(ground(wx,wz)>0.4||isInAirportSafetyZone(wx,wz))continue;
+        const isCruise=(i%4===0);
+        const shipLen=isCruise?240:210+((i*37)%95);
+        const shipW=isCruise?34:30;
+        // Hull at sea level
+        box(g,isCruise?whiteFrame:darkBasalt,shipW,12,shipLen,sx,seaY+5,sz);
+        if(isCruise){
+          box(g,officeGlass,shipW*0.86,22,shipLen*0.76,sx,seaY+22,sz);
+          box(g,whiteFrame,shipW*0.9,4,shipLen*0.82,sx,seaY+35,sz);
+          cyl(g,pagodaRed,4.5,6.5,14,10,sx,seaY+43,sz-18);
+        }else{
+          // Container stacks + bridge superstructure
+          for(let c=-2;c<=1;c++){
+            const cMat=(c+i)%2===0?pagodaRed:(c%2?pagodaGreen:gold);
+            box(g,cMat,shipW*0.84,13,34,sx,seaY+17.5,sz+c*40);
+          }
+          box(g,whiteFrame,shipW*0.78,24,18,sx,seaY+23,sz+shipLen*0.34);
+          box(g,beaconMat,2,2,2,sx,seaY+37,sz+shipLen*0.34);
         }
       }
     }else if(site.type==='secret_monolith'){
@@ -589,12 +642,7 @@ function createTaiwanCity(scene,ground,airports){
     const ll=latLon(x,z);
     if(ll.lat>=taipeiBox.s&&ll.lat<=taipeiBox.n&&ll.lon>=taipeiBox.w&&ll.lon<=taipeiBox.e)return true;
     if(landmarkSites.some(s=>Math.abs(x-s.x)<s.radius&&Math.abs(z-s.z)<s.radius))return true;
-    return airports.some(a=>{
-      if(Math.hypot(x-a.x,z-a.z)>a.length/2+500)return false;
-      const p=runwayCoordinates(x,z,a);
-      if(typeof airportSurroundingsContains==='function'&&airportSurroundingsContains(a,p))return true;
-      return Math.abs(p.along)<a.length/2+85&&Math.abs(p.cross)<Math.abs(a.apron)+160;
-    });
+    return isInAirportSafetyZone(x,z);
   };
 
   function buffers(){return {p:[],n:[],uv:[],c:[]};}
@@ -676,10 +724,10 @@ function createTaiwanCity(scene,ground,airports){
       let base=center;
       if(points.length<=4){
         const g0=ground(points[0][0],points[0][1]),g2=ground(points[2][0],points[2][1]);
-        base=Math.min(center,g0,g2)-.55;
+        base=Math.min(center,g0,g2)-2.4;
       }else{
         for(let i=0;i<points.length;i++){const gp=ground(points[i][0],points[i][1]);if(gp<base)base=gp;}
-        base-=.45;
+        base-=2.4;
       }
       const top=center+h;
       if(BC){const sx=(maxX-minX)*.06,sz=(maxZ-minZ)*.06;BC.add('tw:'+key,minX+sx,minZ+sz,maxX-sx,maxZ-sz,top,base);}
@@ -832,11 +880,11 @@ function createTaiwanCity(scene,ground,airports){
             const bw=kind===2?(16+r2*18):(dens>=3?(12+r2*12):(8.5+r2*7.5));
             const bd=kind===2?(14+r3*14):(dens>=3?(11+r3*10):(8.0+r3*6.5));
             const col=palette[(seed>>>24)%palette.length];
-            dummyObj.position.set(bx,gy-0.55,bz);
+            dummyObj.position.set(bx,gy-1.8,bz);
             dummyObj.rotation.set(0,-ang+((seed&1)?0:Math.PI*0.5),0);
-            dummyObj.scale.set(bw,bh,bd);
+            dummyObj.scale.set(bw,bh+1.8,bd);
             dummyObj.updateMatrix();
-            if(BC&&d2<2500*2500){const hr=Math.max(bw,bd)*.42;BC.add('tw:infill',bx-hr,bz-hr,bx+hr,bz+hr,gy-0.55+bh,gy-2);}
+            if(BC&&d2<2500*2500){const hr=Math.max(bw,bd)*.42;BC.add('tw:infill',bx-hr,bz-hr,bx+hr,bz+hr,gy+bh,gy-2);}
             if(kind===2&&nTech<MAX_TECH_INST){
               infillTech.setMatrixAt(nTech,dummyObj.matrix);infillTech.setColorAt(nTech,col);nTech++;
             }else if((kind===1||bh>=28)&&nOff<MAX_OFF_INST){

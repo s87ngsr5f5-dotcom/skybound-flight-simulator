@@ -55,33 +55,52 @@ function createAtmosphericSky(scene){
         vec3 d=normalize(ray);
         float up=max(0.,d.y);
         float glare=max(0.,dot(sun,d));
-        float mie=pow(glare,4.5)*.30+pow(glare,18.)*.48+pow(glare,90.)*1.15;
-        vec3 horizon=mix(vec3(.028,.045,.088),vec3(.48,.78,.98),daylight);
-        vec3 zenith=mix(vec3(.007,.018,.048),vec3(.07,.36,.88),daylight);
-        vec3 sky=mix(horizon,zenith,pow(up,.72));
-        sky+=vec3(.06,.18,.32)*daylight*exp(-up*3.5)*.35;
-        sky+=vec3(.98,.44,.12)*twilight*pow(glare,3.5)*exp(-up*2.6);
-        sky+=vec3(.55,.19,.33)*twilight*exp(-up*4.8);
-        sky+=vec3(1.,.90,.66)*daylight*(pow(glare,12.)*.26+smoothstep(.99982,.99997,glare)*8.5)+vec3(.55,.76,1.)*mie*daylight*.75;
+        float antiGlare=max(0.,dot(-sun,d));
+        float mie=pow(glare,4.2)*.34+pow(glare,18.)*.54+pow(glare,96.)*1.32;
+        vec3 horizon=mix(vec3(.024,.042,.086),vec3(.48,.78,.98),daylight);
+        vec3 midSky=mix(vec3(.012,.028,.066),vec3(.18,.54,.95),daylight);
+        vec3 zenith=mix(vec3(.005,.014,.042),vec3(.07,.36,.88),daylight);
+        vec3 sky=mix(horizon,midSky,smoothstep(0.,.38,up));
+        sky=mix(sky,zenith,smoothstep(.28,.96,up));
+        // Rayleigh horizon scatter & Belt of Venus anti-solar twilight band
+        sky+=vec3(.08,.22,.38)*daylight*exp(-up*3.8)*.38;
+        sky+=vec3(.99,.46,.14)*twilight*pow(glare,3.2)*exp(-up*2.4)*1.15;
+        sky+=vec3(.62,.22,.38)*twilight*exp(-up*4.5)*(0.75+0.45*antiGlare);
+        sky+=vec3(1.,.92,.70)*daylight*(pow(glare,12.)*.28+smoothstep(.99980,.99997,glare)*9.2)+vec3(.58,.79,1.)*mie*daylight*.82;
+        // High-altitude Cirrus / Ice-Crystal Wisps at ~7,800m
+        if(d.y>.035){
+          vec2 cirUV=(eye.xz+d.xz*((7800.-eye.y)/max(.04,d.y))-seconds*vec2(18.,6.))/9200.;
+          float c1=noise3(vec3(cirUV*vec2(2.6,1.1),1.4));
+          float c2=noise3(vec3(cirUV*vec2(6.2,2.4)+vec2(c1*1.3,0.),3.1));
+          float cirrus=smoothstep(.54,.84,c1*.62+c2*.38)*smoothstep(.04,.24,d.y)*(1.-mist*.7);
+          vec3 cirCol=mix(vec3(.12,.16,.24),vec3(.92,.96,1.),daylight)+vec3(.95,.48,.22)*twilight*(.45+.55*glare);
+          sky=mix(sky,cirCol,cirrus*.38);
+        }
         float night=(1.-smoothstep(.02,.40,daylight))*(1.-mist*.9);
         if(night>.01&&d.y>0.){
           // Warm metropolitan light-pollution horizon skyglow over night cities
-          sky+=vec3(.30,.16,.065)*exp(-up*7.5)*night*(1.-mist*.65);
-          vec2 grid=vec2(atan(d.x,-d.z)*103.,asin(d.y)*135.);
+          sky+=vec3(.32,.17,.07)*exp(-up*7.2)*night*(1.-mist*.65);
+          // Subtle Milky Way galactic band
+          float mwBand=exp(-pow((d.x*.65+d.z*.45-d.y*.25)*3.4,2.))*smoothstep(.08,.45,up);
+          float mwDust=noise3(d*8.5+2.1)*.65+noise3(d*19.+5.4)*.35;
+          sky+=vec3(.07,.11,.20)*mwBand*mwDust*night*.55;
+          vec2 grid=vec2(atan(d.x,-d.z)*108.,asin(d.y)*142.);
           vec2 cell=floor(grid);
           float random=hash(cell);
           vec2 offset=vec2(hash(cell+1.),hash(cell+19.))*.64+.18;
-          float star=(1.-smoothstep(.025,.12,length(fract(grid)-offset)))*smoothstep(.70,.99,random);
-          sky+=vec3(.78,.86,1.)*star*night*smoothstep(.015,.20,up)*(1.25+random*1.2);
+          float twinkle=.78+.22*sin(seconds*(1.8+random*3.5)+random*18.);
+          float star=(1.-smoothstep(.024,.115,length(fract(grid)-offset)))*smoothstep(.69,.99,random)*twinkle;
+          vec3 starTint=mix(vec3(.74,.85,1.),vec3(1.,.91,.78),fract(random*7.3));
+          sky+=starTint*star*night*smoothstep(.015,.20,up)*(1.35+random*1.25);
           float moonFacing=max(0.,dot(moon,d));
-          float disc=smoothstep(.99992,.99995,moonFacing);
+          float disc=smoothstep(.99991,.99995,moonFacing);
           float detail=noise3((d-moon)*340.+3.6);
-          sky+=vec3(.93,.96,1.)*night*(disc*(1.25+.85*detail)+pow(moonFacing,520.)*.14);
+          sky+=vec3(.94,.97,1.)*night*(disc*(1.3+.85*detail)+pow(moonFacing,480.)*.16+pow(moonFacing,48.)*.035);
         }
         float dy=abs(d.y)<.001?(d.y<0.?-.001:.001):d.y;
-        float a=(1450.-eye.y)/dy,b=(2600.-eye.y)/dy;
-        float start=max(0.,min(a,b)),end=min(46000.,max(a,b));
-        if(end>start&&!(eye.y>2700.&&d.y<0.)){
+        float a=(1450.-eye.y)/dy,b=(2650.-eye.y)/dy;
+        float start=max(0.,min(a,b)),end=min(48000.,max(a,b));
+        if(end>start&&!(eye.y>2750.&&d.y<0.)){
           float stride=(end-start)/float(steps);
           float light=0.,opacity=0.;
           for(int i=0;i<18;i++){
@@ -90,17 +109,17 @@ function createAtmosphericSky(scene){
             float density=cloud(p);
             if(density>.012){
               float lit=1.-cloud(p+sun*440.)*.76;
-              float weight=(1.-opacity)*(1.-exp(-density*min(1800.,stride)*.004));
+              float weight=(1.-opacity)*(1.-exp(-density*min(1800.,stride)*.0042));
               light+=weight*lit;
               opacity+=weight;
             }
           }
-          vec3 cloudColor=mix(vec3(.048,.066,.105),vec3(.42,.52,.64),daylight)*opacity;
-          cloudColor+=vec3(.75,.72,.66)*light*daylight;
-          cloudColor+=vec3(.72,.26,.08)*light*twilight;
-          float silver=pow(glare,5.5)*light*(1.-opacity*.52);
-          cloudColor+=vec3(1.18,1.06,.84)*silver*daylight*(.48+.38*raytrace);
-          float distanceFade=exp(-start/28000.)*smoothstep(.028,.16,abs(d.y));
+          vec3 cloudColor=mix(vec3(.052,.072,.115),vec3(.45,.55,.68),daylight)*opacity;
+          cloudColor+=vec3(.78,.75,.69)*light*daylight;
+          cloudColor+=vec3(.82,.31,.11)*light*twilight;
+          float silver=pow(glare,5.2)*light*(1.-opacity*.48);
+          cloudColor+=vec3(1.22,1.08,.86)*silver*(daylight+twilight*.6)*(.52+.40*raytrace);
+          float distanceFade=exp(-start/30000.)*smoothstep(.024,.15,abs(d.y));
           sky=mix(sky,cloudColor+sky*(1.-opacity),distanceFade);
         }
         if(raytrace>.01&&glare>.18&&(daylight+twilight)>.04&&d.y>-.06){
