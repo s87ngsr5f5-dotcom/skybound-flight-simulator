@@ -18,10 +18,10 @@ function random(){
   return seed / 4294967296;
 }
 let renderer;
-const mobileRenderer=touchControls.mode.value==='mobile';
 const rendererOptions=[
-  {antialias:!mobileRenderer,powerPreference:'high-performance'},
-  {antialias:!mobileRenderer},
+  {antialias:true,powerPreference:'high-performance'},
+  {antialias:true},
+  {antialias:false,powerPreference:'high-performance'},
   {antialias:false,powerPreference:'default'},
   {antialias:false,powerPreference:'low-power',precision:'mediump'}
 ];
@@ -3193,7 +3193,7 @@ function initialize(){
     if(flight&&button) action(button.dataset.action);
   });
   const qualitySelect=byId('quality');
-  const defaultQuality=touchControls.mode.value==='mobile'?'low':'balanced';
+  const defaultQuality='balanced';
   let savedQuality;
   try{savedQuality=localStorage.getItem('skybound-quality');}catch{}
   qualitySelect.value=savedQuality||defaultQuality;
@@ -3218,8 +3218,8 @@ function initialize(){
     const ultra=qualitySelect.value==='ultra';
     const scale={low:.75,balanced:1.5,high:2}[renderingQuality()]||1.5;
     const mobile=touchControls.mode.value==='mobile';
-    basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?1.85:2.5,Math.sqrt(6500000/(w*h))):
-      Math.min(devicePixelRatio,scale,mobile?1.25:Infinity);
+    basePixelRatio=ultra?Math.min(Math.max(1.5,devicePixelRatio),mobile?2.1:2.5,Math.sqrt(6500000/(w*h))):
+      Math.min(devicePixelRatio,scale,mobile?2:Infinity);
     if(hangarMode) basePixelRatio=Math.max(basePixelRatio,Math.min(devicePixelRatio,1.25));
     resolutionScale=1;
     measuredFrameTime=measuredFrames=0;

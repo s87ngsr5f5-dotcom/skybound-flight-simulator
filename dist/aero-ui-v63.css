@@ -8,7 +8,8 @@ body.title-hub-open {
 #storyObjectiveHud[hidden],
 #storyRadioBar[hidden],
 #storyDebrief[hidden],
-body.flight-ui #titleHub {
+body.flight-ui #titleHub,
+body.flight-ui .geo-credit {
   display: none !important;
 }
 
@@ -706,5 +707,152 @@ body.title-hub-open .geo-credit {
   }
   .hub-welcome-hero h2 {
     font-size: 24px;
+  }
+}
+
+/* v0.63b In-Flight Layout & Mobile Landscape Uncluttered Spacing */
+@keyframes radioFadeUpMobile {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+body.flight-ui:not(.mobile-mode) #storyObjectiveHud {
+  top: 56px;
+  padding: 5px 14px;
+  font-size: 12px;
+}
+
+body.flight-ui:not(.mobile-mode) #storyRadioBar {
+  bottom: 112px;
+  width: min(560px, 82vw);
+  padding: 9px 15px;
+}
+
+.mobile-mode.flight-ui #hud {
+  --stick-size: clamp(80px, 23dvh, 114px);
+  --throttle-height: clamp(106px, 30dvh, 154px);
+  --throttle-width: clamp(40px, 5.8vw, 52px);
+  --flight-bottom: max(6px, env(safe-area-inset-bottom));
+}
+
+.mobile-mode.flight-ui #glassReadouts {
+  top: 43%;
+  width: min(58vw, 86dvh, 520px);
+  height: min(54dvh, 62vw, 340px);
+}
+
+.mobile-mode.flight-ui #storyObjectiveHud {
+  top: calc(var(--hdr-h, 46px) + 4px);
+  left: max(10px, env(safe-area-inset-left));
+  transform: none;
+  max-width: 39vw;
+  padding: 4px 10px;
+  font-size: 11px;
+  z-index: 6;
+}
+
+.mobile-mode.flight-ui #waypointChip {
+  top: calc(var(--hdr-h, 46px) + 4px);
+  right: max(10px, env(safe-area-inset-right));
+  left: auto;
+  transform: none;
+  max-width: 35vw;
+  padding: 3px 9px;
+  font-size: 11px;
+}
+
+.mobile-mode.flight-ui #touchQuick {
+  right: calc(var(--throttle-width) + 8px);
+  bottom: var(--flight-bottom);
+  width: min(26vw, 200px);
+  gap: 3px;
+}
+
+.mobile-mode.flight-ui #touchQuick button {
+  min-height: 31px;
+  padding: 2px 4px;
+  font-size: clamp(10px, 1.4vw, 12.5px);
+}
+
+.mobile-mode.flight-ui #touchRudderControl {
+  bottom: calc(var(--flight-bottom) + var(--throttle-height) + 22px);
+  width: min(19vw, 140px);
+  font-size: 11px;
+}
+
+.mobile-mode.flight-ui #touchRudder {
+  height: 30px !important;
+}
+
+.mobile-mode.flight-ui #stats {
+  left: calc(var(--stick-size) + 12px);
+  right: calc(var(--throttle-width) + min(26vw, 200px) + 16px);
+  bottom: var(--flight-bottom);
+  transform: none;
+  width: auto;
+  padding: 3px 8px;
+  font-size: 11px;
+  justify-content: center;
+}
+
+.mobile-mode.flight-ui #flightGuide,
+.mobile-mode.flight-ui #gateGuide {
+  left: calc(var(--stick-size) + 12px);
+  right: calc(var(--throttle-width) + min(26vw, 200px) + 16px);
+  bottom: calc(var(--flight-bottom) + 30px) !important;
+  transform: none;
+  width: auto;
+  max-width: none;
+}
+
+.mobile-mode.flight-ui #status {
+  font-size: 11.5px;
+  padding: 4px 10px;
+}
+
+.mobile-mode.flight-ui #storyRadioBar {
+  left: calc(var(--stick-size) + 12px);
+  right: calc(var(--throttle-width) + min(26vw, 200px) + 16px);
+  bottom: calc(var(--flight-bottom) + 64px);
+  transform: none;
+  width: auto;
+  max-width: 440px;
+  margin-inline: auto;
+  padding: 6px 10px;
+  border-radius: 10px;
+  animation: radioFadeUpMobile 0.24s ease;
+}
+
+.mobile-mode.flight-ui #storyRadioBar .radio-speaker {
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.mobile-mode.flight-ui #storyRadioBar .radio-text {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+@media (max-width: 620px) and (orientation: portrait) {
+  .mobile-mode.flight-ui #storyObjectiveHud,
+  .mobile-mode.flight-ui #waypointChip {
+    max-width: 46vw;
+  }
+  .mobile-mode.flight-ui #stats {
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--stick-size) + 10px);
+  }
+  .mobile-mode.flight-ui #flightGuide,
+  .mobile-mode.flight-ui #gateGuide {
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--stick-size) + 42px) !important;
+  }
+  .mobile-mode.flight-ui #storyRadioBar {
+    left: 10px;
+    right: 10px;
+    bottom: calc(var(--stick-size) + 84px);
+    max-width: none;
   }
 }
