@@ -36,7 +36,9 @@ function configureHelicopterFlight(f){
   f.fuel ??= f.aircraft.missionFuel; f.fuelStart ??= f.fuel;
   if(f.start === 'air'){
     f.power = .55; f.vx = f.vy = f.vz = 0; f.speed = 0;
-    f.y = f.departure.elevation + 150;
+    f.y = Math.max(480, (f.departure?.elevation || 0) + 460);
+  } else if(f.start !== 'cold' && f.ground){
+    f.parkingBrake = false;
   }
   return f;
 }
@@ -50,13 +52,15 @@ function toggleHelicopterHover(f){
 function stepHelicopter(f, input, dt = simTick){
   if(f.ended || f.finished) return;
   const g = 9.80665, wind = flightWind(f), density = atmosphere(f.y).density / 1.225;
-  const mass = Math.max(1400, f.aircraft.mass + (f.fuel ?? 280) - 280);
+  const refMass = Math.max(1400, f.aircraft.mass || 1900);
+  const fuelRef = f.aircraft.missionFuel ?? 280;
+  const mass = Math.max(1100, refMass + ((f.fuel ?? fuelRef) - fuelRef));
   f.elapsed += dt;
 
-  f.power = limit(f.power + (input.throttle || 0) * dt * .55, 0, 1);
+  f.power = limit(f.power + (input.throttle || 0) * dt * .85, 0, 1);
   const running = f.engines.some(Boolean) && f.fuel !== 0;
   f.rotorRPM ??= f.start === 'cold' ? 0 : 1;
-  f.rotorRPM += ((running ? 1 : 0) - f.rotorRPM) * (1 - Math.exp(-dt / (running ? 2.8 : 7)));
+  f.rotorRPM += ((running ? 1 : 0) - f.rotorRPM) * (1 - Math.exp(-dt / (running ? 2.2 : 7)));
 
   if(Number.isFinite(f.fuel)){
     f.fuelFlow = running ? .016 + .040 * f.power : 0;
@@ -84,7 +88,7 @@ function stepHelicopter(f, input, dt = simTick){
   if(input.brake && !f.ground){ pitch = limit(-forward * .18, -1, 1); roll = limit(-right * .18, -1, 1); }
 
   // Forward pitch authority: responsive cyclic control for agile handling and cruising
-  const pTarget = -pitch * (pitch > 0 ? .46 : .34);
+  const pTarget = -pitch * (pitch > 0 ? .42 : .34);
   const bTarget = roll * .42;
   f.commandPitch = pTarget; f.commandBank = bTarget;
   f.pitchRate += ((pTarget - f.pitch) * 16 - f.pitchRate * 7) * dt;
@@ -97,13 +101,18 @@ function stepHelicopter(f, input, dt = simTick){
   f.yawRate += (targetYaw - f.yawRate) * (1 - Math.exp(-dt * 4.5));
   if(!f.ground || f.rotorRPM > .35) f.heading = wrapAngle(f.heading + f.yawRate * dt);
 
-  const lift = g * (f.power / .55) * f.rotorRPM * f.rotorRPM * Math.pow(density, .65) * 1900 / mass;
-  f.engineThrust = lift * mass; f.stall = false; f.airBrake = Boolean(input.brake && !f.ground);
   const floor = (f.regional ? regionalHeight(f.x, f.z) : groundHeight(f.x, f.z)) + f.aircraft.gearHeight;
+  const horizontalSpeed = Math.hypot(vx, vz);
+  const groundCushion = f.ground ? 1 : (1 + .06 * Math.exp(-Math.max(0, f.y - floor) / Math.max(3, f.aircraft.geometry?.[2] || 5)));
+  const translationalLift = f.ground ? 1 : (1 + .14 * Math.min(1, horizontalSpeed / 18));
+  const lift = g * (f.power / .55) * f.rotorRPM * f.rotorRPM * Math.pow(density, .65) * (refMass / mass) * groundCushion * translationalLift;
+  f.engineThrust = lift * mass; f.stall = false; f.airBrake = Boolean(input.brake && !f.ground);
 
   if(f.ground){
     f.vx = f.vy = f.vz = 0; f.y = floor;
-    if(!f.parkingBrake && lift * Math.cos(f.pitch) * Math.cos(f.bank) > g * 1.025 && f.rotorRPM > .88){
+    const readyLift = lift * Math.cos(f.pitch) * Math.cos(f.bank);
+    if(f.parkingBrake && running && f.rotorRPM > .88 && readyLift > g * 1.04) f.parkingBrake = false;
+    if(!f.parkingBrake && readyLift > g * 1.025 && f.rotorRPM > .88){
       f.ground = false; f.airborne = true; f.landed = false; f.touchdown = null;
     }
   }
@@ -114,23 +123,23 @@ function stepHelicopter(f, input, dt = simTick){
     const rightAcceleration = Math.sin(f.bank) * lift;
 
     // Aerodynamic fuselage drag: allows smooth high-speed cruise (280-360 km/h)
-    const dragCoeff = (f.aircraft.dragCoeff || .014) + .00020 * Math.hypot(vx, vz);
+    const dragCoeff = (f.aircraft.dragCoeff || .014) + .00020 * horizontalSpeed;
     f.vx += (sine * forwardAcceleration + cosine * rightAcceleration - vx * dragCoeff) * dt;
     f.vz += (-cosine * forwardAcceleration + sine * rightAcceleration - vz * dragCoeff) * dt;
 
     // Vertical flight control:
-    // When flying forward without active throttle commands, automatically damp vertical acceleration
-    // so the helicopter flies forward level without climbing!
-    let verticalAccel = lift * Math.cos(f.pitch) * Math.cos(f.bank) - g;
-    if(Math.abs(input.throttle || 0) < 0.05){
-      const horizontalSpeed = Math.hypot(f.vx, f.vz);
-      if(horizontalSpeed > 2){
-        verticalAccel = (0 - f.vy) * 2.5;
-      } else {
-        verticalAccel -= f.vy * 0.85;
-      }
+    // High collective (>59%) or active collective input ALWAYS climbs strongly even during forward flight;
+    // Neutral cruise collective (52%..59%) applies cyclic-collective mixing so pitching forward holds level flight cleanly.
+    const tiltCos = Math.max(.55, Math.cos(f.pitch) * Math.cos(f.bank));
+    const neutralBand = f.power >= .52 && f.power <= .59 && Math.abs(input.throttle || 0) < .05;
+    let verticalAccel;
+    if(neutralBand){
+      verticalAccel = (f.hover ? (lift * tiltCos - g) : (0 - f.vy) * 1.8);
+    } else if(f.power > .59 || (input.throttle || 0) > .05){
+      const mixFactor = Math.min(1, tiltCos + .16);
+      verticalAccel = lift * mixFactor - g - f.vy * .42;
     } else {
-      verticalAccel -= f.vy * 0.55;
+      verticalAccel = lift * tiltCos - g - f.vy * .65;
     }
     f.vy += verticalAccel * dt;
 
@@ -140,7 +149,7 @@ function stepHelicopter(f, input, dt = simTick){
       const horizontal = Math.hypot(f.vx, f.vz);
       const frame = f.destination ? runwayCoordinates(f.x, f.z, f.destination) : { along: 0, cross: 0 };
       f.touchdown = { ...frame, verticalSpeed: f.vy, speed: horizontal };
-      f.landed = f.vy > -3 && horizontal < 8 && Math.abs(f.bank) < .23 && Math.abs(f.pitch) < .23;
+      f.landed = f.vy > -6.5 && horizontal < 18 && Math.abs(f.bank) < .38 && Math.abs(f.pitch) < .38;
       f.ended = !f.landed; f.ground = true; f.hover = null; f.y = landingFloor;
       f.vx = f.vy = f.vz = 0; f.pitch = f.bank = f.pitchRate = f.bankRate = 0;
     }

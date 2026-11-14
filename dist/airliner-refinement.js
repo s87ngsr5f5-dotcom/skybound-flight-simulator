@@ -38,39 +38,51 @@ function refineAirliner(model,{twin=false}={}){
     if(oldPanel.type==='Group'&&Math.abs(oldPanel.position.z-(-half*.56-.63))<.1) oldPanel.visible=false;
   }
   const cockpitZ=-half*.56, cockpitY=radius*.17;
+  const archMat=new THREE.MeshStandardMaterial({color:0x182028,roughness:.62,metalness:.22});
+  // Solid instrument console housing + flush glareshield coaming (zero gaps!)
+  box(cabin,archMat,3.52,1.08,.48,0,cockpitY+.06,cockpitZ-1.38);
+  const glareshield=box(cabin,trim,3.58,.095,.48,0,cockpitY+.49,cockpitZ-1.24);
+  glareshield.rotation.x=.06;
   box(cabin,trim,3.65,.12,1.60,0,cockpitY-.52,cockpitZ-.75);
-  box(cabin,trim,.52,.45,2.1,0,cockpitY-.52,cockpitZ+.17);
+  box(cabin,trim,.56,.44,2.1,0,cockpitY-.52,cockpitZ+.17);
+  // High unobstructed upper windshield brow & crisp swept A-pillars connecting corners
+  box(cabin,archMat,3.44,.09,.28,0,cockpitY+1.38,cockpitZ-1.14);
+  const centerMullion=box(cabin,archMat,.045,.94,.055,0,cockpitY+.93,cockpitZ-1.18);
+  centerMullion.rotation.x=-.20;
   for(const side of [-1,1]){
-    box(cabin,trim,.12,1.4,1.8,side*1.8,cockpitY+.62,cockpitZ-.55);
-    box(cabin,metal,.035,1.25,.07,side*.62,cockpitY+.92,cockpitZ-1.48);
+    box(cabin,trim,.12,.52,1.8,side*1.74,cockpitY-.20,cockpitZ-.55);
+    const outerPillar=box(cabin,archMat,.06,.96,.08,side*1.58,cockpitY+.93,cockpitZ-1.18);
+    outerPillar.rotation.x=-.20;outerPillar.rotation.z=side*.10;
     const seat=box(cabin,trim,.65,.8,.17,side*.83,cockpitY-.1,cockpitZ+1.1);
     seat.rotation.x=-.13;
     box(cabin,trim,.68,.15,.75,side*.83,cockpitY-.50,cockpitZ+.8);
   }
-  if(twin){
-    const yokeMat=new THREE.MeshStandardMaterial({color:0x2a3038,roughness:.66});
-    box(cabin,trim,3.62,.10,.48,0,cockpitY+.71,cockpitZ-1.28);
-    for(const side of [-1,1]){
-      const x=side*.77;
-      const column=box(cabin,yokeMat,.08,.62,.09,x,cockpitY-.36,cockpitZ-.39);
-      column.rotation.x=-.18;
-      const yoke=new THREE.Mesh(new THREE.TorusGeometry(.178,.031,9,32,Math.PI*1.24),yokeMat);
-      yoke.position.set(x,cockpitY-.09,cockpitZ-.42);
-      yoke.rotation.z=Math.PI*.88;
-      cabin.add(yoke);
-      box(cabin,trim,.16,.10,.055,x,cockpitY-.10,cockpitZ-.40);
-    }
-    for(let row=0;row<3;row++){
-      for(let column=0;column<5;column++){
-        box(cabin,metal,.075,.025,.07,(column-2)*.104,cockpitY-.22,cockpitZ+.37+row*.10);
-      }
+  const yokeMat=new THREE.MeshStandardMaterial({color:0x2a3038,roughness:.66});
+  const yokePivots=[], throttleLevers=[];
+  for(const side of [-1,1]){
+    const x=side*.56;
+    const pivot=new THREE.Group();
+    pivot.position.set(x,cockpitY-.34,cockpitZ-.56);
+    const column=box(pivot,yokeMat,.07,.48,.075,0,.22,0);
+    column.rotation.x=-.14;
+    const wheel=new THREE.Mesh(new THREE.TorusGeometry(.16,.026,9,32,Math.PI*1.24),yokeMat);
+    wheel.position.set(0,.44,-.02);
+    wheel.rotation.z=Math.PI*.88;
+    pivot.add(wheel);
+    box(pivot,trim,.14,.085,.05,0,.43,0);
+    cabin.add(pivot);
+    yokePivots.push({pivot,wheel});
+  }
+  for(let row=0;row<3;row++){
+    for(let column=0;column<5;column++){
+      box(cabin,metal,.075,.025,.07,(column-2)*.104,cockpitY-.22,cockpitZ+.37+row*.10);
     }
   }
   const panelCanvas=document.createElement('canvas');panelCanvas.width=1536;panelCanvas.height=512;
   const ctx=panelCanvas.getContext('2d');
   const screenTexture=new THREE.CanvasTexture(panelCanvas);screenTexture.colorSpace=THREE.SRGBColorSpace;
-  const screen=new THREE.Mesh(new THREE.PlaneGeometry(3.35,1.02),new THREE.MeshBasicMaterial({map:screenTexture}));
-  screen.position.set(0,cockpitY+.21,cockpitZ-1.33);cabin.add(screen);
+  const screen=new THREE.Mesh(new THREE.PlaneGeometry(3.25,.88),new THREE.MeshBasicMaterial({map:screenTexture}));
+  screen.position.set(0,cockpitY+.02,cockpitZ-1.275);screen.rotation.x=-.10;cabin.add(screen);
   const switches=[];
   const actions=twin?['電瓶','引擎 1','引擎 2','燈光','起落架','襟翼']:
     ['電瓶','引擎 1','引擎 2','引擎 3','引擎 4','燈光','起落架','襟翼'];
@@ -79,8 +91,15 @@ function refineAirliner(model,{twin=false}={}){
     button.userData.action=actions[i];
     switches.push(button);
   }
-  box(cabin,trim,2.4,.10,.65,0,cockpitY+1.38,cockpitZ-.57);
-  for(let i=0;i<(twin?2:4);i++)box(cabin,metal,.045,.18,.12,-.16+i*.105,cockpitY-.18,cockpitZ+.20);
+  box(cabin,trim,2.2,.08,.55,0,cockpitY+1.65,cockpitZ-.28);
+  for(let i=0;i<(twin?2:4);i++){
+    const leverPivot=new THREE.Group();
+    leverPivot.position.set((i-(twin?.5:1.5))*.105,cockpitY-.28,cockpitZ+.20);
+    box(leverPivot,metal,.038,.20,.045,0,.10,0);
+    box(leverPivot,trim,.065,.055,.07,0,.21,-.01);
+    cabin.add(leverPivot);
+    throttleLevers.push(leverPivot);
+  }
   let last=-1;
   function update(f,now,day){
     if(now-last<120)return;last=now;
@@ -127,7 +146,20 @@ function refineAirliner(model,{twin=false}={}){
     }
     screenTexture.needsUpdate=true;
   }
-  return {update,switches};
+  function animateControls(f,dt){
+    if(!f)return;
+    const roll=f.manualControls?.roll??0;
+    const pitch=f.manualControls?.pitch??0;
+    const pwr=Math.max(0,Math.min(1,f.power??0));
+    const lerp=Math.min(1,(dt||.016)*14);
+    for(const y of yokePivots){
+      y.pivot.rotation.x+=(pitch*.18-.10-y.pivot.rotation.x)*lerp;
+      y.wheel.rotation.z+=(Math.PI*.88-roll*.62-y.wheel.rotation.z)*lerp;
+    }
+    const targetThr=.22-pwr*.76;
+    for(const lv of throttleLevers) lv.rotation.x+=(targetThr-lv.rotation.x)*lerp;
+  }
+  return {update,animateControls,switches};
 }
 
 

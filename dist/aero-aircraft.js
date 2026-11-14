@@ -440,6 +440,71 @@
     return g;
   }
 
+  let _panelBump = null;
+  function getPanelBumpTexture(THREE) {
+    if (_panelBump || !THREE || typeof document === 'undefined') return _panelBump;
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#808080';
+    g.fillRect(0, 0, 256, 256);
+    // Subtle aerospace aluminum panel seams
+    g.strokeStyle = '#5a5a5a';
+    g.lineWidth = 1.25;
+    for (let p = 0; p < 256; p += 64) {
+      g.beginPath(); g.moveTo(0, p + 0.5); g.lineTo(256, p + 0.5); g.stroke();
+      g.beginPath(); g.moveTo(p + 0.5, 0); g.lineTo(p + 0.5, 256); g.stroke();
+    }
+    // Micro rivet rows along seams
+    g.fillStyle = '#a4a4a4';
+    for (let x = 6; x < 256; x += 12) {
+      for (let y = 0; y < 256; y += 64) {
+        g.fillRect(x, y + 3, 1.5, 1.5);
+        g.fillRect(y + 3, x, 1.5, 1.5);
+      }
+    }
+    _panelBump = new THREE.CanvasTexture(c);
+    _panelBump.wrapS = _panelBump.wrapT = THREE.RepeatWrapping;
+    _panelBump.repeat.set(6, 4);
+    return _panelBump;
+  }
+
+  let _propBlurTex = null;
+  function getPropBlurTexture(THREE) {
+    if (_propBlurTex || !THREE || typeof document === 'undefined') return _propBlurTex;
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    const g = c.getContext('2d');
+    const rg = g.createRadialGradient(128, 128, 12, 128, 128, 126);
+    rg.addColorStop(0.0, 'rgba(220, 228, 236, 0.05)');
+    rg.addColorStop(0.45, 'rgba(180, 195, 210, 0.24)');
+    rg.addColorStop(0.86, 'rgba(215, 225, 235, 0.34)');
+    rg.addColorStop(0.95, 'rgba(255, 228, 110, 0.42)');
+    rg.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    g.fillStyle = rg;
+    g.fillRect(0, 0, 256, 256);
+    // Radial sweep streaks for motion blur illusion
+    for (let i = 0; i < 6; i++) {
+      g.save();
+      g.translate(128, 128);
+      g.rotate((i / 6) * Math.PI * 2);
+      const sg = g.createLinearGradient(0, -12, 124, 12);
+      sg.addColorStop(0, 'rgba(255,255,255,0)');
+      sg.addColorStop(0.5, 'rgba(240,248,255,0.22)');
+      sg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = sg;
+      g.beginPath();
+      g.moveTo(10, 0);
+      g.arc(0, 0, 122, -0.18, 0.18);
+      g.closePath();
+      g.fill();
+      g.restore();
+    }
+    _propBlurTex = new THREE.CanvasTexture(c);
+    _propBlurTex.colorSpace = THREE.SRGBColorSpace;
+    return _propBlurTex;
+  }
+
   globalScope.AeroCraft = {
     nacaSection,
     buildWingLoft,
@@ -452,6 +517,8 @@
     buildTurbofanNacelle,
     buildBlendedWinglet,
     buildTwistedBlade,
-    buildAeroMissile
+    buildAeroMissile,
+    getPanelBumpTexture,
+    getPropBlurTexture
   };
 })(typeof window !== 'undefined' ? window : globalThis);

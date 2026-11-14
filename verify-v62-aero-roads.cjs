@@ -154,7 +154,7 @@ function makeMockThree() {
 
   for (const htmlName of ['index.html', 'iphone.html']) {
     const html = fs.readFileSync(path.join(distDir, htmlName), 'utf8');
-    assert.ok(html.includes('>0.62<'), `${htmlName} must show version 0.62`);
+    assert.ok(/>0\.6[23]</.test(html), `${htmlName} must show version 0.62 or 0.63`);
     assert.ok(html.includes('aero-ui-v62.css?v=62'), `${htmlName} must load aero-ui-v62.css?v=62`);
     assert.ok(html.includes('aero-aircraft.js?v=62'), `${htmlName} must load aero-aircraft.js?v=62`);
     assert.ok(html.includes('id="desktopControlDeck"'), `${htmlName} must include #desktopControlDeck`);

@@ -403,6 +403,16 @@ function createTaiwanCity(scene,ground,airports){
     }
   }
   stats.landmarks=landmarkSites.length;
+  if(typeof BuildingCollision!=='undefined'&&typeof THREE.Box3==='function'){
+    landmarkSites.forEach((site,i)=>{
+      try{
+        const g=landmarkGroups[i];if(!g)return;
+        const box=new THREE.Box3().setFromObject(g);
+        const h=box.max.y-g.position.y;
+        if(Number.isFinite(h)&&h>8){const gy=ground(site.x,site.z);BuildingCollision.addCircle('tw:landmarks',site.x,site.z,site.radius*.5,gy+h,gy-2);}
+      }catch(e){}
+    });
+  }
 
   const skipBuilding=(x,z)=>{
     const ll=latLon(x,z);
@@ -475,6 +485,8 @@ function createTaiwanCity(scene,ground,airports){
   function* buildTile(key,data){
     const group=new THREE.Group();group.name='Taiwan city tile '+key;
     group.userData.masks=[];
+    const BC=typeof BuildingCollision!=='undefined'?BuildingCollision:null;
+    if(BC)BC.clearGroup('tw:'+key);
     const walls=buffers(),glazed=buffers(),techs=buffers(),roofs=buffers();
     let built=0;
     for(const [x,z,h,tone,kind,coords] of data.b){
@@ -499,6 +511,7 @@ function createTaiwanCity(scene,ground,airports){
         base-=.45;
       }
       const top=center+h;
+      if(BC){const sx=(maxX-minX)*.06,sz=(maxZ-minZ)*.06;BC.add('tw:'+key,minX+sx,minZ+sz,maxX-sx,maxZ-sz,top,base);}
       const col=palette[tone%palette.length].clone().multiplyScalar(h>70?.80:1);
       const cr=col.r,cg=col.g,cb=col.b;
       const isGlazed=(kind===1||h>=36);
@@ -530,6 +543,7 @@ function createTaiwanCity(scene,ground,airports){
     stats.buildings-=group.userData.buildings||0;
     for(const [k,rect] of group.userData.masks){const cell=masks.get(k);if(cell){cell.delete(rect);if(!cell.size)masks.delete(k);}}
     group.traverse(o=>o.geometry?.dispose());
+    if(typeof BuildingCollision!=='undefined')BuildingCollision.clearGroup('tw:'+key);
     root.remove(group);loaded.delete(key);stats.tiles=loaded.size;stats.maskRevision++;
   }
 
@@ -612,6 +626,8 @@ function createTaiwanCity(scene,ground,airports){
     const tx0=Math.floor((x-maxR)/tileSz),tx1=Math.floor((x+maxR)/tileSz);
     const tz0=Math.floor((z-maxR)/tileSz),tz1=Math.floor((z+maxR)/tileSz);
     let nRes=0,nOff=0,nTech=0;
+    const BC=typeof BuildingCollision!=='undefined'?BuildingCollision:null;
+    if(BC)BC.clearGroup('tw:infill');
     for(let tx=tx0;tx<=tx1;tx++){
       for(let tz=tz0;tz<=tz1;tz++){
         const k=tx+'_'+tz;
@@ -649,6 +665,7 @@ function createTaiwanCity(scene,ground,airports){
             dummyObj.rotation.set(0,-ang+((seed&1)?0:Math.PI*0.5),0);
             dummyObj.scale.set(bw,bh,bd);
             dummyObj.updateMatrix();
+            if(BC&&d2<2500*2500){const hr=Math.max(bw,bd)*.42;BC.add('tw:infill',bx-hr,bz-hr,bx+hr,bz+hr,gy-0.55+bh,gy-2);}
             if(kind===2&&nTech<MAX_TECH_INST){
               infillTech.setMatrixAt(nTech,dummyObj.matrix);infillTech.setColorAt(nTech,col);nTech++;
             }else if((kind===1||bh>=28)&&nOff<MAX_OFF_INST){

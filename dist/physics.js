@@ -296,13 +296,13 @@ function stepTrainer(f, input, dt=simTick){
   // Manual ailerons command a roll rate, not a limited bank-angle target.
   // Assisted navigation retains its bank-angle controller for stable approaches.
   if(!f.ground&&!attitudeAssist){
-    const maxRollRate=aircraft.rollRate??(aircraft.role==='fighter'?2.8:aircraft.mass>20000?.48:1.05);
+    const maxRollRate=aircraft.rollRate??(aircraft.role==='fighter'?3.05:aircraft.mass>20000?.56:1.18);
     const authority=limit(q/600,.08,1)*highSpeedAuthority;
     let rate=input.roll*maxRollRate*authority;
-    if(input.autoLevel&&Math.abs(input.roll)<.035)rate=limit(-wrapAngle(f.bank)*1.5,-maxRollRate*.55,maxRollRate*.55);
-    const responseTime=aircraft.role==='fighter'?.18:aircraft.mass>20000?.65:.30;
+    if(input.autoLevel&&Math.abs(input.roll)<.035)rate=limit(-wrapAngle(f.bank)*1.7,-maxRollRate*.60,maxRollRate*.60);
+    const responseTime=aircraft.role==='fighter'?.13:aircraft.mass>20000?.48:.22;
     const settling=Math.abs(rate)<Math.abs(f.bankRate)&&rate*f.bankRate>=0;
-    f.bankRate+=(rate-f.bankRate)*(1-Math.exp(-dt/(responseTime*(settling?.45:1))));
+    f.bankRate+=(rate-f.bankRate)*(1-Math.exp(-dt/(responseTime*(settling?.42:1))));
   }else f.bankRate+=bankMoment/aircraft.inertia[1]*dt;
   // Actual lateral lift stays finite at 90 degrees; tan(bank) does not.
   const coordinatedYaw=attitudeAssist?Math.tan(limit(f.bank,-1.2,1.2))*g/Math.max(20,speed):

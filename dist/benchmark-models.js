@@ -10,9 +10,10 @@ function buildBenchmarkAirframe(profile,scene){
   const fuselageHeight=antonov?1.12:noseLoader?1.06:1.18;
   const detailed=profile.role==='passenger'&&engineCount===2;
   const color=fighter?0x778798:freight?0xd9e2e4:0xf2f5f7;
-  const surface=new THREE.MeshPhysicalMaterial({color,roughness:detailed?.30:.44,metalness:fighter?.30:.12,clearcoat:.85,clearcoatRoughness:.12});
+  const panelBump=typeof AeroCraft!=='undefined'?AeroCraft.getPanelBumpTexture(THREE):null;
+  const surface=new THREE.MeshPhysicalMaterial({color,roughness:detailed?.30:.44,metalness:fighter?.30:.12,clearcoat:.85,clearcoatRoughness:.12,bumpMap:panelBump,bumpScale:.014});
   const stockColor=profile.trimColor??(fighter?0x556571:freight?0x173d5d:0x146a80);
-  const paint=new THREE.MeshPhysicalMaterial({color:stockColor,roughness:.32,clearcoat:.85,clearcoatRoughness:.12});
+  const paint=new THREE.MeshPhysicalMaterial({color:stockColor,roughness:.32,clearcoat:.85,clearcoatRoughness:.12,bumpMap:panelBump,bumpScale:.012});
   const rubber=new THREE.MeshStandardMaterial({color:0x151a1e,roughness:.94});
   const metal=new THREE.MeshStandardMaterial({color:0x667886,roughness:.28,metalness:.68});
   const dark=new THREE.MeshStandardMaterial({color:0x14212b,roughness:.66});
@@ -52,6 +53,7 @@ function buildBenchmarkAirframe(profile,scene){
     const t=Math.max(0,Math.min(1,(z-a[0])/(b[0]-a[0])));
     return a[1]+(b[1]-a[1])*t*t*(3-2*t);
   }
+  const cockpitGlassMats=[glazing];
   if(fighter){
     const radome=surface.clone();
     radome.color.setHex(0x54616b);
@@ -208,6 +210,7 @@ function buildBenchmarkAirframe(profile,scene){
       }
       const windowFrame=new THREE.MeshStandardMaterial({color:0x35434b,roughness:.41,side:THREE.DoubleSide});
       const windshield=glazing.clone();windshield.side=THREE.DoubleSide;
+      cockpitGlassMats.push(windshield);
       if(noseLoader){
         const stripe=paint.clone();stripe.side=THREE.DoubleSide;
         for(const side of [-1,1]) for(const [start,end] of [[-.70,-.47],[-.47,.43],[.43,.72]]){
@@ -567,10 +570,12 @@ function buildBenchmarkAirframe(profile,scene){
   const passengerCabin=profile.role==='passenger'?buildPassengerCabin(profile,cabin,group):null;
   const palletMeshes=[];
   if(!fighter){
-    block(cabin,cabinFloor,radius*1.63,.15,half*1.35,0,-.78,0);
+    const deckBulkhead=-half*.49;
+    const deckBack=half*.66;
+    block(cabin,cabinFloor,radius*1.63,.14,Math.max(2,deckBack-deckBulkhead),0,-.78,(deckBulkhead+deckBack)/2);
     for(let i=0;i<8;i++){
       for(const side of [-1,1]){
-        block(cabin,light,.15,.07,1.7,side*radius*.52,radius*.71,-half*.54+i*half*.14);
+        block(cabin,light,.15,.07,1.5,side*radius*.52,radius*.71,-half*.44+i*half*.13);
 
       }
     }
@@ -602,7 +607,7 @@ function buildBenchmarkAirframe(profile,scene){
   lamps.push(tailLight);
   cabin.visible=false;
   scene.add(group,cabin);
-  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,strobes,beacons,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,airBrakes,exhaustPlumes,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
+  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,strobes,beacons,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,airBrakes,exhaustPlumes,cockpitGlassMats,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
   return group;
 }
 
@@ -629,8 +634,9 @@ function buildPassengerCabin(profile,cabin,airframe){
   const shell=new THREE.MeshStandardMaterial({color:0xd6dfe3,side:THREE.DoubleSide,roughness:.88});
   const trim=new THREE.MeshStandardMaterial({color:0x516474,roughness:.86});
   const ceiling=new THREE.MeshStandardMaterial({color:0xe4eef2,emissive:0x91c3de,emissiveIntensity:.4});
-  const cabinLength=lastZ-firstZ+4;
-  const mid=(firstZ+lastZ)/2;
+  const cabinStart=Math.max(firstZ-0.35,-half*.49);
+  const cabinLength=Math.max(2,lastZ+1.6-cabinStart);
+  const mid=(cabinStart+lastZ+1.6)/2;
   function block(mat,x,y,z,width,height,length){
     const mesh=new THREE.Mesh(new THREE.BoxGeometry(width,height,length),mat);
     mesh.position.set(x,y,z);cabin.add(mesh);return mesh;

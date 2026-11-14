@@ -194,6 +194,7 @@ function createTaipeiCity(scene,ground,airports){
   function box(parent,mat,w,h,d,x,y,z){return add(parent,new THREE.BoxGeometry(w,h,d),mat,x,y,z);}
   for(const site of landmarkSites){
     const p=geoPoint(site.lat,site.lon);Object.assign(site,p);
+    if(typeof BuildingCollision!=='undefined'){const gy=ground(p.x,p.z);BuildingCollision.addCircle('tp:landmarks',p.x,p.z,site.radius*.55,gy+site.height,gy-2);}
     const group=new THREE.Group();group.name=site.name;group.position.set(p.x,ground(p.x,p.z),p.z);
     group.userData={height:site.height,source:'Original simplified landmark geometry; see TAIPEI-3D.txt'};landmarks.add(group);
     if(site.type==='101'){
@@ -443,6 +444,8 @@ function createTaipeiCity(scene,ground,airports){
   function* build(key,data){
     const group=new THREE.Group();group.name='Taipei tile '+key;
     group.userData.masks=[];
+    const BC=typeof BuildingCollision!=='undefined'?BuildingCollision:null;
+    if(BC)BC.clearGroup('tp:'+key);
     const walls=buffers(),glazed=buffers(),roofs=buffers(),roads=buffers(),curbs=buffers(),lines=buffers(),waters=buffers();
     let built=0;
     for(const [x,z,h,tone,kind,coords] of data.b){
@@ -466,6 +469,7 @@ function createTaipeiCity(scene,ground,airports){
         base-=.25;
       }
       const top=center+h,color=palette[tone].clone().multiplyScalar(h>75?.76:1);
+      if(BC){const sx=(maxX-minX)*.06,sz=(maxZ-minZ)*.06;BC.add('tp:'+key,minX+sx,minZ+sz,maxX-sx,maxZ-sz,top,base);}
       const cr=color.r,cg=color.g,cb=color.b;
       const isGlazed=h>50||kind===1&&h>25;
       const facadeTarget=isGlazed?glazed:walls;
@@ -561,6 +565,7 @@ function createTaipeiCity(scene,ground,airports){
     stats.buildings-=group.userData.buildings;stats.roads-=group.userData.roads;
     for(const [key,rect] of group.userData.masks){const cell=masks.get(key);cell.delete(rect);if(!cell.size)masks.delete(key);}
     group.traverse(o=>o.geometry?.dispose());root.remove(group);loaded.delete(key);stats.tiles=loaded.size;
+    if(typeof BuildingCollision!=='undefined')BuildingCollision.clearGroup('tp:'+key);
     stats.maskRevision++;
   }
   function request(tile){

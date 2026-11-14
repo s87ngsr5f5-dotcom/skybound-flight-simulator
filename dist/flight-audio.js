@@ -134,22 +134,39 @@ function makeFlightAudio(){
     const now=context.currentTime;
     const sub=context.createOscillator(),subGain=context.createGain();
     sub.type='sine';
-    sub.frequency.setValueAtTime(160,now);
-    sub.frequency.exponentialRampToValueAtTime(25,now+.65);
-    subGain.gain.setValueAtTime(Math.min(1,.85*level),now);
-    subGain.gain.exponentialRampToValueAtTime(.0001,now+1.2);
+    sub.frequency.setValueAtTime(195,now);
+    sub.frequency.exponentialRampToValueAtTime(22,now+.95);
+    subGain.gain.setValueAtTime(Math.min(1,.95*level),now);
+    subGain.gain.exponentialRampToValueAtTime(.0001,now+1.65);
     sub.connect(subGain).connect(master);
-    sub.start(now);sub.stop(now+1.25);
+    sub.start(now);sub.stop(now+1.7);
+    const crunch=context.createOscillator(),cGain=context.createGain();
+    crunch.type='sawtooth';
+    crunch.frequency.setValueAtTime(92,now);
+    crunch.frequency.exponentialRampToValueAtTime(28,now+.45);
+    cGain.gain.setValueAtTime(Math.min(1,.55*level),now);
+    cGain.gain.exponentialRampToValueAtTime(.0001,now+.48);
+    crunch.connect(cGain).connect(master);
+    crunch.start(now);crunch.stop(now+.5);
     if(noiseBuffer){
+      const snap=context.createBufferSource(),sFilter=context.createBiquadFilter(),sGain=context.createGain();
+      snap.buffer=noiseBuffer;
+      sFilter.type='bandpass';
+      sFilter.frequency.setValueAtTime(1850,now);
+      sFilter.Q.value=0.9;
+      sGain.gain.setValueAtTime(Math.min(1,.85*level),now);
+      sGain.gain.exponentialRampToValueAtTime(.0001,now+.35);
+      snap.connect(sFilter).connect(sGain).connect(master);
+      snap.start(now);snap.stop(now+.38);
       const blast=context.createBufferSource(),bFilter=context.createBiquadFilter(),bGain=context.createGain();
       blast.buffer=noiseBuffer;
       bFilter.type='lowpass';
-      bFilter.frequency.setValueAtTime(1400,now);
-      bFilter.frequency.exponentialRampToValueAtTime(80,now+1.8);
-      bGain.gain.setValueAtTime(Math.min(1,.95*level),now);
-      bGain.gain.exponentialRampToValueAtTime(.0001,now+2.1);
+      bFilter.frequency.setValueAtTime(2100,now);
+      bFilter.frequency.exponentialRampToValueAtTime(68,now+2.8);
+      bGain.gain.setValueAtTime(Math.min(1,1.0*level),now);
+      bGain.gain.exponentialRampToValueAtTime(.0001,now+3.1);
       blast.connect(bFilter).connect(bGain).connect(master);
-      blast.start(now);blast.stop(now+2.2);
+      blast.start(now);blast.stop(now+3.2);
     }
   }
   function callout(message,urgent=false){

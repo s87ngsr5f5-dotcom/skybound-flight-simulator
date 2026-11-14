@@ -159,7 +159,7 @@ setImmediate(() => setImmediate(() => {
 
   for (const htmlName of ['index.html', 'iphone.html']) {
     const html = fs.readFileSync(path.join(__dirname, 'dist', htmlName), 'utf8');
-    assert.ok(/>0\.6[12]</.test(html), `${htmlName} must display version 0.61 or 0.62`);
+    assert.ok(/>0\.6[1-3]</.test(html), `${htmlName} must display version 0.61-0.63`);
     assert.ok(/taiwan-city\.js\?v=6[12]/.test(html), `${htmlName} must load taiwan-city.js?v=61 or 62`);
   }
   console.log(`  PASS: v0.61 verified (${manifest.counts.taiwanTotalBuildings.toLocaleString()} total Taiwan buildings, ${totalInst} live Taichung infill instances in 3 InstancedMeshes).`);
