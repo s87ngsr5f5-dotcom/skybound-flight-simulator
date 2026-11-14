@@ -224,7 +224,27 @@ function createTaiwanCity(scene,ground,airports){
     {name:'桃園藝文特區中悅世界與總圖生命樹',lat:25.01680,lon:121.30050,radius:75,type:'taoyuan_hub'},
     {name:'宜蘭蘭陽博物館',lat:24.86860,lon:121.83230,radius:65,type:'lanyang'},
     {name:'金門莒光樓',lat:24.42490,lon:118.31830,radius:45,type:'juguang'},
-    {name:'澎湖西瀛虹橋',lat:23.56880,lon:119.56080,radius:95,type:'rainbowbridge'}
+    {name:'澎湖西瀛虹橋',lat:23.56880,lon:119.56080,radius:95,type:'rainbowbridge'},
+    // International Landmarks & Taiwan-Grade 3D City Clusters
+    {name:'東京晴空塔 Tokyo Skytree',lat:35.71006,lon:139.81070,radius:95,type:'tokyo_skytree'},
+    {name:'東京鐵塔 Tokyo Tower',lat:35.65858,lon:139.74543,radius:85,type:'tokyo_tower'},
+    {name:'東京灣彩虹大橋 Rainbow Bridge',lat:35.63660,lon:139.76330,radius:220,type:'suspension_bridge'},
+    {name:'東京丸之內與羽田灣岸摩天樓群',lat:35.61800,lon:139.75800,radius:180,type:'intl_city_cluster',seed:101,count:96,span:2600,maxH:245},
+    {name:'東京羽田空港城區與京濱工業帶',lat:35.55800,lon:139.74200,radius:150,type:'intl_city_cluster',seed:102,count:84,span:2200,maxH:140},
+    {name:'成田山新勝寺大塔與表參道城區',lat:35.78580,lon:140.31830,radius:140,type:'intl_city_cluster',seed:103,count:76,span:2100,maxH:125,pagoda:true},
+    {name:'香港國際金融中心 IFC & 中銀大廈',lat:22.28520,lon:114.15810,radius:180,type:'hk_central'},
+    {name:'香港環球貿易廣場 ICC & 九龍站天際線',lat:22.30340,lon:114.16020,radius:180,type:'hk_icc'},
+    {name:'香港青馬大橋 Tsing Ma Bridge',lat:22.35140,lon:114.07360,radius:240,type:'suspension_bridge'},
+    {name:'香港東涌與赤鱲角灣岸城區',lat:22.28900,lon:113.94100,radius:160,type:'intl_city_cluster',seed:201,count:82,span:2100,maxH:185},
+    {name:'沖繩那霸首里城與國際通都會群',lat:26.21450,lon:127.68400,radius:160,type:'okinawa_naha'},
+    {name:'首爾樂天世界塔 Lotte World Tower',lat:37.51250,lon:127.10250,radius:120,type:'seoul_lotte'},
+    {name:'N首爾塔與南山天際線',lat:37.55120,lon:126.98820,radius:140,type:'seoul_ntower'},
+    {name:'仁川跨海大橋 Incheon Bridge',lat:37.41380,lon:126.56550,radius:260,type:'suspension_bridge'},
+    {name:'仁川松島國際都市摩天樓群',lat:37.44200,lon:126.48600,radius:170,type:'intl_city_cluster',seed:301,count:88,span:2400,maxH:230},
+    {name:'新加坡濱海灣金沙酒店 Marina Bay Sands',lat:1.28340,lon:103.86070,radius:180,type:'sg_mbs'},
+    {name:'新加坡樟宜星耀與金融區摩天樓群',lat:1.34500,lon:103.96200,radius:165,type:'intl_city_cluster',seed:401,count:86,span:2300,maxH:210},
+    {name:'馬尼拉灣摩天輪與 BGC 金融摩天樓群',lat:14.53500,lon:121.00200,radius:175,type:'manila_skyline'},
+    {name:'Formosa Aero Secret Sanctum',lat:25.05850,lon:121.58200,radius:40,type:'secret_monolith'}
   ];
 
   const landmarkGroups=[];
@@ -380,6 +400,157 @@ function createTaiwanCity(scene,ground,airports){
         seg.rotation.z=a*.42;
       }
       box(g,stone,196,2.2,6,0,2,0);
+    }else if(site.type==='tokyo_skytree'){
+      box(g,stone,88,28,88,0,14,0);
+      cyl(g,whiteFrame,18,34,350,6,0,175,0);
+      cyl(g,officeGlass,24,22,22,18,0,350,0);
+      cyl(g,whiteFrame,10,16,100,12,0,400,0);
+      cyl(g,officeGlass,16,15,16,18,0,450,0);
+      cyl(g,metal,2.2,9,184,12,0,542,0);
+      box(g,beaconMat,3,3,3,0,635,0);
+    }else if(site.type==='tokyo_tower'){
+      for(const sx of [-28,28])for(const sz of [-28,28]){
+        const leg=box(g,pagodaRed,7,125,7,sx*.6,62,sz*.6);
+        leg.rotation.z=sx>0?.18:-.18;leg.rotation.x=sz>0?-.18:.18;
+      }
+      box(g,whiteFrame,42,16,42,0,122,0);
+      cyl(g,pagodaRed,5,14,130,4,0,192,0).rotation.y=Math.PI/4;
+      box(g,whiteFrame,22,12,22,0,252,0);
+      cyl(g,pagodaRed,1.4,4.8,76,8,0,295,0);
+      box(g,beaconMat,2.5,2.5,2.5,0,334,0);
+    }else if(site.type==='suspension_bridge'){
+      for(const sx of [-190,190]){
+        box(g,whiteFrame,14,148,26,sx,74,0);
+        box(g,whiteFrame,16,6,28,sx,115,0);
+        box(g,beaconMat,2.2,2.2,2.2,sx,150,0);
+      }
+      box(g,roadMat,680,4.5,24,0,46,0);
+      for(let i=-12;i<=12;i++){
+        const t=(Math.abs(i)%6)/6,cy=48+88*t*t;
+        box(g,whiteFrame,2.2,cy-46,2.2,i*26,46+(cy-46)/2,11);
+        box(g,whiteFrame,2.2,cy-46,2.2,i*26,46+(cy-46)/2,-11);
+      }
+    }else if(site.type==='hk_central'){
+      // IFC 2 (415m) + Bank of China prism (367m) + Central Harbourfront towers
+      box(g,stone,74,26,74,0,13,0);
+      box(g,officeGlass,52,375,52,0,200,0);
+      for(const s of [-25,25])box(g,whiteFrame,4.5,398,14,s,206,0);
+      cyl(g,metal,12,26,24,8,0,400,0);
+      box(g,beaconMat,2.8,2.8,2.8,0,415,0);
+      // Bank of China Tower nearby
+      box(g,darkGlass,44,295,44,125,148,45);
+      cyl(g,whiteFrame,2,28,72,4,125,331,45).rotation.y=Math.PI/4;
+      cyl(g,metal,.8,1.6,38,6,125,368,45);
+      for(let i=0;i<36;i++){
+        const a=i*2.39996,r=140+((i*53)%780);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r;
+        const bh=65+((i*41)%195),bw=24+((i*17)%22);
+        box(g,i%2?officeGlass:darkGlass,bw,bh,bw,bx,bh/2,bz);
+        if(bh>140)box(g,beaconMat,1.8,1.8,1.8,bx,bh+1.5,bz);
+      }
+    }else if(site.type==='hk_icc'){
+      box(g,stone,82,32,82,0,16,0);
+      box(g,officeGlass,58,438,58,0,235,0);
+      box(g,whiteFrame,60,18,60,0,462,0);
+      box(g,beaconMat,3,3,3,0,484,0);
+      for(let i=0;i<32;i++){
+        const a=i*2.39996,r=135+((i*61)%680);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=58+((i*37)%165);
+        box(g,i%3?officeGlass:wall,26,bh,24,bx,bh/2,bz);
+      }
+    }else if(site.type==='okinawa_naha'){
+      // Shuri Castle vermilion hall + Naha Kokusai-dori city blocks
+      box(g,stone,74,12,56,0,6,0);
+      box(g,pagodaRed,48,18,32,0,21,0);
+      cyl(g,pagodaRed,16,32,10,4,0,35,0).rotation.y=Math.PI/4;
+      cyl(g,gold,1.2,2.5,6,6,0,42,0);
+      for(let i=0;i<54;i++){
+        const a=i*2.39996,r=120+((i*73)%1350);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=24+((i*29)%88),bw=22+((i*13)%18);
+        box(g,i%3===0?officeGlass:wall,bw,bh,bw,bx,bh/2,bz);
+      }
+      box(g,roadMat,1800,1.2,18,0,1.2,90);
+    }else if(site.type==='seoul_lotte'){
+      cyl(g,officeGlass,11,36,515,16,0,258,0);
+      cyl(g,whiteFrame,10,13,40,12,0,535,0);
+      box(g,beaconMat,3,3,3,0,556,0);
+      for(let i=0;i<38;i++){
+        const a=i*2.39996,r=140+((i*67)%860);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=55+((i*43)%155);
+        box(g,i%2?officeGlass:darkGlass,26,bh,26,bx,bh/2,bz);
+      }
+    }else if(site.type==='seoul_ntower'){
+      box(g,stone,44,18,44,0,9,0);
+      cyl(g,whiteFrame,7.5,9.5,145,16,0,82,0);
+      cyl(g,officeGlass,18,16,18,20,0,162,0);
+      cyl(g,metal,1.2,3.2,68,10,0,204,0);
+      box(g,beaconMat,2.4,2.4,2.4,0,239,0);
+    }else if(site.type==='sg_mbs'){
+      // Marina Bay Sands 3 iconic towers + SkyPark ship deck + Supertrees + CBD
+      for(const sx of [-68,0,68]){
+        box(g,officeGlass,28,194,46,sx,97,0);
+        box(g,whiteFrame,30,194,4,sx,97,22);
+      }
+      box(g,whiteFrame,210,9,54,18,198,0);
+      cyl(g,officeGlass,24,14,16,16,95,8,65);
+      // Supertrees
+      for(const [tx,tz,th] of [[-85,-95,48],[-35,-115,52],[25,-105,45]]){
+        cyl(g,pagodaRed,2.5,5.5,th,10,tx,th/2,tz);
+        cyl(g,gold,16,4,5,12,tx,th,tz);
+      }
+      for(let i=0;i<44;i++){
+        const a=i*2.39996,r=160+((i*71)%980);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=75+((i*47)%185);
+        box(g,i%2?officeGlass:darkGlass,28,bh,26,bx,bh/2,bz);
+      }
+    }else if(site.type==='manila_skyline'){
+      // MOA Eye Ferris Wheel + Makati/BGC high-rises
+      cyl(g,whiteFrame,55,55,4,24,-120,62,80).rotation.x=Math.PI/2;
+      box(g,metal,6,65,12,-120,32,80);
+      for(let i=0;i<68;i++){
+        const a=i*2.39996,r=85+((i*79)%1450);
+        const bx=Math.cos(a)*r,bz=Math.sin(a)*r,bh=42+((i*53)%195),bw=24+((i*19)%22);
+        box(g,i%3===0?darkGlass:i%2?officeGlass:wall,bw,bh,bw,bx,bh/2,bz);
+        if(bh>150)box(g,beaconMat,1.8,1.8,1.8,bx,bh+1.5,bz);
+      }
+      box(g,roadMat,2100,1.2,20,0,1.2,0);
+    }else if(site.type==='intl_city_cluster'){
+      const cnt=site.count||80,span=site.span||2200,maxH=site.maxH||180,sd=site.seed||101;
+      if(site.pagoda){
+        for(let t=0;t<5;t++){
+          const y=4+t*8.5,r=14-t*1.6;
+          box(g,pagodaRed,r*1.5,5.5,r*1.5,0,y+2.5,0);
+          cyl(g,pagodaGreen,r*.5,r*1.4,3,4,0,y+6.8,0).rotation.y=Math.PI/4;
+        }
+        cyl(g,gold,.5,1.8,12,8,0,52,0);
+      }
+      box(g,roadMat,span*.85,1.2,18,0,1.0,0);
+      box(g,roadMat,18,1.2,span*.85,0,1.0,0);
+      for(let i=1;i<=cnt;i++){
+        const h1=Math.sin(i*12.9898+sd)*43758.5453,u1=h1-Math.floor(h1);
+        const h2=Math.sin(i*78.233+sd*1.7)*43758.5453,u2=h2-Math.floor(h2);
+        const h3=Math.sin(i*37.719+sd*2.3)*43758.5453,u3=h3-Math.floor(h3);
+        const r=95+Math.pow(u1,.72)*(span*.5);
+        const ang=u2*Math.PI*2;
+        const bx=Math.cos(ang)*r,bz=Math.sin(ang)*r;
+        const distRatio=1-Math.min(1,r/(span*.55));
+        const bh=Math.round(22+(maxH-22)*Math.pow(u3,1.35)*(0.45+0.55*distRatio));
+        const bw=18+Math.round((u1*22)%18),bd=18+Math.round((u2*22)%18);
+        const matPick=bh>95?(i%2?officeGlass:darkGlass):(i%3===0?officeGlass:wall);
+        box(g,matPick,bw,bh,bd,bx,bh/2,bz);
+        if(bh>115){
+          box(g,whiteFrame,bw+1.5,3,bd+1.5,bx,bh+1.5,bz);
+          box(g,beaconMat,1.8,1.8,1.8,bx,bh+4,bz);
+        }
+        if(typeof BuildingCollision!=='undefined'&&bh>28){
+          const wx=site.x+bx,wz=site.z+bz,gy=ground(wx,wz);
+          BuildingCollision.addBox('intl:'+site.seed,wx-bw*.45,wz-bd*.45,wx+bw*.45,wz+bd*.45,gy+bh,gy-2);
+        }
+      }
+    }else if(site.type==='secret_monolith'){
+      cyl(g,gold,18,18,3,24,0,145,0).rotation.x=Math.PI/2;
+      box(g,darkBasalt,8,38,3,0,145,0);
+      box(g,beaconMat,2.4,2.4,2.4,0,168,0);
     }
     g.updateMatrixWorld(true);
     const batches=new Map();
@@ -752,7 +923,9 @@ function createTaiwanCity(scene,ground,airports){
 
   function update(dt,x,z,quality,activeDay,wet){
     clock+=Math.min(dt,.1);day=activeDay;
-    const at=latLon(x,z),near=at.lat>21.6&&at.lat<26.6&&at.lon>117.9&&at.lon<122.4;
+    const at=latLon(x,z);
+    const inTaiwan=at.lat>21.6&&at.lat<26.6&&at.lon>117.9&&at.lon<122.4;
+    const near=inTaiwan||landmarkSites.some(s=>Math.hypot(s.x-x,s.z-z)<65000);
     root.visible=near;if(!near)return;
     const mobile=touchControls.mode.value==='mobile';
     const range=mobile?5000:quality==='ultra'?12000:quality==='high'?9600:7400;
@@ -769,7 +942,7 @@ function createTaiwanCity(scene,ground,airports){
     for(let i=0;i<landmarkGroups.length;i++){
       const g=landmarkGroups[i];
       const d=Math.hypot(g.position.x-x,g.position.z-z);
-      const show=d<Math.max(18000,range*1.9);
+      const show=d<Math.max(28000,range*2.4);
       g.visible=show;
       if(show&&!g.userData.grounded){
         g.position.y=ground(g.position.x,g.position.z);

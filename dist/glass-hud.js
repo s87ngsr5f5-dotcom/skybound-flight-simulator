@@ -79,7 +79,7 @@ function makeGlassReadouts(canvas){
     ink.fillStyle=gold;ink.fill();
     capsule(String(Math.round(degrees)%360).padStart(3,'0')+'°',center,compassY+38*unit,gold);
 
-    const tapeOffset=Math.min(width*.31,height*.45);
+    const tapeOffset=Math.min(width*.22,height*.38,Math.max(36*unit,width*.5-76*unit));
     const ias=displayKmh(speeds.ias);
     scaleRail(ias,ias>1100?100:50,center-tapeOffset,y,-1,'IAS',cyan);
     scaleRail(f.y,f.y>5000?100:50,center+tapeOffset,y,1,'ALT m',gold);
@@ -90,14 +90,18 @@ function makeGlassReadouts(canvas){
     const mach='M '+speeds.mach.toFixed(2),power=(f.aircraft.helicopter?'ROTOR ':'THR ')+Math.round(f.power*100)+'%';
     const gText=f.gForce!==undefined?(f.gForce>=0?'+':'')+f.gForce.toFixed(1)+'G':'';
     const geText=f.groundEffect?.active?' · GE':'';
-    if(width>=365&&innerWidth>innerHeight){
-      const iasX=center-tapeOffset-46*unit,right=center+tapeOffset+46*unit;
-      const infoY=y-height*.25;
-      [tas,gs,mach].forEach((text,i)=>label(text,iasX,infoY+i*13*unit,10,'right','rgba(215,235,248,0.88)'));
-      label(power,iasX,infoY+42*unit,11,'right',gold);
-      if(gText) label(gText+geText,iasX,infoY+55*unit,10,'right',(f.gForce>3.0||f.gForce<0.2)?'#ff8a5c':cyan);
-      [vertical,f.aircraft.helicopter?'NR '+Math.round((f.rotorRPM??0)*100)+'%':f.gear?'GEAR DOWN':'GEAR UP',f.hold||f.hover?'AP ENGAGED':'MANUAL',view]
-        .forEach((text,i)=>label(text,right,infoY+i*13*unit,10,'left',i===1&&f.gear?emerald:ice));
+    if(width>=320&&innerWidth>innerHeight){
+      const leftCol=Math.max(44*unit,center-tapeOffset-38*unit);
+      const rightCol=Math.min(width-44*unit,center+tapeOffset+38*unit);
+      const gearText=f.aircraft.helicopter?'NR '+Math.round((f.rotorRPM??0)*100)+'%':f.gear?'GEAR DOWN':'GEAR UP';
+      const apText=f.hold||f.hover?'AP ENGAGED':'MANUAL';
+      [tas,gs,mach].forEach((text,i)=>label(text,leftCol,y+(-56+i*12)*unit,9.5,'center','rgba(215,235,248,0.92)'));
+      label(power,leftCol,y+21*unit,10.5,'center',gold);
+      if(gText) label(gText+geText,leftCol,y+33*unit,9.5,'center',(f.gForce>3.0||f.gForce<0.2)?'#ff8a5c':cyan);
+      label(vertical,rightCol,y-44*unit,9.5,'center',ice);
+      label(gearText,rightCol,y-32*unit,9.5,'center',f.gear?emerald:ice);
+      label(apText,rightCol,y+21*unit,9.5,'center',ice);
+      if(view) label(view,rightCol,y+33*unit,9.5,'center','rgba(215,235,248,0.88)');
     }else{
       label(tas+' · '+gs+' · '+mach+(gText?' · '+gText:''),center,height-22*unit,10,'center','rgba(225,242,255,0.9)');
       label(vertical+' · '+power+' · '+(f.hold?'AP ON':'MANUAL')+geText,center,height-8*unit,10,'center',gold);

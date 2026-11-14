@@ -1386,3 +1386,235 @@ body.flight-ui:not(.mobile-mode) #tacticalGuide button {
     height: 88px;
   }
 }
+
+/* ==========================================================================
+   v0.66: Room Pill in Menu, Aircraft Performance Upgrades, Interactive Radar
+   Map Toolbar, Desktop/Mobile Online Dogfight Bar & Landscape HUD Fit
+   ========================================================================== */
+
+/* 1. Hide giant room badge at top center during flight (moved into 選單 menu),
+      and make it compact when on the menu header */
+#headerMpBtn {
+  font-size: 11px !important;
+  padding: 3px 9px !important;
+  gap: 5px !important;
+  transform: scale(0.92);
+}
+
+body.flight-ui #headerMpBtn {
+  display: none !important;
+}
+
+#quickMpRoomBtn {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(86, 198, 255, 0.42);
+  background: rgba(16, 44, 70, 0.85);
+  color: #78effe;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+/* 2. Wallet badge & Aircraft Performance Upgrades tab */
+.hub-wallet-badge {
+  background: rgba(255, 207, 94, 0.16) !important;
+  border-color: rgba(255, 207, 94, 0.48) !important;
+  color: #ffd875 !important;
+  font-weight: 800 !important;
+}
+
+.hub-upgrade-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(10, 24, 42, 0.88);
+  border: 1px solid rgba(110, 195, 255, 0.28);
+  font-size: 12.5px;
+  color: #bfe6ff;
+}
+
+.hub-upgrade-summary span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(34, 74, 114, 0.45);
+  border: 1px solid rgba(120, 205, 255, 0.25);
+}
+
+.hub-upgrades-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+  gap: 12px;
+}
+
+.hub-upgrade-card {
+  border-radius: 14px;
+  border: 1px solid rgba(135, 198, 255, 0.25);
+  background: linear-gradient(165deg, rgba(14, 28, 48, 0.92), rgba(9, 18, 32, 0.94));
+  padding: 14px 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hub-upgrade-card.maxed {
+  border-color: rgba(255, 210, 96, 0.55);
+  box-shadow: 0 0 18px rgba(255, 204, 84, 0.14);
+}
+
+.hub-upgrade-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hub-upgrade-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 105, 165, 0.28);
+  border: 1px solid rgba(125, 205, 255, 0.28);
+  flex-shrink: 0;
+}
+
+.hub-upgrade-head h4 {
+  margin: 0 0 2px;
+  font-size: 14.5px;
+  color: #f3f8ff;
+}
+
+.hub-upgrade-sub {
+  font-size: 11.5px;
+  color: #82d8ff;
+}
+
+.hub-upgrade-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(215, 232, 252, 0.84);
+}
+
+.upg-pips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.upg-pip {
+  width: 22px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(140, 195, 255, 0.25);
+}
+
+.upg-pip.filled {
+  background: linear-gradient(90deg, #38bdf8, #facc15);
+  border-color: #fde047;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+}
+
+.upg-lv-text {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #ffdf7e;
+}
+
+/* 3. Interactive Radar Map Toolbar (Zoom + / -, Center, World, Direct-To GPS) */
+.radar-map-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 8px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: rgba(9, 24, 38, 0.86);
+  border: 1px solid rgba(105, 205, 255, 0.26);
+}
+
+.radar-zoom-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.radar-zoom-btns button {
+  flex: 1 1 auto;
+  padding: 4px 7px !important;
+  font-size: 11px !important;
+  border-radius: 6px !important;
+  background: rgba(24, 58, 86, 0.85) !important;
+  border: 1px solid rgba(115, 208, 255, 0.32) !important;
+  color: #e6f6ff !important;
+  cursor: pointer;
+}
+
+.radar-zoom-btns button:hover {
+  background: rgba(42, 96, 140, 0.92) !important;
+}
+
+.radar-direct-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #8ce4ff;
+  font-weight: 600;
+}
+
+.radar-direct-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(6, 16, 28, 0.92);
+  border: 1px solid rgba(115, 208, 255, 0.35);
+  color: #f0f8ff;
+  font-size: 11.5px;
+}
+
+/* 4. Fighter Online Combat Bar visible on both Desktop and Mobile when active */
+@media (min-width: 901px) {
+  body.flight-ui #touchFlight {
+    display: block !important;
+    pointer-events: none !important;
+  }
+  body.flight-ui #touchLeft,
+  body.flight-ui #touchRudderControl,
+  body.flight-ui #touchThrottleControl,
+  body.flight-ui #touchQuick > button {
+    display: none !important;
+  }
+  body.flight-ui #touchCombatBar:not([hidden]) {
+    display: flex !important;
+    pointer-events: auto !important;
+    position: fixed !important;
+    left: 16px !important;
+    bottom: 62px !important;
+    z-index: 42 !important;
+    gap: 6px !important;
+    background: rgba(8, 18, 32, 0.82);
+    padding: 6px 8px;
+    border-radius: 11px;
+    border: 1px solid rgba(255, 120, 96, 0.38);
+  }
+}
+
+/* 5. Mobile landscape HUD safety so readouts never collide with ◂ 方向舵 ▸ */
+@media (max-width: 960px) and (orientation: landscape) {
+  body.flight-ui #glassReadouts {
+    width: min(46vw, 76dvh, 410px) !important;
+    height: min(46vw, 76dvh, 410px) !important;
+  }
+}

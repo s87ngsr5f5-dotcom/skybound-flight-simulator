@@ -112,7 +112,7 @@ function initialize(){
   addEventListener('pointerup',e=>{if(ovDrag&&ovDrag.id===e.pointerId) ovDrag=null;});
   addEventListener('pointercancel',()=>{ovDrag=null;});
   function updateTaiwanOverview(f){
-    const visible=!renderer.instrumentOnly&&Boolean(f)&&!f.ground&&f.y>=9000&&!f.tactical&&!replay;
+    const visible=!renderer.instrumentOnly&&Boolean(f)&&!f.tactical&&!replay;
     const farView=!renderer.instrumentOnly&&f?.y>2200&&
       f.x>-300000&&f.x<100000&&f.z>-90000&&f.z<450000;
     if((farView||visible)&&!taiwanOverview){
@@ -1900,7 +1900,7 @@ function initialize(){
       }
       planPreviewAirport=departure;
       const points=isClimb?[departure,...route]:[departure,...route,destination];
-      const overseas=isVoyage||[departure,destination].some(a=>a.code==='RJAA'||a.code==='VHHH'||a.code==='ROAH');
+      const overseas=isVoyage||[departure,destination].some(a=>['RJAA','RJTT','VHHH','ROAH','RKSI','WSSS','RPLL'].includes(a.code));
       const planCanvas=planMap.canvas;
       const planDpr=Math.min(window.devicePixelRatio||1,2);
       const planW=430,planH=440;
@@ -2442,7 +2442,29 @@ function initialize(){
     flightBar.hidden=flightAircraft.hidden=false;
     flightAircraft.textContent=flight.aircraft.name.split(' · ')[0];
     document.body.classList.add('flight-ui');
-    if(typeof window!=='undefined'){window.__skyboundFlight=flight;window.SkyboundCampaign?.closeHub?.();}
+    if(typeof window!=='undefined'){
+      const upgMods=window.SkyboundCampaign?.getUpgradeModifiers?.();
+      if(upgMods&&flight?.aircraft){
+        const baseAc=fleet.find(a=>a.id===flight.aircraft.id)||flight.aircraft;
+        flight.aircraft={
+          ...baseAc,
+          thrust:Math.round((baseAc.thrust||4500)*upgMods.thrustMult),
+          boostThrust:baseAc.boostThrust?Math.round(baseAc.boostThrust*upgMods.thrustMult):baseAc.boostThrust,
+          wingArea:(baseAc.wingArea||16.2)*upgMods.liftMult,
+          inertia:Array.isArray(baseAc.inertia)?baseAc.inertia.map(v=>v/upgMods.agilityMult):baseAc.inertia,
+          stallAngle:(baseAc.stallAngle||0.28)*(1+(upgMods.agilityMult-1)*0.4),
+          fuelIdle:baseAc.fuelIdle?baseAc.fuelIdle*upgMods.fuelBurnMult:baseAc.fuelIdle,
+          fuelPower:baseAc.fuelPower?baseAc.fuelPower*upgMods.fuelBurnMult:baseAc.fuelPower
+        };
+        if(typeof flight.fuel==='number'&&!flight._upgFuelApplied){
+          flight.fuel=Math.round(flight.fuel*upgMods.fuelCapMult);
+          flight._upgFuelApplied=true;
+        }
+        flight.upgradeMods=upgMods;
+      }
+      window.__skyboundFlight=flight;
+      window.SkyboundCampaign?.closeHub?.();
+    }
     if(typeof multiplayer!=='undefined'){
       const r=byId('mpRoomInput')?.value||'8888';
       const c=byId('mpCallsignInput')?.value||('SKY-'+Math.floor(100+Math.random()*900));
@@ -2452,11 +2474,16 @@ function initialize(){
         multiplayer.switchRoom(r,c);
       }
       const headerMp=byId('headerMpBtn');
+      const roomLabel=`🌐 房間 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`;
       if(headerMp){
         headerMp.hidden=false;
         const text=byId('headerMpText');
         if(text) text.textContent=`🌐 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`;
       }
+      const mobMp=byId('mobileMultiplayer');
+      if(mobMp) mobMp.textContent=roomLabel;
+      const quickMp=byId('quickMpRoomBtn');
+      if(quickMp) quickMp.textContent=roomLabel;
     }
     if(typeof resize==='function') resize();
     const isFighterOrCombat = flight?.aircraft?.role === 'fighter' || Boolean(flight?.tactical) || byId('lesson')?.value === 'multiplayer';
@@ -2480,7 +2507,8 @@ function initialize(){
       replay=null;replayControls.hidden=true;
       if(lesson==='tactical'){
         if(approach) throw new Error('請按「開始飛行」載入戰術任務。');
-        flight=makeTacticalFlight(airports.find(a=>a.code==='RCMQ'),selectedAircraft(),tacticalSelection,wind,
+        const tacDep=airports.find(a=>a.code===byId('departure')?.value)||airports.find(a=>a.code==='RCMQ');
+        flight=makeTacticalFlight(tacDep,selectedAircraft(),tacticalSelection,wind,
           byId('tacticalGuided').value==='guided',byId('tacticalDifficulty').value==='advanced');
       }else if(lesson==='range'){
         if(approach) throw new Error('靶場訓練由臺中跑道開始。');
@@ -2729,21 +2757,24 @@ function initialize(){
         rangeShot(flight);
         if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([20,15,30]);
       }
+      else if(flight.aircraft?.role==='fighter'||(typeof multiplayer!=='undefined'&&multiplayer.isCombatMode?.())) {
+        byId('touchCombatMissile')?.click();
+      }
       else {
         const hud=byId('hud');
         setMobilePanel(hud.dataset.mobilePanel==='nav'?'':'nav');
       }
     }
     if(code==='KeyK'&&!paused) {
-      if(flight.tactical) tacticalView.command('gun');
-      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(18);
-    }
-    if(code==='KeyX'&&!paused&&flight.aircraft.role==='fighter') {
-      if(typeof multiplayer!=='undefined'&&multiplayer.isConnected()){
-        multiplayer.sendCombatEvent('flare',{origin:{x:flight.x,y:flight.y,z:flight.z}});
+      if(flight.tactical) {
+        tacticalView.command('gun');
+        if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(18);
+      } else {
+        byId('touchCombatGun')?.click();
       }
-      showPill('✨ 已投放熱焰彈 (Flares Deployed)');
-      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([15,10,15]);
+    }
+    if(code==='KeyX'&&!paused&&(flight.aircraft?.role==='fighter'||(typeof multiplayer!=='undefined'&&multiplayer.isCombatMode?.()))) {
+      byId('touchCombatFlare')?.click();
     }
     if(code==='KeyV'){flight.bankCommand=0;flight.levelWings=true;}
     if(code==='KeyN') cycleCockpitView();
@@ -2771,10 +2802,16 @@ function initialize(){
       if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(22);
     }
     if(code==='KeyT'&&!paused) {
-      const m=typeof weatherStorm!=='undefined'?weatherStorm.cycleWipers():0;
-      const names=['關閉 (OFF)','慢速 (LO)','快速 (HI)'];
-      showPill('🌧️ 擋風玻璃雨刷：'+names[m]);
-      if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(20);
+      if(flight.tactical) {
+        tacticalView.command('next');
+      } else if((flight.aircraft?.role==='fighter'||(typeof multiplayer!=='undefined'&&multiplayer.isCombatMode?.()))&&!['storm','wet'].includes(byId('weather')?.value)) {
+        byId('touchCombatLock')?.click();
+      } else {
+        const m=typeof weatherStorm!=='undefined'?weatherStorm.cycleWipers():0;
+        const names=['關閉 (OFF)','慢速 (LO)','快速 (HI)'];
+        showPill('🌧️ 擋風玻璃雨刷：'+names[m]);
+        if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate(20);
+      }
     }
     if(code==='KeyR'&&!flight.service) start(flight.approach,true);
     if(!flight.regional) return;
@@ -3345,6 +3382,7 @@ function initialize(){
   function updateMpProjectiles(dt,f){
     if(!mpProjectiles.length) return;
     const peers=(typeof multiplayer!=='undefined'&&multiplayer.isConnected())?multiplayer.getPeers():[];
+    const weapMult=f?.upgradeMods?.weaponMult||1;
     for(let i=mpProjectiles.length-1;i>=0;i--){
       const p=mpProjectiles[i];
       p.life-=dt;
@@ -3356,9 +3394,10 @@ function initialize(){
           const toTarget=new THREE.Vector3(target.state.x-p.mesh.position.x,target.state.y-p.mesh.position.y,target.state.z-p.mesh.position.z);
           if(toTarget.lengthSq()>1){
             toTarget.normalize().multiplyScalar(p.speed);
-            p.vx=THREE.MathUtils.lerp(p.vx,toTarget.x,Math.min(1,dt*4.5));
-            p.vy=THREE.MathUtils.lerp(p.vy,toTarget.y,Math.min(1,dt*4.5));
-            p.vz=THREE.MathUtils.lerp(p.vz,toTarget.z,Math.min(1,dt*4.5));
+            const turnRate=Math.min(1,dt*4.5*weapMult);
+            p.vx=THREE.MathUtils.lerp(p.vx,toTarget.x,turnRate);
+            p.vy=THREE.MathUtils.lerp(p.vy,toTarget.y,turnRate);
+            p.vz=THREE.MathUtils.lerp(p.vz,toTarget.z,turnRate);
             p.mesh.lookAt(p.mesh.position.x+p.vx,p.mesh.position.y+p.vy,p.mesh.position.z+p.vz);
           }
         }
@@ -3368,14 +3407,14 @@ function initialize(){
       p.mesh.position.z+=p.vz*dt;
       let hit=false;
       if(p.isOwn&&p.kind!=='flare'){
-        const hitRadius=p.kind==='fire_missile'?58:42;
+        const hitRadius=(p.kind==='fire_missile'?58:42)*weapMult;
         for(const peer of peers){
           if(!peer.state) continue;
           const dist=Math.hypot(peer.state.x-p.mesh.position.x,peer.state.y-p.mesh.position.y,peer.state.z-p.mesh.position.z);
           if(dist<=hitRadius){
             multiplayer.sendCombatEvent('hit',{
               targetId:peer.id,
-              damage:p.kind==='fire_missile'?35:14,
+              damage:Math.round((p.kind==='fire_missile'?35:14)*weapMult),
               weapon:p.kind==='fire_missile'?'AIM-9X':'20mm 機砲'
             });
             hit=true;
@@ -3494,12 +3533,27 @@ function initialize(){
     const mobileMpBtn=byId('mobileMultiplayer');
     if(mobileMpBtn){
       mobileMpBtn.onclick=()=>{
+        if(document.body.classList.contains('flight-ui')){
+          toggleHudMpDropdown();
+          return;
+        }
         const mpSection=byId('multiplayerSection');
         if(mpSection){
           mpSection.open=true;
           mpSection.scrollIntoView({behavior:'smooth'});
         }
       };
+    }
+
+    const quickControlsEl=byId('quickControls');
+    if(quickControlsEl&&!byId('quickMpRoomBtn')){
+      const qBtn=document.createElement('button');
+      qBtn.type='button';
+      qBtn.id='quickMpRoomBtn';
+      qBtn.className='secondary';
+      qBtn.textContent='🌐 房間 8888 (0機)';
+      qBtn.onclick=()=>toggleHudMpDropdown();
+      quickControlsEl.prepend(qBtn);
     }
 
     const touchHook=byId('touchHook');
@@ -3633,7 +3687,7 @@ function initialize(){
           if(!hudLeaderboard.hidden) renderLeaderboard();
         }
       }
-      if(e.code==='KeyK'&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
+      if(e.code==='KeyK'&&e.shiftKey&&!e.repeat&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
         if(typeof cockpitElectrical!=='undefined'&&flight){
           const isCold=!cockpitElectrical.state.coldAndDark;
           cockpitElectrical.setColdAndDark(isCold);
@@ -3728,6 +3782,13 @@ function initialize(){
       if(headerText&&typeof multiplayer!=='undefined'){
         headerText.textContent=`🌐 ${multiplayer.getRoomId()||'8888'} (${peers.length}機)`;
       }
+      const menuRoomLabel=typeof multiplayer!=='undefined'&&multiplayer.isConnected()
+        ?`🌐 房間 ${multiplayer.getRoomId()||'8888'} (${peers.length}機)`
+        :'🌐 多人連線房間';
+      const mobMp=byId('mobileMultiplayer');
+      if(mobMp) mobMp.textContent=menuRoomLabel;
+      const quickMpRoom=byId('quickMpRoomBtn');
+      if(quickMpRoom) quickMpRoom.textContent=menuRoomLabel;
       const roomDisp=byId('hudMpRoomDisplay'), callDisp=byId('hudMpCallsignDisplay'), countDisp=byId('hudMpPeerCountDisplay');
       if(roomDisp&&typeof multiplayer!=='undefined') roomDisp.textContent=multiplayer.getRoomId()||'--';
       if(callDisp&&typeof multiplayer!=='undefined') callDisp.textContent=multiplayer.getCallsign()||'--';
@@ -3962,7 +4023,8 @@ function initialize(){
           showPill(`⚠️ 遭到 [${data.attacker}] 攻擊！受到 ${data.damage}% 損傷！`);
           if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([40,20,60]);
         }else if(event==='player_scored_kill'){
-          showPill(`🎯 成功擊落目標 [${data.victim}]！`);
+          showPill(`🎯 成功擊落目標 [${data.victim}]！獲得空戰賞金 $3,500`);
+          window.SkyboundCampaign?.addCash?.(3500,'線上空戰擊墜賞金');
           if(typeof navigator!=='undefined'&&navigator.vibrate) navigator.vibrate([30,30,30,30,60]);
         }else if(event==='player_killed'){
           updateCombatPill();
@@ -4066,10 +4128,114 @@ function initialize(){
   let trailFrame=0;
   const radarZoomModes=['auto',15000,45000,120000];
   let radarZoomIdx=0;
+  let radarCustomRange=0;
+  let radarPanX=0,radarPanZ=0;
+  let radarDragStart=null,radarMoved=false;
+  let radarHitAirports=[];
+  let radarLastScale=0.01;
+
+  function setDirectToAirport(ap){
+    if(!ap||!flight) return;
+    flight.destination=ap;
+    flight.route=regionalRoute(flight.departure||ap,ap);
+    flight.waypoint=0;
+    const destSelect=byId('destination');
+    if(destSelect) destSelect.value=ap.id;
+    const directSel=byId('radarDirectSelect');
+    if(directSel) directSel.value=ap.id;
+    showPill(`🧭 GPS 即時導航：直飛 ${ap.name} (${ap.id})`);
+  }
+
+  function setupRadarToolbar(){
+    const navPanel=byId('flightNavigation');
+    if(!navPanel||!radar?.canvas||byId('radarMapToolbar')) return;
+    const bar=document.createElement('div');
+    bar.id='radarMapToolbar';
+    bar.className='radar-map-toolbar';
+    bar.innerHTML=`
+      <div class="radar-zoom-btns">
+        <button type="button" id="radarZoomInBtn" title="放大導航地圖 (Zoom In)">＋ 放大</button>
+        <button type="button" id="radarZoomOutBtn" title="縮小導航地圖 (Zoom Out)">－ 縮小</button>
+        <button type="button" id="radarCenterBtn" title="回到飛機位置並恢復自動縮放">⌖ 置中</button>
+        <button type="button" id="radarWorldBtn" title="跨國航線全覽">🌏 跨國</button>
+        <button type="button" id="radar3dBtn" title="切換 3D 戰術空域俯瞰圖">🗺 3D</button>
+      </div>
+      <div class="radar-direct-row">
+        <span>🧭 直飛導航</span>
+        <select id="radarDirectSelect" aria-label="GPS 即時直飛導航目的地"></select>
+      </div>
+    `;
+    navPanel.insertBefore(bar,radar.canvas);
+    const sel=byId('radarDirectSelect');
+    if(sel){
+      for(const ap of airports){
+        const opt=document.createElement('option');
+        opt.value=ap.id;
+        opt.textContent=`${ap.name} (${ap.id})`;
+        sel.appendChild(opt);
+      }
+      sel.onchange=()=>{
+        const ap=airports.find(a=>a.id===sel.value);
+        if(ap) setDirectToAirport(ap);
+      };
+    }
+    const stepZoom=factor=>{
+      const base=radarCustomRange>0?radarCustomRange:(typeof radarZoomModes[radarZoomIdx]==='number'?radarZoomModes[radarZoomIdx]:30000);
+      radarCustomRange=clamp(Math.round(base*factor),2500,2800000);
+    };
+    byId('radarZoomInBtn')?.addEventListener('click',()=>stepZoom(0.62));
+    byId('radarZoomOutBtn')?.addEventListener('click',()=>stepZoom(1.6));
+    byId('radarCenterBtn')?.addEventListener('click',()=>{
+      radarCustomRange=0;
+      radarPanX=0;
+      radarPanZ=0;
+      radarZoomIdx=0;
+    });
+    byId('radarWorldBtn')?.addEventListener('click',()=>{
+      radarCustomRange=1600000;
+      radarPanX=0;
+      radarPanZ=0;
+    });
+    byId('radar3dBtn')?.addEventListener('click',()=>{
+      if(flight) toggleNavigation(flight);
+    });
+  }
+  setupRadarToolbar();
+
   if(radar?.canvas){
     radar.canvas.style.cursor='pointer';
-    radar.canvas.title='點擊切換雷達縮放 (AUTO / 15km / 45km / 120km)';
-    radar.canvas.addEventListener('click',()=>{
+    radar.canvas.title='滾輪或按鈕放大縮小 · 拖曳平移 · 點擊機場立即設定 GPS 直飛導航';
+    radar.canvas.addEventListener('wheel',e=>{
+      e.preventDefault();
+      const base=radarCustomRange>0?radarCustomRange:(typeof radarZoomModes[radarZoomIdx]==='number'?radarZoomModes[radarZoomIdx]:30000);
+      radarCustomRange=clamp(Math.round(base*(e.deltaY>0?1.32:0.75)),2500,2800000);
+    },{passive:false});
+    radar.canvas.addEventListener('pointerdown',e=>{
+      radarDragStart={x:e.clientX,y:e.clientY,panX:radarPanX,panZ:radarPanZ};
+      radarMoved=false;
+    });
+    window.addEventListener('pointermove',e=>{
+      if(!radarDragStart) return;
+      const dx=e.clientX-radarDragStart.x,dy=e.clientY-radarDragStart.y;
+      if(Math.hypot(dx,dy)>5) radarMoved=true;
+      if(radarMoved&&radarLastScale>0){
+        radarPanX=radarDragStart.panX-dx/radarLastScale;
+        radarPanZ=radarDragStart.panZ-dy/radarLastScale;
+      }
+    });
+    window.addEventListener('pointerup',()=>{radarDragStart=null;});
+    radar.canvas.addEventListener('click',e=>{
+      if(radarMoved){radarMoved=false;return;}
+      const rect=radar.canvas.getBoundingClientRect();
+      const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
+      const hit=radarHitAirports.find(h=>Math.hypot(h.x-cx,h.y-cy)<18);
+      if(hit?.ap){
+        setDirectToAirport(hit.ap);
+        return;
+      }
+      radarCustomRange=0;
+      radarPanX=0;
+      radarPanZ=0;
       radarZoomIdx=(radarZoomIdx+1)%radarZoomModes.length;
     });
   }
@@ -4082,6 +4248,10 @@ function initialize(){
     if(canvas.width!==Math.round(displayW*dpr)||canvas.height!==Math.round(displayH*dpr)){
       canvas.width=Math.round(displayW*dpr);
       canvas.height=Math.round(displayH*dpr);
+    }
+    const directSel=byId('radarDirectSelect');
+    if(directSel&&f.destination&&directSel.value!==f.destination.id&&document.activeElement!==directSel){
+      directSel.value=f.destination.id;
     }
     radar.save();
     radar.scale(dpr,dpr);
@@ -4102,14 +4272,15 @@ function initialize(){
       ' km/h · Mach '+speeds.mach.toFixed(2)+(closing>5&&!f.ground?' · 航點 ETA '+(distance/closing/60).toFixed(1)+' 分':'');
     const xs=visiblePoints.map(p=>p.x),zs=visiblePoints.map(p=>p.z);
     const minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);
-    const zoomRange=f.ground?'auto':radarZoomModes[radarZoomIdx];
-    const centerX=zoomRange==='auto'?(minX+maxX)/2:f.x;
-    const centerZ=zoomRange==='auto'?(minZ+maxZ)/2:f.z;
+    const zoomRange=radarCustomRange>0?radarCustomRange:(f.ground?'auto':radarZoomModes[radarZoomIdx]);
+    const centerX=(zoomRange==='auto'?(minX+maxX)/2:f.x)+radarPanX;
+    const centerZ=(zoomRange==='auto'?(minZ+maxZ)/2:f.z)+radarPanZ;
     const scale=zoomRange==='auto'
       ?Math.min(f.ground?.11:.018,width*.72/Math.max(1,maxX-minX),height*.64/Math.max(1,maxZ-minZ))
       :Math.min(width,height)*0.44/zoomRange;
+    radarLastScale=scale;
     const project=p=>[width/2+(p.x-centerX)*scale,height/2+(p.z-centerZ)*scale];
-    if(f.ground) {
+    if(f.ground&&radarCustomRange===0&&radarPanX===0&&radarPanZ===0) {
       radar.fillStyle='#2c443b';
       radar.fillRect(0,0,width,height);
       // Airport Surface Map elements
@@ -4175,10 +4346,12 @@ function initialize(){
       {x1:ownX-10,y1:ownY-10,x2:ownX+10,y2:ownY+10}
     ];
     const mapAirports=[...new Set([destination,f.departure,...airports].filter(Boolean))];
+    radarHitAirports=[];
     radar.font='bold 12px system-ui';
     for(const airport of mapAirports){
       const [x,y]=project(airport);
       if(x<11||x>width-11||y<14||y>height-18) continue;
+      radarHitAirports.push({x,y,ap:airport});
       const active=airport===destination&&!f.ground;
       radar.fillStyle=active?'#78effe':'#e6f4f9';
       if(f.ground){
