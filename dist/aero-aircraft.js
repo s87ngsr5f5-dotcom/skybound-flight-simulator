@@ -212,20 +212,24 @@
   }
 
   // Sculpted teardrop / bubble canopy
-  function buildCanopyGeometry(length, width, height, slices = 16, radial = 22) {
+  function buildCanopyGeometry(length, width, height, slices = 16, radial = 22, options = {}) {
     const sections = [];
+    const streamlined = Boolean(options.streamlined);
     for (let i = 0; i <= slices; i++) {
       const t = i / slices; // 0 nose -> 1 tail
       const z = (t - 0.5) * length;
-      // Asymmetric laminar teardrop curve: fuller forward, tapered aft
-      const env = Math.sin(Math.pow(t, 0.72) * Math.PI);
+      // Asymmetric laminar teardrop curve: gentle windscreen rake forward, streamlined aft spine fairing
+      const env = streamlined
+        ? Math.sin(Math.pow(t, 0.78) * Math.PI) * (t < 0.35 ? (0.72 + 0.28 * (t / 0.35)) : 1.0)
+        : Math.sin(Math.pow(t, 0.72) * Math.PI);
+      const ryScale = streamlined ? Math.pow(Math.max(0.03, env), 0.95) : Math.max(0.03, Math.pow(env, 0.85));
       sections.push({
         z,
         rx: width * 0.5 * Math.max(0.03, env),
-        ryTop: height * Math.max(0.03, Math.pow(env, 0.85)),
-        ryBot: height * 0.14 * Math.max(0.02, env),
+        ryTop: height * ryScale,
+        ryBot: height * (streamlined ? 0.05 : 0.14) * Math.max(0.02, env),
         y: 0,
-        pTop: 2.15,
+        pTop: streamlined ? 2.25 : 2.15,
         pBot: 2.6
       });
     }
@@ -375,10 +379,11 @@
     fanGroup.add(fanBlades);
     group.add(fanGroup);
 
-    // Swept NACA aerodynamic pylon above nacelle
-    const pylonH = size * 0.92;
-    const pylon = mesh(buildAeroPylonGeometry(pylonH, size * 1.95, size * 2.25, 0.13, size * 0.65), surface, 0, size * 0.84, size * 0.05);
-    pylon.rotation.x = 0.08;
+    // Swept NACA aerodynamic pylon connecting nacelle cleanly into wing interior (never poking through upper skin)
+    const pylonH = Math.max(0.16, options.pylonHeight ?? size * 0.52);
+    const pylonY = options.overwing ? -(size * 0.78 + pylonH) : (options.pylonBaseY ?? size * 0.72);
+    const pylon = mesh(buildAeroPylonGeometry(pylonH, size * 1.75, size * 2.05, 0.13, size * 0.55), surface, 0, pylonY, size * 0.05);
+    if (options.pylonPitch) pylon.rotation.x = options.pylonPitch;
 
     return { group, fanGroup, length: L };
   }

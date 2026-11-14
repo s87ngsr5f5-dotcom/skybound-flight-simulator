@@ -18,6 +18,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+      - run: node verify-fleet100.cjs
+      - run: node verify-fleet100-physics.cjs
+      - run: node verify-fleet100-helicopters.cjs
       - run: node verify-speed-profile.cjs
       - run: node verify-nav-thrust.cjs
       - run: node verify-autoland.cjs

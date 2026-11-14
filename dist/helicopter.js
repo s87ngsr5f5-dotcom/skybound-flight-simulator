@@ -193,8 +193,10 @@ function buildHelicopter(profile, scene){
         root.remove(placeholder);
         const obj = gltf.scene;
         obj.rotation.y = Math.PI; // Correct model forward orientation
-        obj.position.y = -profile.gearHeight + .45;
         root.add(obj);
+        obj.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(obj);
+        if(Number.isFinite(bounds.min.y)) obj.position.y += -profile.gearHeight - bounds.min.y;
 
         obj.traverse(child => {
           if(child.isMesh){
@@ -207,6 +209,7 @@ function buildHelicopter(profile, scene){
     }
   } else if(profile.id === 'uh60'){
     // UH-60M Black Hawk contoured aerodynamic fuselage, GE T700 pods, swept airfoil stabilator & rotor blades
+    const uWheelY=-profile.gearHeight+.34, uTailY=-profile.gearHeight+.20;
     if(typeof AeroCraft!=='undefined'){
       const hullGeo=AeroCraft.buildFuselageLoft([
         {z:-6.2,rx:.14,ryTop:.10,ryBot:.10,y:-.18,power:2},
@@ -219,7 +222,8 @@ function buildHelicopter(profile, scene){
         {z:7.5,rx:.24,ryTop:.32,ryBot:.28,y:.52,power:2}
       ],28);
       mesh(root,hullGeo,militaryGreen,0,0,0);
-      mesh(root,AeroCraft.buildCanopyGeometry(2.6,2.08,.76,12,18),glass,0,.58,-3.7);
+      const uGlass=mesh(root,AeroCraft.buildCanopyGeometry(1.95,1.62,.46,12,18,{streamlined:true}),glass,0,.52,-3.95);
+      uGlass.rotation.x=-.22;
       for(const s of [-1,1]){
         const engPod=mesh(root,AeroCraft.buildCanoeGeometry(3.4,.38,.36),dark,s*.68,1.24,-.25);
         engPod.rotation.x=-.03;
@@ -230,11 +234,13 @@ function buildHelicopter(profile, scene){
           {x:2.15,leadZ:6.95,chord:.68,y:.52,thick:.09,camber:0}
         ],{slices:16,capTip:true,mirror:s<0}),militaryGreen,0,0,0);
         void hTail;
-        const strut=mesh(gear,new THREE.CylinderGeometry(.075,.065,1.08,10),metal,s*1.28,-.45,-1.2);
-        strut.rotation.z=s*.35;
-        const dragBeam=mesh(gear,new THREE.CylinderGeometry(.055,.055,1.25,8),metal,s*.95,-.52,-1.75);
-        dragBeam.rotation.set(.48,0,s*.25);
-        const wheel=mesh(gear,new THREE.TorusGeometry(.24,.10,12,22),dark,s*1.55,-.92,-1.2);
+        const dx=s*(1.55-.92), dy=uWheelY-(-.05), sLen=Math.hypot(dx,dy);
+        const strut=mesh(gear,new THREE.CylinderGeometry(.075,.065,sLen,10),metal,s*.92+dx*.5,-.05+dy*.5,-1.2);
+        strut.rotation.z=Math.atan2(-dx,-dy);
+        const ddx=s*(1.55-.85), ddy=uWheelY-(-.10), ddz=-1.2-(-2.25), dLen=Math.hypot(ddx,ddy,ddz);
+        const dragBeam=mesh(gear,new THREE.CylinderGeometry(.055,.055,dLen,8),metal,s*.85+ddx*.5,-.10+ddy*.5,-2.25+ddz*.5);
+        dragBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),new THREE.Vector3(ddx,ddy,ddz).normalize());
+        const wheel=mesh(gear,new THREE.TorusGeometry(.24,.10,12,22),dark,s*1.55,uWheelY,-1.2);
         wheel.rotation.y=Math.PI/2;
         mesh(wheel,new THREE.CylinderGeometry(.15,.15,.14,14),metal,0,0,0).rotation.x=Math.PI/2;
       }
@@ -245,7 +251,10 @@ function buildHelicopter(profile, scene){
     }else{
       box(root, militaryGreen, 2.3, 1.8, 8.2, 0, .25, -.5);
     }
-    const tailWheel=mesh(gear,new THREE.TorusGeometry(.14,.06,10,18),dark,0,-.35,6.8);
+    const tailStrutLen=Math.hypot(.45-uTailY,.25);
+    const tailStrut=mesh(gear,new THREE.CylinderGeometry(.05,.045,tailStrutLen,8),metal,0,( .45+uTailY)*.5,6.68);
+    tailStrut.rotation.x=-Math.atan2(.25,.45-uTailY);
+    const tailWheel=mesh(gear,new THREE.TorusGeometry(.14,.06,10,18),dark,0,uTailY,6.8);
     tailWheel.rotation.y=Math.PI/2;
     rotor.position.set(0,1.85,-.4);root.add(rotor);
     mesh(rotor,new THREE.CylinderGeometry(.32,.35,.25,18),metal,0,0,0);
@@ -260,6 +269,7 @@ function buildHelicopter(profile, scene){
     for(let i=0;i<4;i++){const b=new THREE.Mesh(trGeo,dark);b.rotation.order='ZYX';b.rotation.z=Math.PI/2;b.rotation.x=i*Math.PI/2;tailRotor.add(b);}
   } else if(profile.id === 'ah64'){
     // AH-64E Apache Guardian: contoured slim tandem fuselage, stepped flat-plate canopy, sponsons, EFAB pylons & T700 pods
+    const aWheelY=-profile.gearHeight+.31, aTailY=-profile.gearHeight+.18;
     if(typeof AeroCraft!=='undefined'){
       const hullGeo=AeroCraft.buildFuselageLoft([
         {z:-5.2,rx:.24,ryTop:.18,ryBot:.20,y:-.18,power:2},
@@ -271,8 +281,10 @@ function buildHelicopter(profile, scene){
         {z:7.3,rx:.20,ryTop:.28,ryBot:.24,y:.48,power:2}
       ],24);
       mesh(root,hullGeo,militaryGreen,0,0,0);
-      mesh(root,AeroCraft.buildCanopyGeometry(2.3,1.12,.68,10,14),glass,0,.76,-1.8);
-      mesh(root,AeroCraft.buildCanopyGeometry(1.9,1.02,.56,10,14),glass,0,.52,-3.2);
+      const rearGlass=mesh(root,AeroCraft.buildCanopyGeometry(2.05,.96,.40,10,14,{streamlined:true}),glass,0,.75,-1.75);
+      rearGlass.rotation.x=-.08;
+      const frontGlass=mesh(root,AeroCraft.buildCanopyGeometry(1.75,.86,.35,10,14,{streamlined:true}),glass,0,.47,-3.20);
+      frontGlass.rotation.x=-.15;
       const turret=mesh(root,new THREE.SphereGeometry(.44,18,14),dark,0,-.22,-4.7);
       mesh(turret,new THREE.CylinderGeometry(.12,.12,.32,12),metal,.18,0,-.34).rotation.x=Math.PI/2;
       const gun=mesh(root,AeroCraft.buildCanoeGeometry(1.65,.14,.14),dark,0,-.72,-2.2);
@@ -291,9 +303,10 @@ function buildHelicopter(profile, scene){
         const pod=mesh(root,new THREE.CylinderGeometry(.25,.25,1.45,14),militaryGreen,side*2.25,-.42,-.82);
         pod.rotation.x=Math.PI/2;
         mesh(pod,new THREE.SphereGeometry(.25,12,8),dark,0,.72,0).scale.y=.55;
-        const strut=mesh(gear,new THREE.CylinderGeometry(.07,.06,1.15,10),metal,side*1.08,-.5,-1.4);
-        strut.rotation.z=side*.35;
-        const wheel=mesh(gear,new THREE.TorusGeometry(.22,.09,10,20),dark,side*1.35,-.98,-1.4);
+        const dx=side*(1.35-.72), dy=aWheelY-(-.10), sLen=Math.hypot(dx,dy);
+        const strut=mesh(gear,new THREE.CylinderGeometry(.07,.06,sLen,10),metal,side*.72+dx*.5,-.10+dy*.5,-1.4);
+        strut.rotation.z=Math.atan2(-dx,-dy);
+        const wheel=mesh(gear,new THREE.TorusGeometry(.22,.09,10,20),dark,side*1.35,aWheelY,-1.4);
         wheel.rotation.y=Math.PI/2;
         mesh(root,AeroCraft.buildWingLoft([
           {x:.12,leadZ:6.4,chord:.90,y:.42,thick:.10,camber:0},
@@ -307,10 +320,13 @@ function buildHelicopter(profile, scene){
     }else{
       box(root, militaryGreen, 1.6, 1.7, 7.4, 0, .2, -.4);
     }
-    const tailWheel=mesh(gear,new THREE.TorusGeometry(.13,.05,8,16),dark,0,-.25,6.2);
+    const aTailStrut=mesh(gear,new THREE.CylinderGeometry(.045,.04,Math.hypot(.38-aTailY,.22),8),metal,0,(.38+aTailY)*.5,6.08);
+    aTailStrut.rotation.x=-Math.atan2(.22,.38-aTailY);
+    const tailWheel=mesh(gear,new THREE.TorusGeometry(.13,.05,8,16),dark,0,aTailY,6.2);
     tailWheel.rotation.y=Math.PI/2;
     rotor.position.set(0,1.75,-.5);root.add(rotor);
     mesh(rotor,new THREE.CylinderGeometry(.28,.3,.3,16),metal,0,0,0);
+    mesh(rotor,new THREE.CylinderGeometry(.14,.16,.72,14),dark,0,.38,0);
     const radome=mesh(rotor,new THREE.SphereGeometry(.65,18,12),dark,0,.75,0);
     radome.scale.set(1.15,.55,1.15);
     const ahBlade=typeof AeroCraft!=='undefined'?AeroCraft.buildTwistedBlade(6.9,.32,.26,.16):new THREE.BoxGeometry(6.8,.04,.22);
@@ -322,7 +338,10 @@ function buildHelicopter(profile, scene){
     const atrGeo=typeof AeroCraft!=='undefined'?AeroCraft.buildTwistedBlade(1.4,.18,.14,.18):new THREE.BoxGeometry(1.4,.04,.16);
     for(let i=0;i<4;i++){const b=new THREE.Mesh(atrGeo,dark);b.rotation.order='ZYX';b.rotation.z=Math.PI/2;b.rotation.x=i*Math.PI/2;tailRotor.add(b);}
   } else {
-    // Default H6 Light Cruise Helicopter (streamlined teardrop MD500/Bell silhouette + curved glass dome + twisted rotor blades)
+    // Default Light/Medium Utility Helicopter (streamlined contoured fuselage + flush windshield + exact ground-contact skids)
+    const scaledHeli=['r44','bell206','h145','s92'].includes(profile.id);
+    const syHeli=scaledHeli?profile.geometry[1]/.94:1;
+    const skidY=-(profile.gearHeight/syHeli-.055);
     if(typeof AeroCraft!=='undefined'){
       mesh(root,AeroCraft.buildFuselageLoft([
         {z:-2.75,rx:.14,ryTop:.12,ryBot:.12,y:-.18,power:2},
@@ -332,19 +351,21 @@ function buildHelicopter(profile, scene){
         {z:1.55,rx:.44,ryTop:.48,ryBot:.38,y:.26,power:2},
         {z:5.45,rx:.16,ryTop:.20,ryBot:.18,y:.38,power:2}
       ],28),paint,0,0,0);
-      mesh(root,AeroCraft.buildCanopyGeometry(2.15,1.76,.98,14,22),glass,0,.32,-1.52);
+      const hGlass=mesh(root,AeroCraft.buildCanopyGeometry(1.92,1.48,.54,14,22,{streamlined:true}),glass,0,.26,-1.60);
+      hGlass.rotation.x=-.14;
       mesh(root,AeroCraft.buildCanoeGeometry(2.35,.52,.42),blue,0,.98,.35);
       const exhaust=mesh(root,new THREE.CylinderGeometry(.17,.20,.7,18,1,true),metal,.32,1.05,1.28);
       exhaust.rotation.x=Math.PI/2;
       mesh(root,new THREE.CylinderGeometry(.08,.11,.65,12),metal,0,1.44,.05);
       for(const side of [-1,1]){
-        const skid=mesh(gear,new THREE.CylinderGeometry(.055,.055,4.6,12),metal,side*.97,-1.27,-.3);
+        const skid=mesh(gear,new THREE.CylinderGeometry(.055,.055,4.6,12),metal,side*.97,skidY,-.3);
         skid.rotation.x=Math.PI/2;
-        const tip=mesh(gear,new THREE.SphereGeometry(.065,10,8),metal,side*.97,-1.18,-2.58);
+        const tip=mesh(gear,new THREE.SphereGeometry(.065,10,8),metal,side*.97,skidY+.09,-2.58);
         tip.scale.set(1,1.6,1.6);
+        const sdx=side*(.97-.52), sdy=skidY-(-.56), sLen=Math.hypot(sdx,sdy);
         for(const z of [-1.35,.70]){
-          const strut=mesh(gear,new THREE.CylinderGeometry(.045,.045,.68,10),metal,side*.76,-.94,z);
-          strut.rotation.z=side*.45;
+          const strut=mesh(gear,new THREE.CylinderGeometry(.045,.045,sLen,10),metal,side*.52+sdx*.5,-.56+sdy*.5,z);
+          strut.rotation.z=Math.atan2(-sdx,-sdy);
         }
         mesh(root,AeroCraft.buildWingLoft([
           {x:.12,leadZ:3.55,chord:.60,y:.42,thick:.10,camber:0},
@@ -362,23 +383,30 @@ function buildHelicopter(profile, scene){
     rotor.position.set(0,1.79,.05);root.add(rotor);
     mesh(rotor,new THREE.SphereGeometry(.17,16,10),metal,0,0,0);
     const hBladeGeo=typeof AeroCraft!=='undefined'?AeroCraft.buildTwistedBlade(4.9,.24,.19,.16):new THREE.BoxGeometry(4.8,.045,.22);
-    for(let blade=0;blade<4;blade++){
-      const arm=new THREE.Group();arm.rotation.y=blade*Math.PI/2;rotor.add(arm);
+    for(let blade=0;blade<(['r44','bell206'].includes(profile.id)?2:profile.id==='h145'?5:4);blade++){
+      const arm=new THREE.Group();arm.rotation.y=blade*Math.PI*2/(['r44','bell206'].includes(profile.id)?2:profile.id==='h145'?5:4);rotor.add(arm);
       const bm=new THREE.Mesh(hBladeGeo,dark);bm.rotation.y=Math.PI/2;arm.add(bm);
     }
-    tailRotor.position.set(.20,.72,5.45);root.add(tailRotor);
-    const htrGeo=typeof AeroCraft!=='undefined'?AeroCraft.buildTwistedBlade(1.45,.17,.14,.18):new THREE.BoxGeometry(1.45,.04,.16);
+    tailRotor.position.set(profile.id==='h145'?0:.20,.72,5.45);root.add(tailRotor);
+    const trLen=profile.id==='h145'?.62:1.45;
+    const htrGeo=typeof AeroCraft!=='undefined'?AeroCraft.buildTwistedBlade(trLen,.17,.14,.18):new THREE.BoxGeometry(trLen,.04,.16);
     for(let i=0;i<4;i++){const b=new THREE.Mesh(htrGeo,dark);b.rotation.order='ZYX';b.rotation.z=Math.PI/2;b.rotation.x=i*Math.PI/2;tailRotor.add(b);}
   }
 
   const navLights = [], strobes = [], beacons = [];
-  for(const side of [-1, 1]) navLights.push(mesh(root, new THREE.SphereGeometry(.06, 9, 6), new THREE.MeshBasicMaterial({ color: side < 0 ? 0xff5347 : 0x57e9ac }), side * .91, .28, .9));
-  const heliStrobe = mesh(root, new THREE.SphereGeometry(.07, 9, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 1.45, -.15);
-  const heliBeacon = mesh(root, new THREE.SphereGeometry(.07, 9, 6), new THREE.MeshBasicMaterial({ color: 0xff2222 }), 0, -.48, .12);
-  const tailLight = mesh(root, new THREE.SphereGeometry(.05, 9, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, .85, 5.65);
-  strobes.push(heliStrobe);
-  beacons.push(heliBeacon);
-  navLights.push(tailLight);
+  if(profile.id !== 'aw101'){
+    const lightX=profile.id==='uh60'?1.15:profile.id==='ah64'?.92:.91;
+    const lightY=profile.id==='uh60'?.24:profile.id==='ah64'?.10:.28;
+    const tailLightZ=profile.id==='uh60'?7.9:profile.id==='ah64'?7.6:5.65;
+    const tailLightY=(profile.id==='uh60'||profile.id==='ah64')?2.25:1.92;
+    for(const side of [-1, 1]) navLights.push(mesh(root, new THREE.SphereGeometry(.06, 9, 6), new THREE.MeshBasicMaterial({ color: side < 0 ? 0xff5347 : 0x57e9ac }), side * lightX, lightY, .9));
+    const heliStrobe = mesh(root, new THREE.SphereGeometry(.07, 9, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 1.45, -.15);
+    const heliBeacon = mesh(root, new THREE.SphereGeometry(.07, 9, 6), new THREE.MeshBasicMaterial({ color: 0xff2222 }), 0, -.42, .12);
+    const tailLight = mesh(root, new THREE.SphereGeometry(.05, 9, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, tailLightY, tailLightZ);
+    strobes.push(heliStrobe);
+    beacons.push(heliBeacon);
+    navLights.push(tailLight);
+  }
 
   const panelCanvas = document.createElement('canvas'); panelCanvas.width = 768; panelCanvas.height = 320;
   const ink = panelCanvas.getContext('2d'), panelTexture = new THREE.CanvasTexture(panelCanvas); panelTexture.colorSpace = THREE.SRGBColorSpace;
@@ -424,9 +452,19 @@ function buildHelicopter(profile, scene){
     panelTexture.needsUpdate = true;
   }
 
+  if(['r44','bell206','h145','s92'].includes(profile.id)){
+    const sx=profile.geometry[1]/.94,sz=profile.geometry[0]/5.8;
+    root.scale.set(sx,sx,sz);cabin.scale.copy(root.scale);
+    rotor.scale.set(profile.geometry[2]/(4.9*sx),1,profile.geometry[2]/(4.9*sz));
+    if(profile.id==='h145'){
+      const housing=mesh(root,new THREE.TorusGeometry(.74,.095,12,32),paint,tailRotor.position.x,tailRotor.position.y,tailRotor.position.z);
+      housing.rotation.y=Math.PI/2;housing.name='H145 enclosed tail rotor';
+    }
+    root.name=profile.name+' parametric airframe';
+  }
   root.userData = { gear, blades: [], surfaces: [], navLights, strobes, beacons, cabin, rotor, tailRotor, updateHelicopter: update };
 
-  if(typeof allAirports !== 'undefined'){
+  if(typeof allAirports !== 'undefined'&&!scene.getObjectByName('H1 training helipad')){
     const airport = allAirports.find(a => a.code === 'RCSS'), pad = airportPoint(airport, 385, airport.apron + 46);
     const padCanvas = document.createElement('canvas'); padCanvas.width = padCanvas.height = 256;
     const p = padCanvas.getContext('2d'); p.fillStyle = '#666e70'; p.fillRect(0, 0, 256, 256);

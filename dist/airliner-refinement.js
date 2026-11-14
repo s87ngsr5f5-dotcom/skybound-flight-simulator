@@ -15,22 +15,16 @@ function refineAirliner(model,{twin=false}={}){
   for(const wheel of data.wheels){
     wheel.material=wheel.material.clone();wheel.material.bumpMap=tyre;wheel.material.bumpScale=.05;
   }
-  if(!twin){
+  if(!twin&&half>30){
     const registration=document.createElement('canvas');registration.width=1024;registration.height=128;
     const text=registration.getContext('2d');text.clearRect(0,0,1024,128);
     text.fillStyle='#134c68';text.font='bold 70px sans-serif';text.textAlign='center';
     text.fillText('SKYBOUND  ·  HORIZON',512,90);
     const livery=new THREE.CanvasTexture(registration);livery.colorSpace=THREE.SRGBColorSpace;
     for(const side of [-1,1]){
-      const decal=new THREE.Mesh(new THREE.PlaneGeometry(24,3),new THREE.MeshBasicMaterial({map:livery,transparent:true,side:THREE.DoubleSide,depthWrite:false}));
+      const decal=new THREE.Mesh(new THREE.PlaneGeometry(18,1.35),new THREE.MeshBasicMaterial({map:livery,transparent:true,side:THREE.DoubleSide,depthWrite:false}));
       decal.rotation.y=side*Math.PI/2;
-      decal.position.set(side*(radius+.035),.55,-half*.27);model.add(decal);
-      for(let i=0;i<16;i++)box(model,metal,.045,.045,.07,side*radius*.98,-.50,-half*.55+i*2.8);
-    }
-    for(const side of [-1,1]){
-      const strut=box(data.gear,metal,.15,2.1,.15,side*4.8,-2.7,1.8);
-      strut.rotation.z=side*.30;
-      for(let i=0;i<3;i++)box(model,trim,.30,.09,.8,side*(8+i*7),-1.1,8+i*2);
+      decal.position.set(side*(radius+.018),.22,-half*.18);model.add(decal);
     }
   }
   const cabin=data.cabin;
@@ -39,9 +33,9 @@ function refineAirliner(model,{twin=false}={}){
   }
   const cockpitZ=-half*.56, cockpitY=radius*.17;
   const archMat=new THREE.MeshStandardMaterial({color:0x182028,roughness:.62,metalness:.22});
-  // Solid instrument console housing + flush glareshield coaming (zero gaps!)
-  box(cabin,archMat,3.52,1.08,.48,0,cockpitY+.06,cockpitZ-1.38);
-  const glareshield=box(cabin,trim,3.58,.095,.48,0,cockpitY+.49,cockpitZ-1.24);
+  // Solid instrument console housing set slightly behind PFD/MFD display plane so glass screens stay unobstructed
+  box(cabin,archMat,3.52,1.08,.44,0,cockpitY+.06,cockpitZ-1.54);
+  const glareshield=box(cabin,trim,3.58,.095,.48,0,cockpitY+.49,cockpitZ-1.26);
   glareshield.rotation.x=.06;
   box(cabin,trim,3.65,.12,1.60,0,cockpitY-.52,cockpitZ-.75);
   box(cabin,trim,.56,.44,2.1,0,cockpitY-.52,cockpitZ+.17);

@@ -40,22 +40,29 @@ function updateDownloadedAircraft(model,profile,flight,livery,anisotropy){
     new THREE.GLTFLoader().load('models/'+asset.file,gltf=>{
       const legacy=new THREE.Group();
       for(const child of [...model.children]){
-        if(child!==data.gear||asset.integratedGear) legacy.add(child);
+        legacy.add(child);
       }
       model.add(legacy);
       const object=gltf.scene;
+      model.add(object);
       if(asset.integratedGear){
+        object.updateMatrixWorld(true);
         const bounds=new THREE.Box3().setFromObject(object);
         const size=bounds.getSize(new THREE.Vector3());
-        const scale=asset.length/size.z;
+        const scale=asset.length/Math.max(.1,size.z);
         object.scale.setScalar(scale);
         object.rotation.y=asset.yaw;
-        object.position.y=-bounds.min.y*scale-profile.gearHeight;
+        object.updateMatrixWorld(true);
+        const sb=new THREE.Box3().setFromObject(object);
+        object.position.y+=-profile.gearHeight-sb.min.y;
       }else{
-        object.position.y=-asset.centerHeight;
+        object.updateMatrixWorld(true);
+        const b=new THREE.Box3().setFromObject(object);
+        const clearance=0.52;
+        if(Number.isFinite(b.min.y)) object.position.y+=-profile.gearHeight+clearance-b.min.y;
+        object.updateMatrixWorld(true);
         addAirframeDetails(object);
       }
-      model.add(object);
       object.visible=false;
       data.downloadLegacy=legacy;
       data.downloaded=object;
@@ -71,9 +78,51 @@ function updateDownloadedAircraft(model,profile,flight,livery,anisotropy){
         }
         if(/Landing_Gear|Tires/.test(part.name)) data.downloadGear.push(part);
       });
+      if(!asset.integratedGear&&THREE.Raycaster){
+        // Attach clean gear struts & tires strictly between -profile.gearHeight and GLB underside
+        object.updateMatrixWorld(true);
+        const wb=new THREE.Box3().setFromObject(object);
+        const len=Math.max(1,wb.max.z-wb.min.z), cz=(wb.min.z+wb.max.z)*.5;
+        const hs=(wb.max.x-wb.min.x)*.5, radius=profile.geometry?.[1]??2.0;
+        const ray=new THREE.Raycaster(), up=new THREE.Vector3(0,1,0);
+        const metal=new THREE.MeshStandardMaterial({color:0x8a959d,roughness:.35,metalness:.68});
+        const tireMat=new THREE.MeshStandardMaterial({color:0x1b2026,roughness:.82});
+        const tireR=Math.min(.52,Math.max(.34,radius*.22));
+        const attachStrut=(gx,gz,pair)=>{
+          ray.set(new THREE.Vector3(gx,-profile.gearHeight-1,gz),up);
+          const hit=ray.intersectObject(object,true)[0];
+          if(!hit) return;
+          const localTop=object.worldToLocal(hit.point.clone());
+          const localBot=object.worldToLocal(new THREE.Vector3(gx,-profile.gearHeight+tireR,gz));
+          const gap=localTop.y-localBot.y;
+          if(gap<0.15) return;
+          const strutG=new THREE.Group();
+          const sGeo=new THREE.CylinderGeometry(tireR*.20,tireR*.17,gap+0.12,10);
+          const sMesh=new THREE.Mesh(sGeo,metal);
+          sMesh.position.set(localTop.x,(localTop.y+localBot.y)*.5+.04,localTop.z);
+          strutG.add(sMesh);
+          const tireGeo=new THREE.CylinderGeometry(tireR,tireR,tireR*.52,18);
+          tireGeo.rotateZ(Math.PI/2);
+          for(const ox of (pair?[-tireR*.52,tireR*.52]:[-tireR*.32,tireR*.32])){
+            const tMesh=new THREE.Mesh(tireGeo,tireMat);
+            tMesh.position.set(localBot.x+ox,localBot.y,localBot.z);
+            strutG.add(tMesh);
+          }
+          object.add(strutG);
+          data.downloadGear.push(strutG);
+        };
+        attachStrut(0,cz-len*.36,false);
+        const mainX=Math.min(hs*.26,radius*1.45);
+        attachStrut(-mainX,cz+len*.05,true);
+        attachStrut(mainX,cz+len*.05,true);
+      }
     },undefined,()=>{data.downloadFailed=true;});
   }
   if(data.downloaded){
+    // Keep any re-applied skin decals inside legacy so external GLB has zero overlapping decal slabs.
+    if(data.decalGroup&&data.decalGroup.parent===model&&data.downloadLegacy){
+      data.downloadLegacy.add(data.decalGroup);
+    }
     // The traffic models have no moving flaps or boarding door geometry.
     const useExternal=asset.integratedGear||(!livery&&!flight?.flaps&&!(flight?.ground&&flight.service));
     data.downloaded.visible=useExternal;

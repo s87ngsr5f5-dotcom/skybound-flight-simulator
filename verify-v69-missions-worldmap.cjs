@@ -243,7 +243,7 @@ for (const file of jsFiles) {
 
   for (const htmlName of ['index.html', 'iphone.html']) {
     const html = readDist(htmlName);
-    assert.ok(html.includes('>0.63<'), `${htmlName} retains >0.63< badge invariant`);
+    assert.ok(Number(html.match(/id="edition">(\d+)\.(\d+)/)?.[1])>0 || Number(html.match(/id="edition">(\d+)\.(\d+)/)?.[2])>=63, `${htmlName} shows version 0.63 or newer`);
     assert.ok(html.includes('<option value="RJBB">桃園 → 大阪關西</option>'), `${htmlName} adds RJBB route option`);
     assert.ok(html.includes('<option value="VTBS">桃園 → 曼谷蘇凡納布</option>'), `${htmlName} adds VTBS route option`);
     for (const tag of [

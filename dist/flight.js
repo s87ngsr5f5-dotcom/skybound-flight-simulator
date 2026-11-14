@@ -817,7 +817,7 @@ function initialize(){
   function makeAircraft(profile,index){
     const [length,radius,span,wingHeight,count,sweep]=profile.geometry;
     const group=new THREE.Group(), gear=new THREE.Group(), blades=[], surfaces=[], navLights=[];
-    const accent=material(['#185378','#9f5433','#16817b','#6a4b9b','#88404b','#354d66'][index]);
+    const accent=material(['#185378','#9f5433','#16817b','#6a4b9b','#88404b','#354d66'][index%6]);
     const trimDark=material('#1f2830',.58,.35);
     const chrome=material('#c5ced3',.22,.75);
     const body=typeof AeroCraft!=='undefined'
@@ -834,16 +834,25 @@ function initialize(){
       :new THREE.Mesh(new THREE.SphereGeometry(1,26,16),fuselage);
     if(typeof AeroCraft==='undefined')body.scale.set(radius,radius*.96,length);
     group.add(body,gear);
-    const glass=typeof AeroCraft!=='undefined'
-      ?new THREE.Mesh(AeroCraft.buildCanopyGeometry(length*.48,radius*1.76,radius*.66,14,20),windowMat)
-      :new THREE.Mesh(new THREE.SphereGeometry(1,16,10),windowMat);
-    if(typeof AeroCraft!=='undefined'){glass.position.set(0,radius*.52,-length*.32);}
-    else{glass.position.set(0,radius*.63,-length*.37);glass.scale.set(radius*.92,radius*.59,length*.23);}
+    const glassGeo=typeof AeroCraft!=='undefined'
+      ?(count>=2&&!profile.jet&&length>6.5
+        ?AeroCraft.buildCanopyGeometry(length*.28,radius*1.26,radius*.28,14,20,{streamlined:true})
+        :AeroCraft.buildCanopyGeometry(length*(profile.jet?.42:.36),radius*(profile.jet?1.24:1.30),radius*(profile.jet?.38:.34),14,20,{streamlined:true}))
+      :new THREE.SphereGeometry(1,16,10);
+    const glass=new THREE.Mesh(glassGeo,windowMat);
+    if(typeof AeroCraft!=='undefined'){
+      if(count>=2&&!profile.jet&&length>6.5){glass.position.set(0,radius*.45,-length*.50);glass.rotation.x=-.18;}
+      else if(profile.jet){glass.position.set(0,radius*.46,-length*.34);glass.rotation.x=-.05;}
+      else{glass.position.set(0,radius*.42,-length*.34);glass.rotation.x=-.11;}
+    }else{glass.position.set(0,radius*.63,-length*.37);glass.scale.set(radius*.92,radius*.59,length*.23);}
     group.add(glass);
-    for(let i=0;i<(profile.jet?6:2);i++){
+    const sideWinCount=(!profile.jet&&count>=2&&length>6.5)?4:(!profile.jet?2:0);
+    for(let i=0;i<sideWinCount;i++){
       for(const side of [-1,1]){
-        const win=new THREE.Mesh(new THREE.CapsuleGeometry(radius*.075,length*.045,4,8),windowMat);
-        win.rotation.x=Math.PI/2;win.position.set(side*radius*.94,radius*.24,-length*.10+i*length*.13);
+        const wz=-length*.06+i*length*.11;
+        const taper=wz>length*.20?Math.max(.55,1-(wz-length*.20)/(length*.80)*.52):1;
+        const win=new THREE.Mesh(new THREE.CapsuleGeometry(radius*.068,length*.04,4,8),windowMat);
+        win.rotation.x=Math.PI/2;win.position.set(side*radius*.92*taper,radius*.22,wz);
         group.add(win);
       }
     }
@@ -851,14 +860,23 @@ function initialize(){
     const flapMat=accent.clone();flapMat.side=THREE.DoubleSide;
     const leadRoot=-length*.40,rootChord=length*.55,tipChord=length*.19;
     const highWing=wingHeight>radius*.25;
+    const wStations=[
+      {x:radius*.62,leadZ:leadRoot,chord:rootChord,y:wingHeight,thick:.13,camber:.032,twist:.03},
+      {x:span*.45,leadZ:leadRoot+sweep*.42,chord:rootChord*.74+tipChord*.26,y:wingHeight+(highWing?.04:.14),thick:.115,camber:.028,twist:.01},
+      {x:span,leadZ:leadRoot+sweep,chord:tipChord,y:wingHeight+(highWing?.12:.34),thick:.095,camber:.020,twist:-.03,tipCurlY:.08}
+    ];
+    const wingAt=absX=>{
+      const [s0,s1,s2]=wStations;
+      const [a,b]=absX<=s1.x?[s0,s1]:[s1,s2];
+      const t=Math.max(0,Math.min(1,(absX-a.x)/Math.max(.01,b.x-a.x)));
+      return {leadZ:a.leadZ+(b.leadZ-a.leadZ)*t,chord:a.chord+(b.chord-a.chord)*t,y:a.y+(b.y-a.y)*t};
+    };
+    const pantY=-profile.gearHeight+radius*.24;
+    const nPantY=-profile.gearHeight+radius*.21;
     for(const side of [-1,1]){
       if(typeof AeroCraft!=='undefined'){
         // True cambered NACA-2412 swept tapered main wing + washout twist
-        const wGeo=AeroCraft.buildWingLoft([
-          {x:radius*.62,leadZ:leadRoot,chord:rootChord,y:wingHeight,thick:.13,camber:.032,twist:.03},
-          {x:span*.45,leadZ:leadRoot+sweep*.42,chord:rootChord*.74+tipChord*.26,y:wingHeight+(highWing?.04:.14),thick:.115,camber:.028,twist:.01},
-          {x:span,leadZ:leadRoot+sweep,chord:tipChord,y:wingHeight+(highWing?.12:.34),thick:.095,camber:.020,twist:-.03,tipCurlY:.08}
-        ],{slices:28,capTip:true,mirror:side<0});
+        const wGeo=AeroCraft.buildWingLoft(wStations,{slices:28,capTip:true,mirror:side<0});
         group.add(new THREE.Mesh(wGeo,wingMat));
         // Aerodynamic horizontal stabilizer (camber 0 NACA-0010 tailplane)
         const hTailY=profile.jet?radius*1.58:radius*.24;
@@ -867,39 +885,43 @@ function initialize(){
           {x:span*.35,leadZ:length*.69,chord:length*.14,y:hTailY+(profile.jet?0:.04),thick:.085,camber:0,twist:0}
         ],{slices:18,capTip:true,mirror:side<0});
         group.add(new THREE.Mesh(hGeo,wingMat));
-        // Contoured airfoil aileron / flap hinge surface
+        // Contoured airfoil aileron / flap hinge surface aligned symmetrically to left/right wing trailing edge
+        const wIn=wingAt(span*.48),wOut=wingAt(span*.82);
         const hinge=new THREE.Group();
-        hinge.position.set(side*span*.52,wingHeight+(highWing?.06:.18),leadRoot+sweep*.52+rootChord*.62);
+        hinge.position.set(side*span*.48,wIn.y,wIn.leadZ+wIn.chord*.82);
         const fGeo=AeroCraft.buildWingLoft([
-          {x:-span*.18,leadZ:0,chord:length*.14,y:0,thick:.09,camber:.015},
-          {x:span*.18,leadZ:sweep*.12,chord:length*.11,y:.02,thick:.085,camber:.015}
-        ],{slices:14,capTip:false});
+          {x:0,leadZ:0,chord:wIn.chord*.19,y:0,thick:.085,camber:.012},
+          {x:span*.34,leadZ:(wOut.leadZ+wOut.chord*.82)-(wIn.leadZ+wIn.chord*.82),chord:wOut.chord*.19,y:wOut.y-wIn.y,thick:.075,camber:.012}
+        ],{slices:12,capTip:false,mirror:side<0});
         hinge.add(new THREE.Mesh(fGeo,flapMat));
         group.add(hinge);surfaces.push(hinge);
-        // Contoured diagonal wing strut fairing for high-wing trainers (Cessna style)
+        // Contoured diagonal wing strut fairing connecting fuselage belly to high-wing underside
         if(highWing){
-          const strutLen=Math.hypot(span*.42,wingHeight+radius*.58);
-          const strutGeo=new THREE.CylinderGeometry(radius*.055,radius*.07,strutLen,10);
-          strutGeo.scale(1.6,1,.65);
+          const wS=wingAt(span*.44);
+          const dx=side*(span*.44-radius*.62), dy=(wS.y-.04)-(-radius*.38), sLen=Math.hypot(dx,dy);
+          const strutGeo=new THREE.CylinderGeometry(radius*.045,radius*.055,sLen,10);
+          strutGeo.scale(1.5,1,.62);
           const strut=new THREE.Mesh(strutGeo,trimDark);
-          strut.position.set(side*span*.23,wingHeight*.5-radius*.25,-length*.10);
-          strut.rotation.z=-side*Math.atan2(span*.36,wingHeight+radius*.55);
+          strut.position.set(side*radius*.62+dx*.5,-radius*.38+dy*.5,wS.leadZ+wS.chord*.35);
+          strut.rotation.z=Math.atan2(-dx,dy);
           group.add(strut);
         }
-        // Aerodynamic gear leg + teardrop wheel pant
-        const legH=Math.max(.32,profile.gearHeight-radius*.35);
-        const leg=new THREE.Mesh(new THREE.CylinderGeometry(radius*.07,radius*.055,legH,10),chrome);
-        leg.position.set(side*span*.20,-profile.gearHeight+legH*.52,length*.08);
-        leg.rotation.z=-side*.22;gear.add(leg);
-        const pant=new THREE.Mesh(AeroCraft.buildWheelPantGeometry(radius*.36,radius*.22),accent);
-        pant.position.set(side*span*.23,-profile.gearHeight+.30,length*.09);gear.add(pant);
+        // Aerodynamic main gear leg anchored inside lower fuselage down to wheel pant hub
+        const gTopX=side*radius*.52,gTopY=-radius*.36,gBotX=side*span*.23;
+        const gdx=gBotX-gTopX, gdy=pantY-gTopY, gdz=length*.09-length*.08, gLen=Math.hypot(gdx,gdy,gdz);
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(radius*.06,radius*.05,gLen,10),chrome);
+        leg.position.set(gTopX+gdx*.5,gTopY+gdy*.5,length*.08+gdz*.5);
+        leg.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),new THREE.Vector3(gdx,gdy,gdz).normalize());
+        gear.add(leg);
+        const pant=new THREE.Mesh(AeroCraft.buildWheelPantGeometry(radius*.34,radius*.20),accent);
+        pant.position.set(gBotX,pantY,length*.09);gear.add(pant);
       }else{
         const geo=new THREE.BufferGeometry();
         geo.setAttribute('position',new THREE.Float32BufferAttribute([0,wingHeight,leadRoot,side*span,wingHeight+.20,leadRoot+sweep,side*span,wingHeight+.20,leadRoot+sweep+tipChord,0,wingHeight,leadRoot+rootChord],3));
         geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();group.add(new THREE.Mesh(geo,wingMat));
       }
       const nav=new THREE.Mesh(new THREE.SphereGeometry(.10,10,8),new THREE.MeshBasicMaterial({color:side<0?0xdc3934:0x35dba0}));
-      nav.position.set(side*span,wingHeight+(highWing?.13:.34),leadRoot+sweep+tipChord*.22);
+      nav.position.set(side*span,wStations[2].y,leadRoot+sweep+tipChord*.22);
       group.add(nav);navLights.push(nav);
     }
     // Swept NACA-0010 vertical fin with curved dorsal fillet
@@ -910,10 +932,13 @@ function initialize(){
         {y:radius*2.35,leadZ:length*.72,chord:length*.16,thick:.085}
       ],{slices:20,capTip:true}),accent);
       group.add(vFin);
-      const nLeg=new THREE.Mesh(new THREE.CylinderGeometry(radius*.065,radius*.055,Math.max(.32,profile.gearHeight-.2),10),chrome);
-      nLeg.position.set(0,-profile.gearHeight*.52,-length*.54);nLeg.rotation.x=-.14;gear.add(nLeg);
-      const nPant=new THREE.Mesh(AeroCraft.buildWheelPantGeometry(radius*.32,radius*.20),accent);
-      nPant.position.set(0,-profile.gearHeight+.26,-length*.56);gear.add(nPant);
+      const nTopY=-radius*.32,nTopZ=-length*.48,nBotZ=-length*.56,ndy=nPantY-nTopY,ndz=nBotZ-nTopZ;
+      const nLeg=new THREE.Mesh(new THREE.CylinderGeometry(radius*.055,radius*.045,Math.hypot(ndy,ndz),10),chrome);
+      nLeg.position.set(0,nTopY+ndy*.5,nTopZ+ndz*.5);
+      nLeg.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),new THREE.Vector3(0,ndy,ndz).normalize());
+      gear.add(nLeg);
+      const nPant=new THREE.Mesh(AeroCraft.buildWheelPantGeometry(radius*.30,radius*.18),accent);
+      nPant.position.set(0,nPantY,nBotZ);gear.add(nPant);
     }else{
       const tail=new THREE.Shape();tail.moveTo(0,0);tail.lineTo(length*.43,0);tail.lineTo(length*.32,radius*2.2);tail.lineTo(length*.18,radius*2.2);tail.closePath();
       const fin=new THREE.Mesh(new THREE.ExtrudeGeometry(tail,{depth:.14,bevelEnabled:false}),accent);
@@ -924,29 +949,37 @@ function initialize(){
       ?new THREE.MeshBasicMaterial({map:AeroCraft.getPropBlurTexture(THREE),transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide})
       :null;
     for(let i=0;i<count;i++){
-      const x=count===1?0:(i===0?-1:1)*span*(profile.jet?.21:.34);
-      const y=profile.jet?.34:count===1?-.02:wingHeight-.04;
-      const z=profile.jet?length*.48:count===1?-length*.96:-length*.36;
+      const x=count===1?0:(count===4?[-.65,-.33,.33,.65][i]:(i===0?-.34:.34))*span*(profile.jet?.62:1);
+      const wE=count>=2&&!profile.jet?wingAt(Math.abs(x)):null;
+      const y=profile.jet?.34:count===1?-.02:(wE?wE.y-.04:wingHeight-.04);
+      const z=profile.jet?length*.48:count===1?-length*.96:(wE?wE.leadZ-length*.06:-length*.36);
       if(profile.jet&&typeof AeroCraft!=='undefined'){
         const nac=AeroCraft.buildTurbofanNacelle(THREE,radius*.52,.78,{surface:accent,metal:chrome,dark:trimDark},{chevron:false});
         nac.group.scale.setScalar(.85);nac.group.position.set(x,y,z);group.add(nac.group);
-      }else if(count===2){
-        const nacBody=new THREE.Mesh(new THREE.CapsuleGeometry(radius*.38,length*.24,6,14),accent);
-        nacBody.rotation.x=Math.PI/2;nacBody.position.set(x,wingHeight,z+length*.14);group.add(nacBody);
+        if(Math.abs(x)>radius*.55){
+          const pLen=Math.abs(x)-radius*.42;
+          const pylon=new THREE.Mesh(new THREE.BoxGeometry(pLen,radius*.16,length*.14),accent);
+          pylon.position.set(Math.sign(x)*(radius*.42+pLen*.5),y,z+length*.04);
+          group.add(pylon);
+        }
+      }else if(count>=2){
+        const nacBody=new THREE.Mesh(new THREE.CapsuleGeometry(radius*.36,length*.22,6,14),accent);
+        nacBody.rotation.x=Math.PI/2;nacBody.position.set(x,wE?wE.y:wingHeight,z+length*.16);group.add(nacBody);
       }
       if(!profile.jet){
         const propGroup=new THREE.Group();propGroup.position.set(x,y,z);
-        const cone=new THREE.Mesh(new THREE.ConeGeometry(radius*.24,radius*.52,18),chrome);
+        const cone=new THREE.Mesh(new THREE.ConeGeometry(radius*.22,radius*.48,18),chrome);
         cone.rotation.x=-Math.PI/2;propGroup.add(cone);
         const bladeCount=count===1?2:3;
-        const bRadius=span*(count===1?.24:.19);
+        const maxSafePropR=Math.max(radius*.65,y+profile.gearHeight-.22);
+        const bRadius=Math.min(span*(count===1?.23:.18),maxSafePropR);
         const bladeGeo=typeof AeroCraft!=='undefined'
-          ?AeroCraft.buildTwistedBlade(bRadius,radius*.17,radius*.075,.38)
+          ?AeroCraft.buildTwistedBlade(bRadius,radius*.16,radius*.07,.38)
           :new THREE.BoxGeometry(bRadius,.09,.09);
         for(let b=0;b<bladeCount;b++){
           const blade=new THREE.Mesh(bladeGeo,trimDark);
           blade.rotation.z=(b/bladeCount)*Math.PI*2;
-          blade.rotation.y=Math.PI/2;
+          blade.rotation.x=.22;
           propGroup.add(blade);
         }
         group.add(propGroup);blades.push(propGroup);
@@ -1056,7 +1089,7 @@ function initialize(){
       }
       pfdTex.needsUpdate=true;
     }
-    group.userData={gear,blades,surfaces,navLights,propDiscs,propBlurMat,cockpitCanopy:glass,cabin:gaCockpit,updateGaCockpit};
+    group.userData={gear,blades,surfaces,navLights,half:length,radius,wheels:[],flaps:surfaces,palletMeshes:[],propDiscs,propBlurMat,cockpitCanopy:glass,cabin:gaCockpit,updateGaCockpit};
     scene.add(group);
     return group;
   }
@@ -1362,7 +1395,17 @@ function initialize(){
   const aeroFX=createTouchdownSmokeAndVortex(scene);
   const models=new Map(),airlinerDetails={};
   function aircraftModel(profile){
-    if(models.has(profile.id)) return models.get(profile.id);
+    if(models.has(profile.id))return models.get(profile.id);
+    if(models.size>=4){
+      const victim=[...models.keys()].find(id=>id!==flight?.aircraft.id);
+      if(victim){
+        const old=models.get(victim),geos=new Set(),mats=new Set();
+        for(const root of [old,old.userData.cabin])if(root){root.removeFromParent();root.traverse(o=>{if(o.geometry)geos.add(o.geometry);for(const m of o.material?(Array.isArray(o.material)?o.material:[o.material]):[])mats.add(m);});}
+        geos.forEach(g=>g.dispose());mats.forEach(m=>m.dispose());
+        aircraftSkins.releaseProfile?.(victim);
+        models.delete(victim);delete airlinerDetails[victim];
+      }
+    }
     const model=profile.helicopter?buildHelicopter(profile,scene):profile.role?buildBenchmarkAirframe(profile,scene):makeAircraft(profile,fleet.indexOf(profile));
     if(profile.role==='fighter')refineFighter(model,profile);
     if(typeof aircraftSkins!=='undefined') aircraftSkins.applyLivery(model,profile,THREE);
@@ -1372,7 +1415,7 @@ function initialize(){
     }
     if(typeof cockpitEnhancements!=='undefined') cockpitEnhancements.enhanceCockpit(model,profile,THREE);
     if(typeof cockpitElectrical!=='undefined'&&model.userData&&model.userData.cabin){
-      cockpitElectrical.buildSwitchPanel(THREE,model.userData.cabin,profile.role==='fighter');
+      cockpitElectrical.buildSwitchPanel(THREE,model.userData.cabin,profile.role==='fighter',profile);
     }
     models.set(profile.id,model);
     return model;
@@ -1592,7 +1635,15 @@ function initialize(){
     byId('destination').add(new Option(labelAirport(r),r.code));
   }
   byId('destination').value='RCYU';
-  for(const m of fleet) byId('aircraft').add(new Option(m.name,m.id));
+  const planeCategory=byId('aircraftCategory');
+  for(const [value,label] of Object.entries(fleetCategories))planeCategory.add(new Option(label,value));
+  function populateAircraft(selected){
+    const matching=fleet.filter(p=>fleetMatches(p,planeCategory.value));
+    byId('aircraft').replaceChildren(...fleet.map(p=>{const o=new Option(p.name+(aircraftUnlocked(p)?'':' 🔒'),p.id);o.hidden=!fleetMatches(p,planeCategory.value);return o;}));
+    if(matching.some(p=>p.id===selected))byId('aircraft').value=selected;
+  }
+  populateAircraft('a223');
+  planeCategory.onchange=()=>{populateAircraft(byId('aircraft').value);drawPlan();};
   byId('aircraft').value='a223';
   const selectedAircraft=()=>fleet.find(m=>m.id===byId('aircraft').value);
   const selectedAirport=name=>airports.find(r=>r.code===byId(name).value);
@@ -1946,7 +1997,8 @@ function initialize(){
     byId('tacticalSetup').hidden=!isTactical;
     if(isTactical&&selectedAircraft().role!=='fighter') byId('aircraft').value='sf16';
     for(const option of byId('aircraft').options){
-      option.disabled=isTactical&&fleet.find(plane=>plane.id===option.value)?.role!=='fighter';
+      const p=fleet.find(plane=>plane.id===option.value);
+      option.disabled=!aircraftUnlocked(p)||(isTactical&&p?.role!=='fighter');
     }
     const isVoyage=lesson==='naritaCargo';
     if(isVoyage) byId('aircraft').value='sf748';
@@ -2503,7 +2555,7 @@ function initialize(){
       if(f.awaitingService&&groundServiceAllowed(f)) f.bridge=!f.bridge;
     }]);
     if(f.aircraft.role==='cargo'){
-      if(!f.aircraft.sideCargo) entries.push(['機鼻貨門',()=>f.noseDoor,()=>{if(groundServiceAllowed(f)) f.noseDoor=!f.noseDoor;}]);
+      if(!f.aircraft.sideCargo) entries.push([f.aircraft.tailCargo?'尾部裝載坡道':'機鼻貨門',()=>f.noseDoor,()=>{if(groundServiceAllowed(f)) f.noseDoor=!f.noseDoor;}]);
       if(f.voyage||f.aircraft.sideCargo) entries.push(['側貨門',()=>f.sideDoor,()=>{if(groundServiceAllowed(f)) f.sideDoor=!f.sideDoor;}]);
       entries.push(['主貨艙檢視',()=>f.cabinView,()=>{if(f.ground) f.cabinView=!f.cabinView;}]);
       const sheet=document.createElement('details');
@@ -2644,6 +2696,7 @@ function initialize(){
   }
   function start(approach,restart=false,preset=restart?flight?.quickPreset:null){
     try{
+      if(!aircraftUnlocked(selectedAircraft()))throw new Error(aircraftLockText(selectedAircraft()));
       const lesson=byId('lesson').value;
       const selection=regionalContracts[lesson]?regionalContractPlan(lesson):
         parsePlan(['free','cold','taxi','benchmark'].includes(lesson));
@@ -3094,21 +3147,30 @@ function initialize(){
   let hangarYaw=null,hangarElevation=.59,hangarZoom=1;
   const displayedAircraft=()=>fleet.find(a=>a.id===hangarAircraft.value);
   function populateHangar(selected){
-    const matching=fleet.filter(plane=>hangarFilter.value==='all'||(plane.helicopter?'helicopter':plane.role)===hangarFilter.value);
-    hangarAircraft.replaceChildren(...matching.map(plane=>new Option(plane.name,plane.id)));
+    const matching=fleet.filter(plane=>fleetMatches(plane,hangarFilter.value));
+    hangarAircraft.replaceChildren(...matching.map(plane=>new Option(plane.name+(aircraftUnlocked(plane)?'':' 🔒'),plane.id)));
     if(matching.some(plane=>plane.id===selected)) hangarAircraft.value=selected;
     updateHangarInfo();
   }
   function updateHangarInfo(){
     const plane=displayedAircraft();
     byId('hangarInfo').textContent=plane.type+' · 機長 '+(plane.geometry[0]*2).toFixed(1)+
-      ' m · 翼展 '+(plane.geometry[2]*2).toFixed(1)+' m';
+      ' m · 翼展 '+(plane.geometry[2]*2).toFixed(1)+' m · '+aircraftLockText(plane)+' · '+plane.modelStatus;
+    byId('hangarFly').disabled=!aircraftUnlocked(plane);
+    byId('hangarUnlock').hidden=aircraftUnlocked(plane);
+    byId('hangarUnlock').textContent=plane.unlock?'前往 '+plane.unlock.label:'';
     for(const option of hangarView.options){
       option.disabled=(option.value==='cabin'&&plane.role==='fighter')||
         (option.value==='cargoDoor'&&plane.role!=='cargo');
     }
     if(hangarView.selectedOptions[0]?.disabled) hangarView.value='orbit';
   }
+  hangarFilter.replaceChildren(...Object.entries(fleetCategories).map(([v,t])=>new Option(t,v)));
+  byId('hangarUnlock').onclick=()=>{
+    const plane=displayedAircraft();if(!plane?.unlock)return;
+    closeInspection();
+    window.dispatchEvent(new CustomEvent('skybound:unlock-mission',{detail:{chapter:plane.unlock.chapter}}));
+  };
   hangarAircraft.onchange=updateHangarInfo;
   hangarFilter.onchange=()=>populateHangar(hangarAircraft.value);
   hangarView.onchange=()=>{hangarZoom=1;hangarYaw=null;hangarElevation=.59;};
@@ -3176,6 +3238,8 @@ function initialize(){
   };
   byId('exitInspection').onclick=closeInspection;
   byId('hangarFly').onclick=()=>{
+    if(!aircraftUnlocked(displayedAircraft()))return;
+    planeCategory.value='all';populateAircraft(hangarAircraft.value);
     byId('aircraft').value=hangarAircraft.value;
     byId('lesson').value='free';
     closeInspection();drawPlan();byId('fly').focus();
@@ -5365,7 +5429,7 @@ function initialize(){
   function animateCargoDoors(data,noseOpen,sideOpen,dt){
     const blend=Math.min(1,dt*2.8);
     data.sideDoor.rotation.z+=(Number(sideOpen)*-1.33-data.sideDoor.rotation.z)*blend;
-    data.noseDoor.rotation.x+=(Number(noseOpen)*1.37-data.noseDoor.rotation.x)*blend;
+    data.noseDoor.rotation.x+=(Number(noseOpen)*(data.tailCargo?-.35:1.37)-data.noseDoor.rotation.x)*blend;
     if(data.cargoRamp){
       const extension=clamp((data.noseDoor.rotation.x-.31)/.98,0,1);
       data.cargoRamp.visible=extension>.025;
@@ -5624,8 +5688,12 @@ function initialize(){
       }
       const gear=model.userData.gear;
       const gearTarget=f.gear===false?0:1;
-      if(!paused) gear.scale.y+=(gearTarget-gear.scale.y)*Math.min(1,dt*4);
-      gear.visible=gear.scale.y>.06;
+      let gProg=gear.userData.progress??(gear.visible?1:0);
+      if(!paused) gProg+=(gearTarget-gProg)*Math.min(1,dt*4);
+      gear.userData.progress=gProg;
+      gear.position.y=(1-gProg)*profile.gearHeight*.58;
+      gear.scale.setScalar(.35+.65*gProg);
+      gear.visible=gProg>.12;
       model.userData.blades.forEach((blade,i)=>{if(!paused&&(f.engines?.[i]??true)) blade.rotation.z+=dt*(9+f.power*135)*(f.propLow?.72:1);});
       if(model.userData.propBlurMat){
         const spinning=f.engines?.some(Boolean)??true;
@@ -5687,7 +5755,7 @@ function initialize(){
         }
         if(profile.role==='cargo'){
           if(f.ground&&(f.noseDoor||f.sideDoor)&&!f.cabinView){
-            const offset=new THREE.Vector3(f.sideDoor?-data.radius-5:0,-profile.gearHeight+.5,f.sideDoor?data.sideDoor.position.z:-data.half-4);
+            const offset=new THREE.Vector3(f.sideDoor?-data.radius-5:0,-profile.gearHeight+.5,f.sideDoor?data.sideDoor.position.z:profile.tailCargo?data.half+4:-data.half-4);
             cargoLoader.position.copy(pos).add(offset.applyQuaternion(model.quaternion));
             cargoLoader.rotation.y=model.rotation.y+(f.sideDoor?Math.PI/2:0);
             cargoLoader.visible=true;
@@ -5700,7 +5768,7 @@ function initialize(){
         data.cabin.visible=cameraMode===1||Boolean(f.cabinView);
         data.palletMeshes.forEach((pallet,index)=>{
           const loaded=f.pallets[index]>0;
-          const entry=profile.sideCargo?data.sideDoor.position.z:-data.half-4;
+          const entry=profile.sideCargo?data.sideDoor.position.z:profile.tailCargo?data.half+4:-data.half-4;
           const station=palletStations[index].arm;
           const doorOpen=f.noseDoor||f.sideDoor;
           const desired=loaded?station:entry;
@@ -6055,7 +6123,7 @@ function initialize(){
       const apparentSize=innerHeight*model.userData.half/(distance*Math.tan(viewFov*rad/2));
       model.userData.closeDetails.visible=hangarMode||apparentSize>145;
     }
-    const targetNear=cockpitActive()?0.14:0.6;
+    const targetNear=cockpitActive()||(!flight&&['panel','night','cabin'].includes(previewInspection))?0.14:0.6;
     if(Math.abs(camera.fov-viewFov)>0.02||camera.near!==targetNear){camera.fov=viewFov;camera.near=targetNear;camera.updateProjectionMatrix();}
     drawMouseYoke();
     updateTaiwanOverview(flight);

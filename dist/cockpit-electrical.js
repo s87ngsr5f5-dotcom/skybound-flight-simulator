@@ -141,7 +141,7 @@
     }
 
     // Build 3D switch panel inside cockpit
-    function buildSwitchPanel(THREE, cabin, isFighter) {
+    function buildSwitchPanel(THREE, cabin, isFighter, profile) {
       if (!cabin) return null;
       panelGroup = new THREE.Group();
       panelGroup.name = 'electricalSwitchPanel';
@@ -232,9 +232,19 @@
       });
 
       // Position panel in cockpit (center console or lower left depending on airframe)
+      const g = profile && profile.geometry;
       if (isFighter) {
-        panelGroup.position.set(-0.28, -0.15, -0.52);
+        panelGroup.position.set(g ? -Math.min(0.28, g[1] * 0.25) : -0.28, -0.15, -0.52);
         panelGroup.rotation.set(-0.35, 0.28, 0);
+      } else if (profile && (profile.role === 'passenger' || profile.role === 'cargo')) {
+        panelGroup.position.set(0, g[1] * 0.17 - 0.24, -g[0] * 0.56 + 0.05);
+        panelGroup.rotation.set(-0.85, 0, 0);
+      } else if (profile && profile.helicopter) {
+        panelGroup.position.set(0, -0.22, -1.78);
+        panelGroup.rotation.set(-0.65, 0, 0);
+      } else if (g) {
+        panelGroup.position.set(0, g[1] * 0.44, -g[0] * 0.36);
+        panelGroup.rotation.set(-0.55, 0, 0);
       } else {
         panelGroup.position.set(0, -0.18, -0.56);
         panelGroup.rotation.set(-0.45, 0, 0);

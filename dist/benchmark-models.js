@@ -5,8 +5,9 @@ function buildBenchmarkAirframe(profile,scene){
   group.add(closeDetails);
   const [half,radius,span,wingY,engineCount,sweep]=profile.geometry;
   const fighter=profile.role==='fighter', freight=profile.role==='cargo';
+  const f16=fighter&&(profile.id==='sf16'||profile.f16Family);
   const antonov=Boolean(profile.antonov), upperDeck=profile.upperDeck;
-  const noseLoader=freight&&!profile.sideCargo;
+  const noseLoader=freight&&!profile.sideCargo&&!profile.tailCargo;
   const fuselageHeight=antonov?1.12:noseLoader?1.06:1.18;
   const detailed=profile.role==='passenger'&&engineCount===2;
   const color=fighter?0x778798:freight?0xd9e2e4:0xf2f5f7;
@@ -58,19 +59,42 @@ function buildBenchmarkAirframe(profile,scene){
     const radome=surface.clone();
     radome.color.setHex(0x54616b);
     hull(group,[[-half,.014],[-half*.91,radius*.17],[-half*.73,radius*.39]],radome,.86);
-    hull(group,[[-half*.73,radius*.39],[-half*.30,radius*.82],[half*.20,radius],
-      [half*.72,radius*.78],[half,radius*.64]],surface,.86);
-    const canopyZ=-half*(profile.sideIntakes?.40:.37),canopyY=radius*.57;
-    const canopyLength=half*(profile.sideIntakes?.17:.185);
-    const canopyWidth=radius*(profile.sideIntakes?.62:.58);
-    const canopyBase=mesh(group,new THREE.SphereGeometry(1,32,14),paint,0,canopyY-.035,canopyZ);
-    canopyBase.scale.set(canopyWidth+.025,.12,canopyLength+.075);
-    const canopy=mesh(group,new THREE.SphereGeometry(1,40,18,0,Math.PI*2,0,Math.PI/2),glazing,0,canopyY,canopyZ);
-    canopy.scale.set(canopyWidth,radius*.43,canopyLength);
+    if(!f16&&typeof AeroCraft!=='undefined'){
+      const wide=profile.twinTail||engineCount===2,flat=profile.rectangularNozzle;
+      const w=wide?1.45:1;
+      const fighterHull=AeroCraft.buildFuselageLoft([
+        {z:-half*.73,rx:radius*.39,ryTop:radius*.34,ryBot:radius*.31,y:0,power:2},
+        {z:-half*.43,rx:radius*.68,ryTop:radius*.58,ryBot:radius*.48,y:0,power:flat?2.7:2},
+        {z:-half*.13,rx:radius*w,ryTop:radius*(flat?.46:.72),ryBot:radius*.52,y:0,power:flat?3.1:2.4},
+        {z:half*.35,rx:radius*w,ryTop:radius*(flat?.43:.74),ryBot:radius*.49,y:0,power:flat?3.1:2.4},
+        {z:half*.74,rx:radius*(wide?1.06:.76),ryTop:radius*.45,ryBot:radius*.38,y:0,power:2.5},
+        {z:half,rx:radius*(wide?.85:.57),ryTop:radius*.38,ryBot:radius*.34,y:0,power:2.5}
+      ],32);
+      mesh(group,fighterHull,surface).name=profile.id+' blended fighter fuselage';
+    }else{
+      hull(group,[[-half*.73,radius*.39],[-half*.30,radius*.82],[half*.20,radius],
+        [half*.72,radius*.78],[half,radius*.64]],surface,profile.bodyHeight??.86);
+    }
+    const canopyZ=-half*(f16?.41:profile.sideIntakes?.39:.36),canopyY=radius*(f16?.53:.45);
+    const canopyLength=half*(f16?.24:profile.sideIntakes?.20:.21);
+    const canopyWidth=radius*(profile.sideIntakes?.46:.43);
+    const canopyHeight=radius*(f16?.33:.24);
+    const canopyBase=mesh(group,new THREE.SphereGeometry(1,32,14),paint,0,canopyY-.015,canopyZ);
+    canopyBase.scale.set(canopyWidth+.018,.055,canopyLength+.055);
+    const canopyGeo=typeof AeroCraft!=='undefined'
+      ?AeroCraft.buildCanopyGeometry(canopyLength*2.05,canopyWidth*2,canopyHeight,18,24,{streamlined:true})
+      :new THREE.SphereGeometry(1,40,18,0,Math.PI*2,0,Math.PI/2);
+    const canopy=mesh(group,canopyGeo,glazing,0,canopyY,canopyZ);
+    if(typeof AeroCraft==='undefined') canopy.scale.set(canopyWidth,canopyHeight,canopyLength);
+    canopy.rotation.x=-.055;
+    canopy.name=f16?'F16 bubble canopy':'Fighter canopy';
+    if(typeof AeroCraft!=='undefined'){
+      mesh(group,AeroCraft.buildCanoeGeometry(half*.30,canopyWidth*.84,canopyHeight*.52),surface,0,canopyY-.01,canopyZ+canopyLength*.92);
+    }
     const seam=[];
     for(let i=0;i<=40;i++){
       const t=i*Math.PI/20;
-      seam.push(new THREE.Vector3(Math.cos(t)*(canopyWidth+.018),canopyY+.014,canopyZ+Math.sin(t)*(canopyLength+.018)));
+      seam.push(new THREE.Vector3(Math.cos(t)*(canopyWidth+.012),canopyY+.008,canopyZ+Math.sin(t)*(canopyLength+.012)));
     }
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(seam),new THREE.LineBasicMaterial({color:0x3d4c56})));
     const probe=mesh(group,new THREE.CylinderGeometry(.014,.032,.30,10),metal,0,0,-half-.13);
@@ -95,13 +119,13 @@ function buildBenchmarkAirframe(profile,scene){
         if(profile.delta){
           const spike=mesh(group,new THREE.ConeGeometry(.21,.6,18),metal,intakeSide-side*.10,-.22,intakeZ-.14);
           spike.rotation.x=-Math.PI/2;
-        }else{
+        }else if(engineCount===2){
           const exhaust=side*(profile.wideIntakes?.46:.38);
           hull(group,[[half*.84,.34],[half*.96,.32],[half*1.01,.28]],metal).position.set(exhaust,-.12,0);
           mesh(group,new THREE.CircleGeometry(.24,24),dark,exhaust,-.12,half*1.01+.02);
         }
       }
-      if(profile.delta){
+      if(profile.delta||engineCount===1){
         hull(group,[[half-.75,.59],[half-.23,.60],[half,.51]],metal,.92);
         mesh(group,new THREE.CircleGeometry(.45,32),dark,0,0,half+.014);
       }
@@ -140,8 +164,6 @@ function buildBenchmarkAirframe(profile,scene){
       }
     }else{
       hull(group,body,surface,fuselageHeight);
-      const lower=hull(group,body.map(([z,r])=>[z,r*.91]),paint,1.06);
-      lower.position.y=-radius*.31;
       if(profile.sideCargo){
         sideDoor.position.set(-radius*.96,radius*.49,-half*.49);
         block(sideDoor,metal,.12,2.58,3.45,0,-1.29,0);
@@ -232,15 +254,16 @@ function buildBenchmarkAirframe(profile,scene){
         if(doorZ.every(door=>Math.abs(z-door)>.72)) windowPositions.push(z);
       }
       for(const side of [-1,1]){
-        for(const [left,right] of [[.08,.44],[.49,.80],[.85,1.12]]){
-          const z0=half*(upperSkin?-.81:antonov?-.768:-.909)+(left-.08)*half*.055;
-          const z1=z0+Math.min(1.24,half*.044);
-          const outline=[[z0,left*side],[z1,(left-.055)*side],[z1+half*.008,right*side],[z0+half*.014,right*side]];
-          skinPanel(outline,windowFrame,.032);
+        const panePairs=profile.fullDoubleDeck?[[.32,.66],[.70,.98],[1.02,1.26]]:[[.08,.44],[.49,.80],[.85,1.12]];
+        for(const [left,right] of panePairs){
+          const z0=half*(upperSkin?-.82:profile.fullDoubleDeck?-.885:antonov?-.768:-.909)+(left-panePairs[0][0])*half*.05;
+          const z1=z0+Math.min(1.18,half*.042);
+          const outline=[[z0,left*side],[z1,(left-.048)*side],[z1+half*.007,right*side],[z0+half*.012,right*side]];
+          skinPanel(outline,windowFrame,.016);
           const center=outline.reduce((mean,p)=>[mean[0]+p[0]/4,mean[1]+p[1]/4],[0,0]);
-          skinPanel(outline.map(p=>p.map((value,k)=>center[k]+(value-center[k])*.86)),windshield,.053);
+          skinPanel(outline.map(p=>p.map((value,k)=>center[k]+(value-center[k])*.86)),windshield,.026);
         }
-        const rows=freight?[]:engineCount===4&&!upperSkin?[1.44,.91]:[1.38];
+        const rows=freight?[]:profile.fullDoubleDeck?[1.44,.91]:[1.38];
         const upperWindows=upperSkin?Array.from({length:upperDeck==='long'?19:4},(_,i)=>-half*.70+i*.70):[];
         if(freight&&!upperWindows.length) continue;
         const windows=new THREE.InstancedMesh(windowGeo,windshield,windowPositions.length*rows.length+upperWindows.length);
@@ -314,7 +337,7 @@ function buildBenchmarkAirframe(profile,scene){
   }
   const surfaces=[], flaps=[], lamps=[], fans=[], airBrakes=[], exhaustPlumes=[], strobes=[], beacons=[];
   if(fighter){
-    const twin=profile.sideIntakes&&!profile.delta;
+    const twin=engineCount===2;
     const nozzleZ=half*(twin?1.01:1)+.035;
     for(const x of twin?[-1,1].map(side=>side*(profile.wideIntakes?.46:.38)):[0]){
       const plume=new THREE.Group();
@@ -346,24 +369,28 @@ function buildBenchmarkAirframe(profile,scene){
     }
   }
   for(const side of [-1,1]){
-    const chord=profile.delta?6.3:fighter?(profile.wideIntakes?3.65:profile.sideIntakes?2.85:4.4):half*.51;
-    const root=-half*(profile.delta?.39:fighter?.29:.24);
-    const tip=root+sweep;
+    const chord=profile.wingRootChord??(profile.delta?half*.88:fighter?(profile.wideIntakes?3.65:profile.sideIntakes?2.85:4.4):half*.51);
+    // F-16's clipped swept wing must not inherit the shallow generic wing sweep.
+    const wingSweep=f16?3.10:profile.delta?half*.77:sweep;
+    const root=-half*(profile.delta?.39:f16?.265:fighter?.29:.24);
+    const tip=root+wingSweep;
+    const tipRatio=profile.wingTipRatio??.24;
+    const wingV=f=>Math.max(0,Math.min(1,(span*f-radius*.68)/Math.max(.5,span-radius*.68)));
+    const wingRake=v=>profile.rakedTip?Math.max(0,(v-.88)/.12):0;
+    const wingChordAt=v=>{const r=wingRake(v),yehudi=(!fighter&&v<.32)?Math.sin(v/.32*Math.PI*.5)*.14*chord:0;return chord*(1-(1-tipRatio)*v)*(1-r*.84)+yehudi;};
+    const wingLeadAt=v=>root+wingSweep*v+wingRake(v)*2.1;
+    const wingDihedralY=v=>wingY+v*v*(antonov?-1.15:fighter?-.05:.72);
     if(typeof AeroCraft!=='undefined'){
       // True multi-station cambered supercritical NACA airfoil loft with Yehudi trailing-edge kink, dihedral & washout
       const wingStations=[];
       const sections=18;
       for(let k=0;k<=sections;k++){
-        const v=k/sections,rake=profile.rakedTip?Math.max(0,(v-.88)/.12):0;
-        const yehudi=(!fighter&&v<.32)?Math.sin(v/.32*Math.PI*.5)*.14*chord:0;
-        const c=chord*(1-.76*v)*(1-rake*.84)+yehudi;
-        const lead=root+sweep*v+rake*2.1;
-        const dy=v*v*(antonov?-1.15:fighter?-.05:.72);
+        const v=k/sections;
         wingStations.push({
           x:radius*.68+v*(span-radius*.68),
-          leadZ:lead,
-          chord:c,
-          y:wingY+dy,
+          leadZ:wingLeadAt(v),
+          chord:wingChordAt(v),
+          y:wingDihedralY(v),
           thick:fighter?(.065-.02*v):(.135-.045*v),
           camber:fighter?.010:(.026-.010*v),
           twist:fighter?(-.02*v):(.025-.055*v),
@@ -372,47 +399,54 @@ function buildBenchmarkAirframe(profile,scene){
       }
       const wingGeo=AeroCraft.buildWingLoft(wingStations,{slices:32,capTip:true,mirror:side<0});
       const wingMat=surface.clone();wingMat.side=THREE.DoubleSide;
-      mesh(group,wingGeo,wingMat);
+      const mainWing=mesh(group,wingGeo,wingMat);
+      mainWing.name=(f16?'F16':profile.id)+(side<0?' port main wing':' starboard main wing');
       // Karman blended wing-body root fairing
       if(!fighter){
-        const kGeo=AeroCraft.buildCanoeGeometry(chord*1.48,radius*.48,radius*.34);
+        const kGeo=AeroCraft.buildCanoeGeometry(chord*1.42,radius*.44,radius*.30);
         mesh(group,kGeo,surface,side*radius*.78,wingY+.05,root+chord*.45);
       }
-      // Sculpted underwing flap-track canoe fairings for commercial airliners & freighters
+      // Sculpted underwing flap-track canoe fairings tucked strictly inside trailing edge
       if(!fighter&&engineCount>=2){
         for(const cf of [.24,.48,.68]){
-          const podLen=chord*(1-cf*.45)*.46;
-          const pod=mesh(group,AeroCraft.buildCanoeGeometry(podLen,radius*.075,radius*.065),surface,
-            side*span*cf,wingY-.18+cf*cf*.48,root+sweep*cf+chord*(1-.62*cf));
+          const cv=wingV(cf),c=wingChordAt(cv),podLen=Math.min(c*.52,chord*.36);
+          const pod=mesh(group,AeroCraft.buildCanoeGeometry(podLen,Math.min(radius*.055,.14),Math.min(radius*.048,.12)),surface,
+            side*span*cf,wingDihedralY(cv)-c*.045-radius*.045,wingLeadAt(cv)+c*.58);
           pod.rotation.x=-.04;
         }
       }
       // Curved blended winglet (airliners) or streamlined wingtip missile launch rail (fighters)
-      if(!profile.noWinglet&&!profile.rakedTip){
+      const tipWy=wingDihedralY(1.0),tipC=wingChordAt(1.0),tipLz=wingLeadAt(1.0);
+      if(f16||(!profile.noWinglet&&!profile.rakedTip)){
         if(fighter){
-          mesh(group,AeroCraft.buildCanoeGeometry(2.35,.065,.065),paint,side*span,wingY-.02,tip+chord*.18);
-          const tipMsl=AeroCraft.buildAeroMissile(2.55,.068,surface,paint,dark);
-          tipMsl.position.set(side*(span+(side>0?.08:-.08)),wingY-.05,tip+chord*.16);
-          group.add(tipMsl);
+          mesh(group,AeroCraft.buildCanoeGeometry(Math.min(2.35,tipC*1.9),.055,.055),paint,side*span,tipWy-.01,tipLz+tipC*.45);
+          // F-16 tactical stores are owned by the live loadout, not baked into its mesh.
+          if(!f16){
+            const tipMsl=AeroCraft.buildAeroMissile(Math.min(2.55,tipC*2.0),.062,surface,paint,dark);
+            tipMsl.position.set(side*(span+(side>0?.07:-.07)),tipWy-.03,tipLz+tipC*.42);
+            group.add(tipMsl);
+          }
         }else{
-          const wHeight=upperDeck==='long'?2.65:2.15;
-          const wlGeo=AeroCraft.buildBlendedWinglet(chord*.24,wHeight,1.45,.34,side<0);
-          mesh(group,wlGeo,paint,side*(span-.05),wingY+.65,tip+chord*.02);
+          const wHeight=Math.min(span*.09,upperDeck==='long'?2.65:2.15);
+          const wChord=Math.max(.35,Math.min(chord*.24,tipC*1.05));
+          const wlGeo=AeroCraft.buildBlendedWinglet(wChord,wHeight,wHeight*.65,.34,side<0);
+          mesh(group,wlGeo,paint,side*(span-.05),tipWy-.02,tipLz+tipC*.04);
           if(profile.splitWinglet){
-            const lowerWl=AeroCraft.buildBlendedWinglet(chord*.19,.95,.65,.48,side<0);
-            const lwMesh=mesh(group,lowerWl,paint,side*(span-.10),wingY+.58,tip+chord*.06);
+            const lowerWl=AeroCraft.buildBlendedWinglet(wChord*.82,wHeight*.44,wHeight*.28,.48,side<0);
+            const lwMesh=mesh(group,lowerWl,paint,side*(span-.09),tipWy-.04,tipLz+tipC*.08);
             lwMesh.scale.y=-1;
           }
         }
       }
       // Contoured swept NACA horizontal stabilizer (zero flat slabs)
       if(!profile.delta){
-        const hRootZ=half*.54,hTipZ=half*.73,hSpan=span*(fighter?.36:.33),hY=radius*(fighter?-.02:.10);
+        const hRootZ=half*.54,hTipZ=half*.73,hSpan=span*(profile.stabilatorSpan??(f16?.55:fighter?.36:.33)),hY=profile.tTail?radius*.62+half*.34:radius*(fighter?-.02:.10);
         const hGeo=AeroCraft.buildWingLoft([
-          {x:radius*.34,leadZ:hRootZ,chord:half*.19,y:hY,thick:.09,camber:0,twist:0},
+          {x:radius*.34,leadZ:hRootZ,chord:half*(f16?.26:.19),y:hY,thick:.09,camber:0,twist:0},
           {x:hSpan,leadZ:hTipZ,chord:half*.085,y:hY+(fighter?-.06:.18),thick:.075,camber:0,twist:-.02}
         ],{slices:20,capTip:true,mirror:side<0});
-        mesh(group,hGeo,wingMat);
+        const stabilator=mesh(group,hGeo,wingMat);
+        stabilator.name=(f16?'F16':profile.id)+(side<0?' port stabilator':' starboard stabilator');
       }
     }else{
       const wingVertices=[],wingIndices=[],sections=20,slices=32;
@@ -433,69 +467,107 @@ function buildBenchmarkAirframe(profile,scene){
       const wingGeo=new THREE.BufferGeometry();wingGeo.setAttribute('position',new THREE.Float32BufferAttribute(wingVertices,3));wingGeo.setIndex(wingIndices);wingGeo.computeVertexNormals();
       const wingMat=surface.clone();wingMat.side=THREE.DoubleSide;mesh(group,wingGeo,wingMat);
     }
+    if(profile.canard){
+      const canard=mesh(group,AeroCraft.buildWingLoft([
+        {x:radius*.65,leadZ:-half*.52,chord:half*.20,y:radius*.12,thick:.07,camber:0},
+        {x:span*.39,leadZ:-half*.37,chord:half*.07,y:radius*.14,thick:.06,camber:0}
+      ],{slices:16,mirror:side<0}),surface);
+      canard.name=profile.id+' canard';
+    }
+    const aV0=wingV(.54),aV1=wingV(.82),aC0=wingChordAt(aV0),aC1=wingChordAt(aV1);
+    const aTE0=wingLeadAt(aV0)+aC0*.84,aTE1=wingLeadAt(aV1)+aC1*.84;
     const aileron=new THREE.Group();
-    aileron.position.set(side*span*.66,wingY+(fighter?0:.30),profile.delta?root+sweep*.66+chord*.43:tip+chord*.23);
+    aileron.position.set(side*span*.54,wingDihedralY(aV0),aTE0);
     if(typeof AeroCraft!=='undefined'){
       const aGeo=AeroCraft.buildWingLoft([
-        {x:-span*.13,leadZ:0,chord:chord*.14,y:0,thick:.09,camber:.01},
-        {x:span*.13,leadZ:sweep*.05,chord:chord*.11,y:0,thick:.08,camber:.01}
-      ],{slices:12,capTip:false});
+        {x:0,leadZ:0,chord:aC0*.18,y:0,thick:.09,camber:.01},
+        {x:span*.28,leadZ:aTE1-aTE0,chord:aC1*.18,y:wingDihedralY(aV1)-wingDihedralY(aV0),thick:.08,camber:.01}
+      ],{slices:12,capTip:false,mirror:side<0});
       aileron.add(new THREE.Mesh(aGeo,paint));
     }else{
-      block(aileron,paint,span*.29,.15,chord*.13,0,0,chord*.065);
+      block(aileron,paint,span*.28,.15,aC0*.16,side*span*.14,0,aC0*.08);
     }
     group.add(aileron);surfaces.push(aileron);
+    const fV0=wingV(.22),fV1=wingV(.48),fC0=wingChordAt(fV0),fC1=wingChordAt(fV1);
+    const fTE0=wingLeadAt(fV0)+fC0*.82,fTE1=wingLeadAt(fV1)+fC1*.82;
     const flap=new THREE.Group();
-    flap.position.set(side*span*.28,wingY+.08,root+chord*.79);
+    flap.position.set(side*span*.22,wingDihedralY(fV0)-.02,fTE0);
     if(typeof AeroCraft!=='undefined'){
       const fGeo=AeroCraft.buildWingLoft([
-        {x:-span*.15,leadZ:0,chord:chord*.17,y:0,thick:.10,camber:.025},
-        {x:span*.15,leadZ:sweep*.06,chord:chord*.14,y:0,thick:.09,camber:.025}
-      ],{slices:12,capTip:false});
+        {x:0,leadZ:0,chord:fC0*.20,y:0,thick:.10,camber:.025},
+        {x:span*.26,leadZ:fTE1-fTE0,chord:fC1*.20,y:wingDihedralY(fV1)-wingDihedralY(fV0),thick:.09,camber:.025}
+      ],{slices:12,capTip:false,mirror:side<0});
       flap.add(new THREE.Mesh(fGeo,metal));
     }else{
-      block(flap,metal,span*.32,.14,chord*.17,0,0,chord*.085);
+      block(flap,metal,span*.26,.14,fC0*.18,side*span*.13,0,fC0*.09);
     }
     group.add(flap);flaps.push(flap);
     if(profile.delta){
       const brake=new THREE.Group();
-      brake.position.set(side*1.72,wingY+.22,.45);
+      brake.position.set(side*span*.34,wingDihedralY(wingV(.34))+.04,.45);
       block(brake,metal,.84,.045,.73,0,0,.365);
       block(brake,surface,.81,.035,.69,0,.036,.365);
       group.add(brake);airBrakes.push(brake);
     }
+    const tipY=wingDihedralY(1.0)+(fighter?0:profile.rakedTip?.18:.02),tipZ=wingLeadAt(1.0)+wingChordAt(1.0)*.25;
     const lamp=mesh(group,new THREE.SphereGeometry(fighter?.085:.19,12,8),
-      new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,wingY+.62,tip+(profile.rakedTip?2.2:0));
+      new THREE.MeshBasicMaterial({color:side===-1?0xed4f49:0x65ffd4}),side*span,tipY,tipZ);
     const strobe=mesh(group,new THREE.SphereGeometry(fighter?.095:.21,12,8),
-      new THREE.MeshBasicMaterial({color:0xffffff}),side*span,wingY+.62,tip+(profile.rakedTip?2.2:0)+.15);
+      new THREE.MeshBasicMaterial({color:0xffffff}),side*span,tipY,tipZ+.15);
     lamps.push(lamp);strobes.push(strobe);
-    if(!fighter&&engineCount>=2){
+    if(!fighter&&engineCount>=2&&!profile.rearEngines){
       for(const factor of engineCount===4?[.33,.65]:[.38]){
         const size=profile.nacelleRadius??(freight?1.43:1.78);
         const length=profile.rakedTip?1.35:1;
-        if(typeof AeroCraft!=='undefined'){
-          const nac=AeroCraft.buildTurbofanNacelle(THREE,size,length,{surface,metal,dark},{chevron:detailed||freight||engineCount===2});
+        const ev=wingV(factor),ewY=wingDihedralY(ev),elZ=wingLeadAt(ev);
+        if(profile.turboprop){
+          const x=side*span*factor,y=ewY-radius*.08,z=elZ+wingChordAt(ev)*.18;
+          const nac=hull(group,[[z-radius*1.8,radius*.29],[z-radius,radius*.36],[z+radius*1.8,radius*.26],[z+radius*2.1,.06]],surface);
+          nac.position.set(x,y,0);nac.name=profile.id+' turboprop engine';
+          const prop=new THREE.Group();prop.position.set(x,y,z-radius*1.85);group.add(prop);fans.push(prop);
+          const pr=Math.min(span*.20,radius*1.42,Math.max(radius*.85,y+profile.gearHeight-.26)),blades=profile.id==='a400m'?8:6;
+          for(let b=0;b<blades;b++){
+            const blade=mesh(prop,AeroCraft.buildTwistedBlade(pr,radius*.15,radius*.07,.38),dark);blade.rotation.z=b*Math.PI*2/blades;blade.rotation.x=.22;
+          }
+          const hub=mesh(prop,new THREE.ConeGeometry(radius*.23,radius*.5,18),metal);hub.rotation.x=-Math.PI/2;
+        }else if(typeof AeroCraft!=='undefined'){
+          const minSafeY=-profile.gearHeight+Math.max(.26,size*.22)+size*1.02;
+          const idealY=ewY-size*.62-.16;
+          const nacY=profile.overwingEngines?ewY+size+.32:Math.max(idealY,minSafeY);
+          const pylonH=profile.overwingEngines?Math.max(.22,nacY-size*.78-ewY+.03):Math.max(.18,ewY-nacY-size*.72+.03);
+          const nac=AeroCraft.buildTurbofanNacelle(THREE,size,length,{surface,metal,dark},{
+            chevron:detailed||freight||engineCount===2,
+            pylonHeight:pylonH,
+            pylonBaseY:size*.72,
+            overwing:Boolean(profile.overwingEngines)
+          });
           fans.push(nac.fanGroup);
-          nac.group.position.set(side*span*factor,wingY-size*.55-.36,root+sweep*factor-1.2);
+          nac.group.position.set(side*span*factor,nacY,elZ-size*.18);
+          nac.group.name=profile.id+' wing engine';
           group.add(nac.group);
         }else{
           const engine=new THREE.Group();
           hull(engine,[[-2.8,size*.89],[-2.52,size],[.82,size*.94],[1.8,size*.71]],surface);
           const fanGroup=new THREE.Group();engine.add(fanGroup);fans.push(fanGroup);
-          engine.scale.z=length;engine.position.set(side*span*factor,wingY-size*.55-.40,root+sweep*factor-1.5);
+          engine.scale.z=length;engine.position.set(side*span*factor,Math.max(ewY-size*.55-.32,-profile.gearHeight+size*1.25),elZ-size*.3);
           group.add(engine);
         }
       }
     }
   }
-  const tailHeight=half*(fighter?.41:antonov?.40:.36);
+  const tailHeight=profile.finHeight??half*(fighter?.41:antonov?.40:.36);
   if(typeof AeroCraft!=='undefined'){
     const finGeo=AeroCraft.buildVerticalFoilLoft([
       {y:radius*.42,leadZ:half*.24,chord:half*.56,thick:.085},
       {y:radius*.72+tailHeight*.22,leadZ:half*.48,chord:half*.34,thick:.09},
       {y:radius*.62+tailHeight*(fighter?1.08:1.0),leadZ:half*(fighter?.72:.70),chord:half*(fighter?.13:.16),thick:.08}
     ],{slices:22,capTip:true});
-    const vertical=mesh(group,finGeo,paint,0,0,0);
+    const vertical=mesh(group,finGeo,paint,profile.twinTail?-span*.23:0,0,0);
+    vertical.name=profile.id+' vertical fin';
+    if(profile.twinTail){
+      vertical.rotation.z=profile.finCant??.18;
+      const second=mesh(group,finGeo,paint,span*.23,0,0);second.rotation.z=-(profile.finCant??.18);second.name=profile.id+' second vertical fin';
+    }
     // Streamlined dorsal SATCOM radome & swept VHF blade antennas
     mesh(group,AeroCraft.buildCanoeGeometry(half*.14,radius*.22,radius*.16),surface,0,radius*1.02,half*.02);
     mesh(group,AeroCraft.buildAeroPylonGeometry(.45,.42,.20,.14,.18),metal,0,radius*.96,half*.12);
@@ -509,17 +581,36 @@ function buildBenchmarkAirframe(profile,scene){
     block(group,metal,.09,.29,.23,0,-radius*.87,half*.16);
   }
 
+  if(profile.rearEngines||profile.trijet){
+    const engineXs=profile.rearEngines?[-radius*1.35,radius*1.35]:[];
+    for(const x of engineXs){
+      const nac=AeroCraft.buildTurbofanNacelle(THREE,profile.nacelleRadius||radius*.52,.9,{surface,metal,dark},{chevron:false});
+      nac.group.position.set(x,radius*.25,half*.52);nac.group.name=profile.id+' rear engine';group.add(nac.group);fans.push(nac.fanGroup);
+      block(group,surface,Math.abs(x),.11,.45,x/2,radius*.25,half*.56);
+    }
+    if(engineCount===3){
+      const nac=AeroCraft.buildTurbofanNacelle(THREE,profile.nacelleRadius||radius*.52,.9,{surface,metal,dark},{chevron:false});
+      nac.group.position.set(0,radius*1.5,half*.58);nac.group.name=profile.id+' centre engine';group.add(nac.group);fans.push(nac.fanGroup);
+    }
+  }
+  if(profile.rectangularNozzle){
+    for(const side of [-1,1]){
+      const x=side*radius*.57,z=half*1.012;
+      block(group,metal,.94,.58,.36,x,-.08,z);
+      block(group,dark,.78,.40,.03,x,-.08,z+.19);
+    }
+  }
   const wheels=[];
   const bodyAxles=upperDeck?2:3;
   const bogies=antonov?[[0,-half*.65,2],...[-1,1].flatMap(side=>
     Array.from({length:5},(_,i)=>[side*radius*.98,-3.8+i*2.18,1]))]:
     fighter?[[0,-half*.54,1],[-1.12,1.3,1],[1.12,1.3,1]]:
-    engineCount===2?[[0,-half*.71,1],[-span*.128,2,profile.mainAxles??2],[span*.128,2,profile.mainAxles??2]]:
+    !upperDeck&&engineCount<=3?[[0,-half*.71,1],[-span*.128,2,profile.mainAxles??2],[span*.128,2,profile.mainAxles??2]]:
     [[0,-half*.71,1],[-span*.128,2,2],[span*.128,2,2],[-radius*.82,7.8,bodyAxles],[radius*.82,7.8,bodyAxles]];
   const tireShapes=new Map();
   for(const [x,z,axles] of bogies){
-    const size=fighter?.32:antonov?.61:radius>2.9?.64:.55;
-    const width=fighter?.21:.34;
+    const size=fighter?.32:antonov?.61:radius>2.9?.64:radius<1.5?Math.max(.24,Math.min(.44,profile.gearHeight*.24)):.55;
+    const width=fighter?.21:radius<1.5?.22:.34;
     if(!tireShapes.has(size)){
       const shoulder=[
         [.53,-.50],[.82,-.50],[.93,-.44],[.99,-.31],[1,-.17],[1,.17],[.99,.31],
@@ -550,6 +641,13 @@ function buildBenchmarkAirframe(profile,scene){
     }
   }
 
+  if(profile.tailCargo){
+    noseDoor.position.set(0,-radius*.52,half*.64);
+    const rampLength=Math.min(half*.44,8);
+    const ramp=block(noseDoor,metal,radius*1.55,.16,rampLength,0,0,rampLength*.5);
+    ramp.name=profile.id+' rear loading ramp';
+    for(const side of [-1,1])block(noseDoor,paint,.10,.16,rampLength,side*radius*.75,.10,rampLength*.5);
+  }
   const panel=new THREE.Group();
   const cabinFloor=new THREE.MeshStandardMaterial({color:0x364352,roughness:.83});
   const seat=new THREE.MeshStandardMaterial({color:freight?0x574c42:0x1c526d,roughness:.88});
@@ -607,7 +705,7 @@ function buildBenchmarkAirframe(profile,scene){
   lamps.push(tailLight);
   cabin.visible=false;
   scene.add(group,cabin);
-  group.userData={gear,blades:fans,surfaces,flaps,navLights:lamps,strobes,beacons,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,airBrakes,exhaustPlumes,cockpitGlassMats,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
+  group.userData={profileId:profile.id,tailCargo:profile.tailCargo,modelStatus:profile.modelStatus,gear,blades:fans,surfaces,flaps,navLights:lamps,strobes,beacons,noseDoor,sideDoor,cargoRamp,wheels,cabin,palletMeshes,passengerCabin,closeDetails,airBrakes,exhaustPlumes,cockpitGlassMats,half,radius,setLivery:owned=>paint.color.setHex(owned?0x1f9991:stockColor)};
   return group;
 }
 

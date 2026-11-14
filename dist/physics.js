@@ -279,7 +279,7 @@ function stepTrainer(f, input, dt=simTick){
   // Propeller P-Factor & Torque yaw (C172S etc. single-engine propeller at high alpha/power)
   const isPropeller=!aircraft.jet && Boolean(aircraft.power);
   const propPfactor=(isPropeller && !attitudeAssist && !f.ground && !f.hold) ?
-    -0.12*limit(alpha,-0.15,0.35)*f.power*(aircraft.power/119000)*(Math.abs(f.pitch)>.40?.08:1) : 0;
+    -0.12*limit(alpha,-0.15,0.35)*f.power*limit((aircraft.power/119000)*(1040/Math.max(1040,aircraft.mass)),0,2)*(Math.abs(f.pitch)>.40?.08:1) : 0;
   f.pFactor=propPfactor;
 
   // Feed in part of the additional lift needed for a steep turn.

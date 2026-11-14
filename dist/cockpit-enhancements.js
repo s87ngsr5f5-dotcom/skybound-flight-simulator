@@ -258,7 +258,9 @@ const cockpitEnhancements = (() => {
     // A. Windshield Micro-Scratch & Solar Glare Layer
     const glareTex = getWindshieldGlareTexture(THREE);
     if (glareTex) {
-      const glareGeo = new THREE.PlaneGeometry(isFighter ? 1.6 : 3.4, isFighter ? 1.4 : 2.1);
+      const gW = Math.min(isFighter ? 1.25 : 3.1, Math.max(.70, radius * 1.22));
+      const gH = Math.min(isFighter ? .95 : 1.72, Math.max(.55, radius * .92));
+      const glareGeo = new THREE.PlaneGeometry(gW, gH);
       const glareMat = new THREE.MeshPhysicalMaterial({
         map: glareTex,
         transparent: true,
@@ -276,14 +278,20 @@ const cockpitEnhancements = (() => {
 
       if (isFighter) {
         const eyeZ = -half * (profile.sideIntakes ? 0.40 : 0.37);
-        const eyeY = radius * 0.78 + 0.16;
-        glareMesh.position.set(0, eyeY + 0.08, eyeZ - 0.72);
-        glareMesh.rotation.x = -0.15;
+        const eyeY = radius * 0.72 + 0.12;
+        glareMesh.position.set(0, eyeY + 0.04, eyeZ - 0.65);
+        glareMesh.rotation.x = -0.22;
+      } else if (profile.helicopter) {
+        glareMesh.position.set(0, .52, -1.75);
+        glareMesh.rotation.x = -0.28;
+      } else if (!profile.role) {
+        glareMesh.position.set(0, radius * .72, -half * .42);
+        glareMesh.rotation.x = -0.26;
       } else {
         const cockpitZ = -half * 0.56;
         const cockpitY = radius * 0.17;
-        glareMesh.position.set(0, cockpitY + 0.85, cockpitZ - 1.25);
-        glareMesh.rotation.x = -0.22;
+        glareMesh.position.set(0, cockpitY + Math.min(0.85, radius * 0.45), cockpitZ - 1.22);
+        glareMesh.rotation.x = -0.24;
       }
       cockpitGroup.add(glareMesh);
       data.windshieldGlare = glareMesh;
@@ -292,7 +300,8 @@ const cockpitEnhancements = (() => {
     // B. Warning Placards Decals on Pedestal & Glare Shield
     const placardTex = getPlacardTexture(THREE, isFighter);
     if (placardTex) {
-      const pGeo = new THREE.PlaneGeometry(isFighter ? 0.42 : 0.65, isFighter ? 0.42 : 0.65);
+      const pSize = Math.min(isFighter ? 0.36 : 0.58, Math.max(0.24, radius * 0.36));
+      const pGeo = new THREE.PlaneGeometry(pSize, pSize);
       const pMat = new THREE.MeshBasicMaterial({
         map: placardTex,
         transparent: true,
@@ -304,9 +313,15 @@ const cockpitEnhancements = (() => {
 
       if (isFighter) {
         const eyeZ = -half * (profile.sideIntakes ? 0.40 : 0.37);
-        const eyeY = radius * 0.78 + 0.16;
-        placardMesh.position.set(0.48, eyeY - 0.42, eyeZ - 0.58);
+        const eyeY = radius * 0.72 + 0.12;
+        placardMesh.position.set(Math.min(0.42, radius * 0.36), eyeY - 0.38, eyeZ - 0.55);
         placardMesh.rotation.set(-0.25, -0.18, 0);
+      } else if (profile.helicopter) {
+        placardMesh.position.set(0, -.12, -1.85);
+        placardMesh.rotation.x = -Math.PI / 2 + 0.35;
+      } else if (!profile.role) {
+        placardMesh.position.set(0, radius * .50, -half * .38);
+        placardMesh.rotation.x = -Math.PI / 2 + 0.35;
       } else {
         const cockpitZ = -half * 0.56;
         const cockpitY = radius * 0.17;

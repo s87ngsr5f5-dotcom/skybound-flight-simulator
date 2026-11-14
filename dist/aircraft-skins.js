@@ -449,6 +449,7 @@ const aircraftSkins = (() => {
     }
 
     const isFighter = profile.role === 'fighter';
+    const isF16 = isFighter && (profile.id === 'sf16' || profile.f16Family);
     const isPassenger = profile.role === 'passenger' || profile.role === 'cargo';
     const isHelicopter = Boolean(profile.helicopter);
     const isTrainer = profile.id === 'c172s';
@@ -488,14 +489,17 @@ const aircraftSkins = (() => {
     const decalGroup = new THREE.Group();
     decalGroup.name = 'AircraftSkins_Decals';
 
-    // A. Fighter Decals (Roundels on Wings & Fuselage, Tail Art, Wing Spine Stripes)
+    // A. Fighter Decals (Roundels on Wings & Fuselage, Tail Art)
     if (isFighter) {
       const roundelTex = createRoundelTexture(THREE, theme.id === 'camo');
       const tailTex = createFighterTailTexture(THREE, profile, theme.id);
       const wingTex = createWingStripeTexture(THREE, profile, theme.id);
+      const fWingY = (profile.geometry[3] ?? 0.12) + 0.085;
+      const fWingZ = isF16 ? half * 0.10 : half * 0.12;
 
       if (roundelTex) {
-        const roundelGeo = new THREE.PlaneGeometry(1.4, 1.4);
+        const rwSize = Math.min(0.68, radius * 0.72);
+        const roundelGeo = new THREE.PlaneGeometry(rwSize, rwSize);
         const roundelMat = new THREE.MeshBasicMaterial({
           map: roundelTex,
           transparent: true,
@@ -505,24 +509,25 @@ const aircraftSkins = (() => {
 
         const rwLeft = new THREE.Mesh(roundelGeo, roundelMat);
         rwLeft.rotation.x = -Math.PI / 2;
-        rwLeft.position.set(-span * 0.58, 0.22, half * 0.12);
+        rwLeft.position.set(-span * 0.56, fWingY, fWingZ);
         decalGroup.add(rwLeft);
 
         const rwRight = new THREE.Mesh(roundelGeo, roundelMat);
-        rwRight.rotation.x = Math.PI / 2;
-        rwRight.position.set(span * 0.58, -0.22, half * 0.12);
+        rwRight.rotation.x = -Math.PI / 2;
+        rwRight.position.set(span * 0.56, fWingY, fWingZ);
         decalGroup.add(rwRight);
 
-        const sideRoundelGeo = new THREE.PlaneGeometry(0.9, 0.9);
+        const srSize = Math.min(0.66, radius * 0.65);
+        const sideRoundelGeo = new THREE.PlaneGeometry(srSize, srSize);
         for (const side of [-1, 1]) {
           const rSide = new THREE.Mesh(sideRoundelGeo, roundelMat);
           rSide.rotation.y = side * Math.PI / 2;
-          rSide.position.set(side * (radius * 0.96 + 0.02), radius * 0.15, -half * 0.18);
+          rSide.position.set(side * (radius * 0.94 + 0.02), radius * 0.12, -half * 0.18);
           decalGroup.add(rSide);
         }
       }
 
-      if (wingTex) {
+      if (wingTex && !isFighter) {
         const wGeo = new THREE.PlaneGeometry(span * 0.55, half * 0.28);
         const wMat = new THREE.MeshBasicMaterial({ map: wingTex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
         for (const side of [-1, 1]) {
@@ -533,8 +538,10 @@ const aircraftSkins = (() => {
         }
       }
 
-      if (tailTex) {
-        const tailGeo = new THREE.PlaneGeometry(half * 0.45, half * 0.35);
+      if (tailTex && isF16) {
+        // Keep F-16 art strictly inside the actual swept fin trapezoid.
+        const tailH = profile.finHeight ?? half * 0.41;
+        const tailGeo = new THREE.PlaneGeometry(Math.min(0.60, half * 0.22), Math.min(1.15, tailH * 0.42));
         const tailMat = new THREE.MeshBasicMaterial({
           map: tailTex,
           transparent: true,
@@ -544,19 +551,19 @@ const aircraftSkins = (() => {
         for (const side of [-1, 1]) {
           const tDecal = new THREE.Mesh(tailGeo, tailMat);
           tDecal.rotation.y = side * Math.PI / 2;
-          tDecal.position.set(side * 0.11, radius * 1.5, half * 0.56);
+          tDecal.position.set(side * 0.10, radius * 0.65 + tailH * 0.38, half * 0.60);
           decalGroup.add(tDecal);
         }
       }
     }
 
-    // B. Commercial Airliner / Cargo Decals (Fuselage Cheatline + Top Wing Stripe + Vertical Tail Crest)
+    // B. Commercial Airliner / Cargo Decals (Contoured Fuselage Cheatline + Swept Wing Stripe + Fin Crest)
     if (isPassenger) {
       const liveryTex = createAirlinerLiveryTexture(THREE, profile, theme.id);
       const wingTex = createWingStripeTexture(THREE, profile, theme.id);
       if (liveryTex) {
-        const bannerLength = half * 1.35;
-        const bannerHeight = radius * 0.72;
+        const bannerLength = half * 1.12;
+        const bannerHeight = radius * 0.52;
         const bannerGeo = new THREE.PlaneGeometry(bannerLength, bannerHeight);
         const bannerMat = new THREE.MeshBasicMaterial({
           map: liveryTex,
@@ -568,25 +575,33 @@ const aircraftSkins = (() => {
         for (const side of [-1, 1]) {
           const banner = new THREE.Mesh(bannerGeo, bannerMat);
           banner.rotation.y = side * Math.PI / 2;
-          banner.position.set(side * (radius * 0.98 + 0.03), radius * 0.22, -half * 0.08);
+          banner.position.set(side * (radius * 1.005), radius * 0.12, -half * 0.04);
           decalGroup.add(banner);
         }
       }
-      if (wingTex) {
-        const wingGeo = new THREE.PlaneGeometry(span * 0.46, radius * 1.25);
+      if (wingTex && profile.wingDecalApproved) {
+        const wLen = Math.min(span * 0.30, span * 0.28);
+        const wChord = Math.min(radius * 0.44, half * 0.10);
+        const wingGeo = new THREE.PlaneGeometry(wLen, wChord);
         const wingMat = new THREE.MeshBasicMaterial({ map: wingTex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+        const wingBaseY = profile.geometry[3] ?? -radius * 0.2;
+        const wingSweepZ = profile.geometry[5] ?? half * 0.24;
+        const sweepAngle = Math.atan2(wingSweepZ, Math.max(1, span));
+        const decalY = wingBaseY + 0.22 * 0.22 * 0.72 + Math.min(0.28, half * 0.015);
         for (const side of [-1, 1]) {
           const wm = new THREE.Mesh(wingGeo, wingMat);
-          wm.rotation.x = -Math.PI / 2;
-          wm.position.set(side * span * 0.45, radius * 0.26, half * 0.05);
+          wm.rotation.order = 'YXZ';
+          wm.rotation.set(-Math.PI / 2, -side * sweepAngle, 0);
+          wm.position.set(side * span * 0.44, decalY, -half * 0.04 + wingSweepZ * 0.42);
           decalGroup.add(wm);
         }
-        // Tail Crest Banner visible cleanly from chase camera
-        const tailBannerGeo = new THREE.PlaneGeometry(radius * 2.1, radius * 1.55);
+        // Compact vertical-fin crest wholly inside the swept tail fin bounds
+        const tailH = profile.finHeight ?? half * 0.36;
+        const tailBannerGeo = new THREE.PlaneGeometry(Math.min(half * 0.20, radius * 1.45), Math.min(tailH * 0.44, radius * 1.15));
         for (const side of [-1, 1]) {
           const tb = new THREE.Mesh(tailBannerGeo, wingMat);
           tb.rotation.y = side * Math.PI / 2;
-          tb.position.set(side * 0.16, radius * 2.05, half * 0.72);
+          tb.position.set(side * 0.14, radius * 0.72 + tailH * 0.42, half * 0.57);
           decalGroup.add(tb);
         }
       }
@@ -616,7 +631,8 @@ const aircraftSkins = (() => {
     if (isHelicopter) {
       const heliTex = createHelicopterLiveryTexture(THREE, theme.id);
       if (heliTex) {
-        const hGeo = new THREE.PlaneGeometry(half * 0.92, radius * 0.68);
+        const hWidth=Math.min(half*.36,1.9);
+        const hGeo=new THREE.PlaneGeometry(hWidth,Math.min(radius*.68,.75));
         const hMat = new THREE.MeshBasicMaterial({ map: heliTex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
         for (const side of [-1, 1]) {
           const hMesh = new THREE.Mesh(hGeo, hMat);
@@ -641,6 +657,9 @@ const aircraftSkins = (() => {
   }
 
   return {
+    releaseProfile(id){
+      for(const [key,texture] of textureCache)if(key.includes('_'+id+'_')){texture.dispose?.();textureCache.delete(key);}
+    },
     LIVERY_THEMES,
     getSelectedTheme,
     setSelectedTheme,

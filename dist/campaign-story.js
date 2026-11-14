@@ -1329,7 +1329,7 @@
       <aside class="hub-sidebar">
         <div>
           <div class="hub-brand">
-            <span class="hub-kicker">SKYBOUND GLOBAL · v0.69</span>
+            <span class="hub-kicker">SKYBOUND GLOBAL · v0.71</span>
             <h1 class="hub-title">蒼穹守望者</h1>
             <p class="hub-subtitle">Formosa Wings · 故事模式 · 跨國地圖 · 特技挑戰</p>
           </div>
@@ -2195,7 +2195,7 @@
               <div class="mp-room-chips">${worldQuickHubs}</div>
             </div>
             <div class="hub-form-grid">
-              <label>執飛機型<select id="hubFfAircraft">${cloneOptionsHtml('aircraft')}</select></label>
+              <label>機型分類<select id="hubFfCategory">${Object.entries(fleetCategories).map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select></label><label>執飛機型<select id="hubFfAircraft">${cloneOptionsHtml('aircraft')}</select></label>
               <label>起始狀態<select id="hubFfStartType">${cloneOptionsHtml('startType')}</select></label>
               <label>出發機場<select id="hubFfDeparture">${cloneOptionsHtml('departure')}</select></label>
               <label>目的機場<select id="hubFfDestination">${cloneOptionsHtml('destination')}</select></label>
@@ -2334,6 +2334,7 @@
   }
 
   function settleWinRewards(ch, st) {
+    const lockedBefore=fleet.filter(p=>!aircraftUnlocked(p));
     const meta = loadCareerMeta();
     const evalRes = evaluateMissionStars(ch, st);
     const newlyUnlocked = [];
@@ -2424,6 +2425,7 @@
       xpEarned,
       rankUp: newRank !== oldRank ? newRank : null,
       newlyUnlocked,
+      unlockedAircraft:lockedBefore.filter(aircraftUnlocked).map(p=>p.name),
       meta
     };
   }
@@ -2464,7 +2466,7 @@
         rewardsEl.innerHTML = `
           <span class="reward-chip">💰 +$${rewardInfo.moneyEarned.toLocaleString()}</span>
           <span class="reward-chip">⭐ +${rewardInfo.xpEarned} XP</span>
-          ${rankChip}${medalChips}`;
+          ${rankChip}${medalChips}${(rewardInfo.unlockedAircraft||[]).map(name=>`<span class="reward-chip">✈ 解鎖：${name}</span>`).join('')}`;
       } else {
         rewardsEl.innerHTML = '';
       }
@@ -2583,6 +2585,15 @@
     }
   }
 
+  document.addEventListener('change',event=>{
+    if(event.target.id!=='hubFfCategory')return;
+    const select=document.getElementById('hubFfAircraft'),category=event.target.value;
+    const matches=fleet.filter(p=>fleetMatches(p,category));
+    select.replaceChildren(...matches.map(p=>{const o=new Option(p.name+(aircraftUnlocked(p)?'':' 🔒'),p.id);o.disabled=!aircraftUnlocked(p);return o;}));
+    const available=matches.find(aircraftUnlocked);if(available)select.value=available.id;
+    document.getElementById('hubFreeFlyBtn').disabled=!available;
+  });
+  globalScope.addEventListener?.('skybound:unlock-mission',event=>startChapter(event.detail.chapter));
   function startChapter(chapterId) {
     const ch = ALL_CHAPTERS.find(c => c.id === chapterId) || CHAPTERS[0];
     selectedChapterId = ch.id;

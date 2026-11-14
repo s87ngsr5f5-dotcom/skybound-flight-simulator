@@ -66,16 +66,16 @@ function refineFighter(model,profile){
     s.font='20px sans-serif';s.fillText('SKYBOUND',20,229);
     const map=new THREE.CanvasTexture(stencil);map.colorSpace=THREE.SRGBColorSpace;
     for(const sign of [-1,1]){
-      const label=part(model,new THREE.PlaneGeometry(.66,.98),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,side:THREE.DoubleSide}),sign*.12,radius*.61+half*.22,half*.70);
+      const label=part(model,new THREE.PlaneGeometry(.52,.78),new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,side:THREE.DoubleSide}),sign*.105,1.88,half*.69);
       label.rotation.y=sign*Math.PI/2;
     }
-    const pilot=new THREE.Group();pilot.position.set(0,radius*.49,-half*.37);model.add(pilot);
-    const torso=part(pilot,new THREE.CapsuleGeometry(.17,.22,6,12),seat,0,0,0);torso.scale.set(1.0,1.0,.68);
-    const helmet=part(pilot,new THREE.SphereGeometry(.17,18,12),seat,0,.29,0);helmet.scale.y=1.1;
-    part(pilot,new THREE.SphereGeometry(.175,16,10,Math.PI*.55,Math.PI*.9,Math.PI*.2,Math.PI*.55),graphite,0,.29,-.015);
+    const pilot=new THREE.Group();pilot.position.set(0,radius*.41,-half*.41);model.add(pilot);
+    const torso=part(pilot,new THREE.CapsuleGeometry(.15,.18,6,12),seat,0,0,0);torso.scale.set(1.0,1.0,.68);
+    const helmet=part(pilot,new THREE.SphereGeometry(.145,18,12),seat,0,.24,0);helmet.scale.y=1.06;
+    part(pilot,new THREE.SphereGeometry(.15,16,10,Math.PI*.55,Math.PI*.9,Math.PI*.2,Math.PI*.55),graphite,0,.24,-.014);
   }
   for(const child of [...cabin.children]){child.traverse(o=>o.geometry?.dispose());cabin.remove(child);}
-  const eye={x:0,y:radius*.78+.16,z:-half*(profile.sideIntakes?.40:.37)};
+  const eye={x:0,y:radius*(f16?.91:.78)+.16,z:-half*(f16?.43:profile.sideIntakes?.40:.37)};
   data.cockpitEye={...eye,z:eye.z+.38};
   // Instrument panel below the pilot's eye line; separate side consoles and glare shield.
   const panelZ=eye.z-.92,panelY=eye.y-.55;

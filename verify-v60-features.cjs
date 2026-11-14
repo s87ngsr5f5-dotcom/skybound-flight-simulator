@@ -125,6 +125,6 @@ for (const htmlName of ['index.html', 'iphone.html']) {
   assert.ok(/taiwan-city\.js\?v=6[0-2]/.test(html), `${htmlName} must include taiwan-city.js?v=60/61/62`);
   const twMatch = html.match(/taiwan-city\.js\?v=6[0-2]/);
   assert.ok(html.indexOf(twMatch[0]) < html.indexOf('flight.js?v=roll31'), `${htmlName} script order check`);
-  assert.ok(/>0\.6[0-3]</.test(html), `${htmlName} version badge must be 0.60-0.63`);
+  assert.ok(Number(html.match(/id="edition">(\d+)\.(\d+)/)?.[1])>0 || Number(html.match(/id="edition">(\d+)\.(\d+)/)?.[2])>=60, `${htmlName} must show version 0.60 or newer`);
 }
 console.log(`  PASS: Verified ${manifest.counts.buildings} OSM buildings in ${manifest.tiles.length} tiles + landmarks & v0.60 UI.`);

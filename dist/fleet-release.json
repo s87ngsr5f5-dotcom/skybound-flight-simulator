@@ -1,0 +1,17 @@
+{
+  "version": "0.71",
+  "registeredAircraft": 100,
+  "newProfiles": 79,
+  "categories": {
+    "trainer": 14,
+    "prop": 10,
+    "business": 10,
+    "airliner": 25,
+    "cargo": 13,
+    "fighter": 20,
+    "helicopter": 8
+  },
+  "specialUnlocks": 6,
+  "modelTier": "parametric-prototypes-and-existing-models",
+  "highFidelityFleetComplete": false
+}

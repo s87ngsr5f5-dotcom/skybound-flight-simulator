@@ -101,7 +101,7 @@ const distDir = path.join(__dirname, 'dist');
 {
   for (const htmlName of ['index.html', 'iphone.html']) {
     const html = fs.readFileSync(path.join(distDir, htmlName), 'utf8');
-    assert.ok(html.includes('>0.63<'), `${htmlName} shows version 0.63`);
+    assert.ok(Number(html.match(/id="edition">(\d+)\.(\d+)/)?.[1])>0 || Number(html.match(/id="edition">(\d+)\.(\d+)/)?.[2])>=63, `${htmlName} shows version 0.63 or newer`);
     assert.ok(html.includes('aero-ui-v63.css?v=63'), `${htmlName} loads aero-ui-v63.css?v=63`);
     assert.ok(html.includes('building-collision.js?v=63'), `${htmlName} loads building-collision.js?v=63`);
     assert.ok(html.includes('campaign-story.js?v=63'), `${htmlName} loads campaign-story.js?v=63`);

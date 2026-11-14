@@ -455,3 +455,5 @@ body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudeMode {
   body:not(.mobile-mode) #hud:has(#systems:not([hidden])) #attitudeMode { left: min(22vh,130px); bottom: 101px; }
   body:not(.mobile-mode) #hud #systems { max-height: max(62px,calc(100% - 236px)); }
 }
+
+#hangarFly:disabled{opacity:.42;cursor:not-allowed;filter:grayscale(.7)}
