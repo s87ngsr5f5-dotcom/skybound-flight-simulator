@@ -58,6 +58,8 @@ jobs:
       - run: node verify-v61-performance.cjs
       - run: node verify-v62-aero-roads.cjs
       - run: node verify-v63-campaign-collision.cjs
+      - run: node verify-v69-missions-worldmap.cjs
+      - run: node verify-v70-real-world-cities.cjs
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

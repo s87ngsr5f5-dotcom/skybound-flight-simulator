@@ -105,4 +105,13 @@ ctxHandlers[0]({
 });
 assert.strictEqual(inputPrevented, false, 'Input elements must preserve native interaction');
 
+// Title hub & mobile portrait/landscape launch CTA checks
+const aeroUiV63 = fs.readFileSync(path.join(distDir, 'aero-ui-v63.css'), 'utf8');
+const campaignJs = fs.readFileSync(path.join(distDir, 'campaign-story.js'), 'utf8');
+assert(/--hub-top/.test(aeroUiV63) && /syncHubTop/.test(campaignJs), 'Hub dynamically tracks header bottom via --hub-top');
+assert(/@media\s*\(max-width:\s*900px\)[\s\S]*flex-direction:\s*row[\s\S]*overflow-x:\s*auto/.test(aeroUiV63), 'Portrait mobile turns .hub-menu-list into compact horizontal tab strip');
+assert(/#campaignRouteCanvas\s*\{\s*display:\s*none\s*!important/.test(aeroUiV63), 'Landscape compact rule keeps campaign launch CTA above the fold');
+assert(/hubQuickStartBtn/.test(campaignJs) && /hubQuickFreeBtn/.test(campaignJs), 'Welcome stage provides immediate 1-tap quick launch buttons above the fold');
+assert(/document\.body\.classList\.contains\('flight-ui'\)\s*&&\s*event\.target\.closest\('#touchFlight,\.hud button'\)/.test(touchJs), 'touchend guard only blocks rapid double-tap during active flight-ui HUD');
+
 console.log('All mobile viewport & anti-zoom tests passed successfully!');

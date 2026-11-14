@@ -48,28 +48,28 @@
       rewardMoney: 5000,
       rewardXp: 180,
       maxSafeG: 3.5,
-      targetText: '① 跑道離地爬升 ② 維持 600+ ft 掠過基隆河 ③ 累積巡航 3.2 km',
+      targetText: '① 跑道離地爬升 ② 維持 600+ ft (183m) 掠過基隆河 ③ 累積巡航 3.2 km',
       story: '清晨六點二十分，晨曦染金了大屯山與淡水河。你剛通過民航機師檢定，將與周教官駕駛 Cessna 172S 從松山 10 跑道首飛，依序完成離地、低空走廊巡航與平飛穩定考驗。',
       radio: [
         { delay: 1.5, speaker: '周教官 · RCSS教席', text: '「晨風，歡迎來到真正的天空！油門推滿，達 55 節輕輕拉桿離地。」' }
       ],
       stages: [
         {
-          label: '階段 1/3 · 加速離地爬升至 400 ft',
+          label: '階段 1/3 · 加速離地爬升至 400 ft (122m)',
           check: f => !f.ended && !f.ground && f.y >= 122,
           radio: { speaker: '台北近場台 · Taipei Approach', text: '「Skybound-01 已離地！請繼續爬升並沿淡水河向西進入第二階段巡航。」' }
         },
         {
-          label: '階段 2/3 · 保持 500+ ft 巡航累積 1.8 km',
-          check: (f, st) => !f.ended && f.y >= 152 && st.flownM >= 1800,
+          label: '階段 2/3 · 保持 600+ ft (183m) 巡航累積 1.8 km',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 183 && st.flownM >= 1800,
           radio: { speaker: '副駕駛 · 周教官', text: '「看左側信義區 101 玻璃帷幕在晨光中反光了！穩住姿態完成最後一段航程！」' }
         },
         {
-          label: '階段 3/3 · 穩定完成 3.2 km 盆地巡禮',
-          check: (f, st) => !f.ended && f.y >= 160 && st.flownM >= 3200
+          label: '階段 3/3 · 穩定 600+ ft (183m) 完成 3.2 km 盆地巡禮',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 183 && st.flownM >= 3200
         }
       ],
-      winCondition: (f, st) => !f.ended && f.airborne && st.flownM >= 3200 && f.y >= 160
+      winCondition: (f, st) => !f.ended && !f.ground && st.flownM >= 3200 && f.y >= 183
     },
     {
       id: 2,
@@ -107,10 +107,10 @@
         },
         {
           label: '階段 3/3 · 穩定維持高空走廊達 5.0 km',
-          check: (f, st) => !f.ended && f.y >= 320 && st.flownM >= 5000
+          check: (f, st) => !f.ended && !f.ground && f.y >= 305 && st.flownM >= 5000
         }
       ],
-      winCondition: (f, st) => !f.ended && st.flownM >= 5000 && f.y >= 320
+      winCondition: (f, st) => !f.ended && !f.ground && st.flownM >= 5000 && f.y >= 305
     },
     {
       id: 3,
@@ -148,10 +148,10 @@
         },
         {
           label: '階段 3/3 · 完成 6.0 km 暴風突圍或安全落地',
-          check: (f, st) => !f.ended && ((f.finished && f.landed) || (st.flownM >= 6000 && f.y >= 480))
+          check: (f, st) => !f.ended && ((f.finished && f.landed) || (!f.ground && st.flownM >= 6000 && f.y >= 460))
         }
       ],
-      winCondition: (f, st) => !f.ended && ((f.finished && f.landed) || (st.flownM >= 6000 && f.y >= 480))
+      winCondition: (f, st) => !f.ended && ((f.finished && f.landed) || (!f.ground && st.flownM >= 6000 && f.y >= 460))
     },
     {
       id: 4,
@@ -212,7 +212,7 @@
       rewardMoney: 18000,
       rewardXp: 440,
       maxSafeG: 6.5,
-      targetText: '① 靠近 KC-135 編隊空域 ② 穩定保持速度姿態 20 秒 ③ 完成 6 km 補給編隊',
+      targetText: '① 靠近 KC-135 編隊空域 (10 秒) ② 穩定保持速度姿態 (24 秒 · 3.5 km) ③ 完成 6 km 補給編隊 (34 秒)',
       story: '經過一小時驅離巡邏，戰機內油已跌破安全餘裕。KC-135 加油機在萬呎金黃雲海上展開伸縮加油管，你必須將機速與姿態控至毫釐之間！',
       radio: [
         { delay: 1.2, speaker: '加油官 · TEXACO-21', text: '「Viper-1，我是 Texaco-21，依機腹 PDI 燈號緩慢前推逼近對接區！」' }
@@ -352,16 +352,16 @@
           radio: { speaker: '東京進場台 · TOKYO APP', text: '「Formosa-801 雷達接觸！前方進入彩虹大橋與丸之內摩天樓空域，請保持 900 ft 以上。」' }
         },
         {
-          label: '階段 2/3 · 飛越東京灣與晴空塔走廊 (3.0 km)',
-          check: (f, st) => !f.ended && f.y >= 275 && st.flownM >= 3000,
+          label: '階段 2/3 · 飛越東京灣與晴空塔走廊 (> 900 ft · 3.0 km)',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 275 && st.flownM >= 3000,
           radio: { speaker: '副機長 · FIRST OFFICER', text: '「機長你看！晴空塔與東京鐵塔就在翼下，東京灣的日出太震撼了！」' }
         },
         {
           label: '階段 3/3 · 穩定切入關東成田航道 (5.6 km)',
-          check: (f, st) => !f.ended && f.y >= 290 && st.flownM >= 5600
+          check: (f, st) => !f.ended && !f.ground && f.y >= 275 && st.flownM >= 5600
         }
       ],
-      winCondition: (f, st) => !f.ended && f.y >= 290 && st.flownM >= 5600
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 275 && st.flownM >= 5600
     },
     {
       id: 9,
@@ -394,16 +394,16 @@
           radio: { speaker: '香港離場台 · HKG DEP', text: '「已越過赤鱲角東岸！前方通過青馬大橋與維港高樓群，請拉升至 1,300 ft 以上！」' }
         },
         {
-          label: '階段 2/3 · 穿越維港 IFC/ICC 摩天樓空域 (3.4 km)',
-          check: (f, st) => !f.ended && f.y >= 395 && st.flownM >= 3400,
+          label: '階段 2/3 · 穿越維港 IFC/ICC 摩天樓空域 (> 1,300 ft · 3.4 km)',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 397 && st.flownM >= 3400,
           radio: { speaker: '客艙乘務長 · PURSER', text: '「窗外維多利亞港的夜景穿過雨幕了！機長操縱非常穩健！」' }
         },
         {
           label: '階段 3/3 · 衝出香港雷雨區切入海峽航路 (6.2 km)',
-          check: (f, st) => !f.ended && f.y >= 410 && st.flownM >= 6200
+          check: (f, st) => !f.ended && !f.ground && f.y >= 397 && st.flownM >= 6200
         }
       ],
-      winCondition: (f, st) => !f.ended && f.y >= 410 && st.flownM >= 6200
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 397 && st.flownM >= 6200
     },
     {
       id: 10,
@@ -480,15 +480,15 @@
         },
         {
           label: '階段 2/3 · 穿越松島與漢江都會夜空 (> 1,400 ft · 3.8 km)',
-          check: (f, st) => !f.ended && f.y >= 425 && st.flownM >= 3800,
+          check: (f, st) => !f.ended && !f.ground && f.y >= 427 && st.flownM >= 3800,
           radio: { speaker: '副機長 · FIRST OFFICER', text: '「首爾與仁川的跨海夜景不輸台北！四具引擎推力穩定，繼續加速！」' }
         },
         {
           label: '階段 3/3 · 切入黃海高空越洋航路 (7.0 km)',
-          check: (f, st) => !f.ended && !f.ground && f.y >= 440 && st.flownM >= 7000
+          check: (f, st) => !f.ended && !f.ground && f.y >= 427 && st.flownM >= 7000
         }
       ],
-      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 440 && st.flownM >= 7000
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 427 && st.flownM >= 7000
     },
     {
       id: 12,
@@ -521,16 +521,16 @@
           radio: { speaker: '新加坡雷達席 · SIN RADAR', text: '「Merlion-220，前方即為濱海灣金沙酒店三塔與擎天樹花園，保持 1,000 ft 以上安全高度！」' }
         },
         {
-          label: '階段 2/3 · 掠過濱海灣金沙與金融區天際線 (3.2 km)',
-          check: (f, st) => !f.ended && f.y >= 305 && st.flownM >= 3200,
+          label: '階段 2/3 · 掠過濱海灣金沙與金融區天際線 (> 1,000 ft · 3.2 km)',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 305 && st.flownM >= 3200,
           radio: { speaker: '客艙廣播 · CAPTAIN PA', text: '「各位貴賓，本機下方正是新加坡地標濱海灣金沙酒店與摩天輪，祝您旅途愉快！」' }
         },
         {
           label: '階段 3/3 · 完成獅城海峽巡航航段 (6.0 km)',
-          check: (f, st) => !f.ended && f.y >= 320 && st.flownM >= 6000
+          check: (f, st) => !f.ended && !f.ground && f.y >= 305 && st.flownM >= 6000
         }
       ],
-      winCondition: (f, st) => !f.ended && f.y >= 320 && st.flownM >= 6000
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 305 && st.flownM >= 6000
     },
     {
       id: 13,
@@ -551,7 +551,7 @@
       rewardMoney: 48000,
       rewardXp: 960,
       maxSafeG: 8.5,
-      targetText: '① 馬尼拉 06 跑道極速升空 ② 穿越馬卡蒂／BGC 摩天樓與海灣摩天輪 ③ 高空超音速北上巴士海峽 6.6 km',
+      targetText: '① 馬尼拉 06 跑道極速升空 ② 穿越馬卡蒂／BGC 摩天樓與海灣摩天輪 (> 1,150 ft) ③ 高空超音速北上巴士海峽 6.6 km',
       story: '跨國遠征最終章！熱帶風暴生成於呂宋島東方，你將駕駛幻象 2000 自馬尼拉尼諾伊國際機場緊急升空，掠過馬尼拉灣摩天輪與 BGC 金融大樓群，以超音速衝上巴士海峽開闢安全氣象走廊！',
       radio: [
         { delay: 1.2, speaker: '馬尼拉塔台 · MANILA TWR', text: '「Mirage-Express，06 跑道允許全推力起飛！感謝台灣機隊支援跨國氣象走廊護航！」' }
@@ -563,16 +563,16 @@
           radio: { speaker: '馬尼拉區管 · MNL CTR', text: '「已越過馬卡蒂與馬尼拉灣摩天輪！全推力加速爬升北上！」' }
         },
         {
-          label: '階段 2/3 · 高空高速衝刺呂宋走廊 (3.5 km)',
-          check: (f, st) => !f.ended && f.y >= 350 && st.flownM >= 3500,
+          label: '階段 2/3 · 高空高速衝刺呂宋走廊 (> 1,150 ft · 3.5 km)',
+          check: (f, st) => !f.ended && !f.ground && f.y >= 351 && st.flownM >= 3500,
           radio: { speaker: '總指揮官 · SKYBOUND HQ', text: '「六大國際都會遠征即將大功告成！保持全速衝過終點線！」' }
         },
         {
           label: '階段 3/3 · 完成 6.6 km 跨國史詩遠征',
-          check: (f, st) => !f.ended && !f.ground && f.y >= 360 && st.flownM >= 6600
+          check: (f, st) => !f.ended && !f.ground && f.y >= 351 && st.flownM >= 6600
         }
       ],
-      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 360 && st.flownM >= 6600
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 351 && st.flownM >= 6600
     },
     {
       id: 14,
@@ -606,15 +606,15 @@
         },
         {
           label: '階段 2/3 · 穿越淀川與大阪城天守閣走廊 (> 1,100 ft · 3.4 km)',
-          check: (f, st) => !f.ended && f.y >= 335 && st.flownM >= 3400,
+          check: (f, st) => !f.ended && !f.ground && f.y >= 336 && st.flownM >= 3400,
           radio: { speaker: '副機長 · FIRST OFFICER', text: '「機長你看！大阪城天守閣的金飾與梅田藍天大廈的空中圓環清晰可見！」' }
         },
         {
           label: '階段 3/3 · 穩定切入東海道東京航路 (6.4 km)',
-          check: (f, st) => !f.ended && !f.ground && f.y >= 350 && st.flownM >= 6400
+          check: (f, st) => !f.ended && !f.ground && f.y >= 336 && st.flownM >= 6400
         }
       ],
-      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 350 && st.flownM >= 6400
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 336 && st.flownM >= 6400
     },
     {
       id: 15,
@@ -648,15 +648,15 @@
         },
         {
           label: '階段 2/3 · 巡禮湄南河曲流與鄭王廟金塔 (> 1,150 ft · 3.6 km)',
-          check: (f, st) => !f.ended && f.y >= 350 && st.flownM >= 3600,
+          check: (f, st) => !f.ended && !f.ground && f.y >= 351 && st.flownM >= 3600,
           radio: { speaker: '客艙廣播 · CAPTAIN PA', text: '「各位旅客，下方蜿蜒發光的正是曼谷母親河——湄南河與鄭王廟高塔！」' }
         },
         {
           label: '階段 3/3 · 飛越暹羅灣切入南洋國際航路 (6.8 km)',
-          check: (f, st) => !f.ended && !f.ground && f.y >= 360 && st.flownM >= 6800
+          check: (f, st) => !f.ended && !f.ground && f.y >= 351 && st.flownM >= 6800
         }
       ],
-      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 360 && st.flownM >= 6800
+      winCondition: (f, st) => !f.ended && !f.ground && f.y >= 351 && st.flownM >= 6800
     }
   ];
 
@@ -837,6 +837,7 @@
   let activeMission = null;
   let radioHideTimer = null;
   let hubOpenTimer = null;
+  let onlineFlightRequested = false;
 
   function todayStr() {
     const d = new Date();
@@ -893,6 +894,7 @@
         localStorage.setItem(SIM_CAREER_KEY, JSON.stringify(c));
         localStorage.setItem('skybound.money', String(c.money));
       }
+      globalScope.__skyboundSyncWallet?.();
     } catch {}
   }
 
@@ -913,6 +915,7 @@
       c.money = Math.max(0, Number(c.money) || 0) + Math.round(amount);
       localStorage.setItem(SIM_CAREER_KEY, JSON.stringify(c));
       localStorage.setItem('skybound.money', String(c.money));
+      globalScope.__skyboundSyncWallet?.();
     } catch {}
   }
 
@@ -924,6 +927,7 @@
       c.money = Math.max(0, cur - Math.round(cost));
       localStorage.setItem(SIM_CAREER_KEY, JSON.stringify(c));
       localStorage.setItem('skybound.money', String(c.money));
+      globalScope.__skyboundSyncWallet?.();
       return true;
     } catch { return false; }
   }
@@ -1295,8 +1299,18 @@
     return [...sel.options].map(o => `<option value="${o.value}"${o.value === sel.value ? ' selected' : ''}>${o.textContent}</option>`).join('');
   }
 
+  function syncHubTop() {
+    if (typeof document === 'undefined') return;
+    const hdr = document.querySelector?.('header');
+    if (hdr && typeof hdr.getBoundingClientRect === 'function') {
+      const topPx = Math.max(44, Math.ceil(hdr.getBoundingClientRect().bottom));
+      document.documentElement?.style?.setProperty?.('--hub-top', `${topPx}px`);
+    }
+  }
+
   function ensureDOM() {
     if (document.getElementById('titleHub')) return;
+    syncHubTop();
 
     const plan = document.getElementById('plan');
     if (plan && !document.getElementById('plannerBackBar')) {
@@ -1393,6 +1407,19 @@
         }
         return;
       }
+      const quickStartBtn = e.target.closest('#hubQuickStartBtn');
+      if (quickStartBtn) {
+        startChapter(Number(quickStartBtn.dataset.quickCh || selectedChapterId || 1));
+        return;
+      }
+      if (e.target.closest('#hubQuickFreeBtn')) {
+        onlineFlightRequested = false;
+        const les = document.getElementById('lesson');
+        if (les) { les.value = 'free'; les.dispatchEvent(new Event('change')); }
+        closeHub();
+        document.getElementById('fly')?.click();
+        return;
+      }
       if (e.target.closest('#hubLaunchChapterBtn')) {
         startChapter(selectedChapterId);
         return;
@@ -1404,6 +1431,7 @@
       }
       const quickBtn = e.target.closest('[data-hub-quick]');
       if (quickBtn) {
+        onlineFlightRequested = false;
         const key = quickBtn.dataset.hubQuick;
         closeHub();
         document.querySelector(`#quickFlights [data-quick="${key}"]`)?.click();
@@ -1434,6 +1462,7 @@
         return;
       }
       if (e.target.closest('#hubFreeFlyBtn')) {
+        onlineFlightRequested = false;
         const map = [
           ['hubFfAircraft', 'aircraft'],
           ['hubFfDeparture', 'departure'],
@@ -1509,6 +1538,7 @@
         if (realCall && hubCall) realCall.value = hubCall;
         document.getElementById('mpJoinBtn')?.click();
         if (launchAfter) {
+          onlineFlightRequested = true;
           closeHub();
           document.getElementById('fly')?.click();
         } else {
@@ -1542,6 +1572,7 @@
     if (flyBtn) flyBtn.addEventListener('click', () => closeHub());
     const menuBtn = document.getElementById('menu');
     if (menuBtn) menuBtn.addEventListener('click', () => {
+      onlineFlightRequested = false;
       activeMission = null;
       hideFlightStoryOverlays();
       clearTimeout(hubOpenTimer);
@@ -1585,6 +1616,14 @@
         <span>★ ${totalStars}/${ALL_CHAPTERS.length * 3} · 🏅 ${meta.medals.length}/${MEDALS.length}</span>
       </div>
     `;
+  }
+
+  function refreshCareerUI() {
+    try { ensureDOM(); } catch {}
+    renderCareerCard(loadProgress(), loadCareerMeta());
+    if (activeTab === 'upgrades' && !document.getElementById('titleHub')?.hidden) {
+      renderStage('upgrades');
+    }
   }
 
   function bindSettingsControls() {
@@ -1633,6 +1672,56 @@
     syncCheck('hubSetKeepBank', 'keepBank');
     syncCheck('hubSetMouse', 'mouse');
     syncCheck('hubSetRt', 'rtLighting');
+
+    const exportBtn = document.getElementById('hubExportSaveBtn');
+    const importInp = document.getElementById('hubImportSaveInput');
+    const saveFb = document.getElementById('hubSaveFeedback');
+    if (exportBtn) {
+      exportBtn.onclick = () => {
+        try {
+          const keys = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('skybound.')) keys[k] = localStorage.getItem(k);
+          }
+          const payload = JSON.stringify({ version: 'skybound-save-v1', exportedAt: new Date().toISOString(), keys }, null, 2);
+          const blob = new Blob([payload], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `skybound-save-${todayStr()}.json`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          if (saveFb) { saveFb.style.color = '#8be9b5'; saveFb.textContent = `✓ 已匯出 ${Object.keys(keys).length} 項存檔紀錄`; }
+        } catch (err) {
+          if (saveFb) { saveFb.style.color = '#ff8a7a'; saveFb.textContent = '匯出存檔失敗：' + (err?.message || err); }
+        }
+      };
+    }
+    if (importInp) {
+      importInp.onchange = () => {
+        const file = importInp.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(String(reader.result || '{}'));
+            const entries = data && typeof data.keys === 'object' && data.keys ? Object.entries(data.keys) : [];
+            const valid = entries.filter(([k, v]) => typeof k === 'string' && k.startsWith('skybound.') && typeof v === 'string');
+            if (!valid.length) throw new Error('無有效 SKYBOUND 存檔欄位');
+            for (const [k, v] of valid) localStorage.setItem(k, v);
+            globalScope.__skyboundSyncWallet?.();
+            refreshCareerUI();
+            if (saveFb) { saveFb.style.color = '#8be9b5'; saveFb.textContent = `✓ 已還原 ${valid.length} 項存檔！所有資金與改裝已即時更新。`; }
+          } catch (err) {
+            if (saveFb) { saveFb.style.color = '#ff8a7a'; saveFb.textContent = '匯入失敗：' + (err?.message || 'JSON 格式錯誤'); }
+          }
+        };
+        reader.readAsText(file);
+      };
+    }
   }
 
   function drawCampaignRoutePreview(ch) {
@@ -1713,11 +1802,19 @@
     const stage = document.getElementById('hubStage');
     if (!hub || !stage) return;
 
+    let activeMenuBtn = null;
     hub.querySelectorAll('.hub-menu-btn').forEach(btn => {
       const sel = btn.dataset.hubTab === tab;
       btn.classList.toggle('active', sel);
       btn.setAttribute('aria-selected', String(sel));
+      if (sel) activeMenuBtn = btn;
     });
+    stage.scrollTop = 0;
+    hub.scrollTop = 0;
+    if (activeMenuBtn && typeof activeMenuBtn.scrollIntoView === 'function') {
+      try { activeMenuBtn.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' }); } catch {}
+    }
+    syncHubTop();
 
     const prog = loadProgress();
     const meta = loadCareerMeta();
@@ -1738,12 +1835,17 @@
       const totalUpgLv = Object.values(upg).reduce((a, b) => a + b, 0);
       stage.innerHTML = `
         <div class="hub-home-wrap">
+          <div class="hub-mobile-orient-hint">📱 手機直向亦可直接點擊起飛 · 橫向握持可享最佳 3D 寬闊視野</div>
           <div class="hub-hero-showcase">
             <img class="hub-hero-bg" src="${nextCh.image}" alt="${nextCh.title}">
             <div class="hub-hero-overlay">
               <span class="hub-kicker">SKYBOUND GLOBAL · TAIWAN & 8 WORLD METROPOLISES</span>
               <h2>選好模式，立即升空</h2>
               <p>${rank.current.badge} ${rank.current.title} · 戰役 ${completedCount}/${ALL_CHAPTERS.length} 章（★ ${totalStars}/${ALL_CHAPTERS.length * 3}）· 資金 $${money.toLocaleString()}</p>
+              <div class="hub-quick-cta-row">
+                <button type="button" id="hubQuickStartBtn" class="campaign-launch-btn" data-quick-ch="${nextCh.id}">▶ 立即出發執飛 ${nextCh.code} · ${nextCh.title} →</button>
+                <button type="button" id="hubQuickFreeBtn" class="hub-back-btn">✈ 快速自由起飛</button>
+              </div>
             </div>
           </div>
 
@@ -2173,6 +2275,15 @@
                 <button type="button" id="hubResetControlsBtn" class="hub-back-btn">↺ 恢復平順預設值</button>
               </div>
             </div>
+            <div class="hub-panel-card" style="grid-column:1 / -1">
+              <h3>💾 瀏覽器存檔備份與還原</h3>
+              <p class="muted" style="font-size:12px;margin:0 0 10px">目前生涯資金、改裝等級、劇情星數與勳章皆安全儲存在本機瀏覽器 <code>localStorage</code>。更換裝置或清除瀏覽紀錄前，可先匯出 JSON 備份檔。</p>
+              <div class="actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                <button type="button" id="hubExportSaveBtn" class="hub-back-btn">⬇ 匯出 JSON 存檔</button>
+                <label class="hub-back-btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">⬆ 匯入還原存檔<input type="file" id="hubImportSaveInput" accept="application/json,.json" hidden></label>
+                <span id="hubSaveFeedback" style="font-size:12px;color:#8be9b5"></span>
+              </div>
+            </div>
           </div>
         </div>`;
       bindSettingsControls();
@@ -2181,7 +2292,10 @@
 
   function openHub(tab = activeTab) {
     if (document.body.classList.contains('flight-ui')) return;
+    onlineFlightRequested = false;
     ensureDOM();
+    syncHubTop();
+    globalScope.__skyboundSyncWallet?.();
     const hub = document.getElementById('titleHub');
     if (hub) hub.hidden = false;
     document.body.classList.add('title-hub-open');
@@ -2408,6 +2522,7 @@
   }
 
   function launchMission(ch) {
+    onlineFlightRequested = false;
     closeHub();
     hideFlightStoryOverlays();
 
@@ -2562,12 +2677,26 @@
     const objHud = document.getElementById('storyObjectiveHud');
     if (objHud && ch.objectiveDistM) {
       const pct = Math.min(100, Math.round((activeMission.flownM / ch.objectiveDistM) * 100));
-      const altFt = Math.max(0, Math.round((f.y || 0) * 3.28084));
+      const altM = Math.max(0, Math.round(f.y || 0));
+      const altFt = Math.max(0, Math.round(altM * 3.28084));
+      const distKm = (activeMission.flownM / 1000).toFixed(1);
+      const targetKm = (ch.objectiveDistM / 1000).toFixed(1);
+      const iasKt = Math.max(0, Math.round((f.speed || 0) * 1.94384));
+      const touchHudEl = document.getElementById('touchFlight');
+      const touchStyleVisible = Boolean(touchHudEl && !touchHudEl.hidden && (typeof globalScope.getComputedStyle !== 'function' || globalScope.getComputedStyle(touchHudEl).display !== 'none'));
+      const isTouchMode = document.body.classList.contains('touch-device') || touchStyleVisible;
       const curStage = stages[Math.min(activeMission.stageIdx, Math.max(0, stages.length - 1))];
       const stagePrefix = curStage ? curStage.label : ch.title;
       const nextGate = Array.isArray(activeMission.gates) ? activeMission.gates.find(g => !g.passed) : null;
       const gateHint = nextGate ? ` · ◎ ${(Math.hypot(nextGate.x - f.x, nextGate.z - f.z) / 1000).toFixed(1)}km` : '';
-      objHud.textContent = `${ch.code} · ${stagePrefix} (${pct}% · ${altFt} ft${gateHint})`;
+      if (f.ground && activeMission.stageIdx === 0 && ch.startType !== 'carrier') {
+        const takeoffTip = iasKt < 55
+          ? (isTouchMode ? `請向上拖曳右側「油門滑桿」加速 (${iasKt}/55 kt)` : `按住 [W] 推滿油門加速 (${iasKt}/55 kt)`)
+          : (isTouchMode ? `已達 ${iasKt} kt！輕推左側「飛行搖桿」抬頭離地` : `已達 ${iasKt} kt！按 [↑] 或輕拉滑鼠抬頭離地`);
+        objHud.textContent = `${ch.code} · 🛫 ${takeoffTip} · (${altFt} ft / ${altM}m)`;
+      } else {
+        objHud.textContent = `${ch.code} · ${stagePrefix} (${pct}% · ${distKm}/${targetKm} km · ${altFt} ft / ${altM}m${gateHint})`;
+      }
     }
 
     if (f.ended && !activeMission.settled) {
@@ -2598,6 +2727,11 @@
     }
   }, 250);
 
+  if (typeof globalScope.addEventListener === 'function') {
+    globalScope.addEventListener('resize', syncHubTop);
+    globalScope.addEventListener('orientationchange', () => setTimeout(syncHubTop, 120));
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => openHub('welcome'));
   } else {
@@ -2618,6 +2752,8 @@
     startChapter,
     startChallenge,
     showRadio,
+    refreshCareerUI,
+    isOnlineFlight: () => Boolean(onlineFlightRequested),
     getProgress: loadProgress,
     getCareerStats: loadCareerMeta
   };

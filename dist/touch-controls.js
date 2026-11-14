@@ -195,7 +195,7 @@ const touchControls=(()=>{
   document.addEventListener('touchend',event=>{
     const now=Date.now();
     if(now-lastTouchEndTime<=280&&!isEditableTarget(event.target)){
-      if(event.target.closest('#touchFlight,.hud,header,button')) event.preventDefault();
+      if(document.body.classList.contains('flight-ui')&&event.target.closest('#touchFlight,.hud button')) event.preventDefault();
     }
     lastTouchEndTime=now;
   },{passive:false});

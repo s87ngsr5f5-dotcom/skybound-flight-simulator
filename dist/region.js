@@ -224,7 +224,10 @@ function internationalTerrainHeight(x,z){
     }
     const hakoneKm=Math.hypot((lat-35.23)*111,(lon-139.02)*90.5);
     const tanzawaKm=Math.hypot((lat-35.47)*111,(lon-139.16)*90.5);
-    const inTokyoBay=lat>=35.22&&lat<=35.63&&lon>=139.77&&lon<=140.04&&Math.hypot((lat-35.5494)*111,(lon-139.7798)*90.5)>3.2;
+    const isOdaiba=lat>=35.612&&lat<=35.648&&lon>=139.760&&lon<=139.825;
+    const isUrayasu=lat>=35.620&&lon>=139.850;
+    const isKawasakiPort=lat>=35.485&&lat<=35.555&&lon<=139.798;
+    const inTokyoBay=!isOdaiba&&!isUrayasu&&!isKawasakiPort&&lat>=35.22&&lat<=35.63&&lon>=139.77&&lon<=140.04&&Math.hypot((lat-35.5494)*111,(lon-139.7798)*90.5)>3.5;
     if(inTokyoBay) return 0;
     let h=14+noise*9;
     if(hakoneKm<18) h+=1150*Math.exp(-Math.pow(hakoneKm/8.5,1.8));
@@ -238,22 +241,26 @@ function internationalTerrainHeight(x,z){
     const crossKm=Math.abs(lon-spineLon)*99.5;
     if(crossKm>9.5) return 0;
     const northHill=Math.max(0,(lat-26.32)*620);
-    const shuriHill=135*Math.exp(-Math.pow(Math.hypot((lat-26.217)*111,(lon-127.719)*99.5)/3.8,1.8));
-    return Math.max(4,(1-Math.pow(crossKm/9.5,1.8))*(22+northHill+noise*12)+shuriHill);
+    const shuriHill=128*Math.exp(-Math.pow(Math.hypot((lat-26.217)*111,(lon-127.719)*99.5)/2.1,1.9));
+    return Math.max(4,(1-Math.pow(crossKm/9.5,1.8))*(16+northHill+noise*9)+shuriHill);
   }
   // 3. Hong Kong (VHHH / Lantau / Victoria Harbour / Victoria Peak / Kowloon)
   if(lat>=22.15&&lat<=22.56&&lon>=113.84&&lon<=114.36){
     const clkKm=Math.hypot((lat-22.308)*111,(lon-113.9185)*102.5);
     if(clkKm<3.4) return 8.5;
+    const inHarbour=lat>=22.2862&&lat<=22.2935&&lon>=114.135&&lon<=114.215;
+    if(inHarbour) return 0;
     const lantauPeak=934*Math.exp(-Math.pow(Math.hypot((lat-22.246)*111,(lon-113.922)*102.5)/4.4,1.75));
     const sunsetPeak=869*Math.exp(-Math.pow(Math.hypot((lat-22.261)*111,(lon-113.957)*102.5)/4.5,1.75));
-    const vicPeak=552*Math.exp(-Math.pow(Math.hypot((lat-22.2759)*111,(lon-114.1455)*102.5)/3.2,1.7));
+    const vicRaw=552*Math.exp(-Math.pow(Math.hypot((lat-22.2759)*111,(lon-114.1455)*102.5)/1.38,1.95));
+    const harborSlope=lat>22.280?Math.max(0,1-(lat-22.280)/0.006):1;
+    const vicPeak=vicRaw*harborSlope;
     const taiMoShan=957*Math.exp(-Math.pow(Math.hypot((lat-22.411)*111,(lon-114.123)*102.5)/6.8,1.75));
     const lionRock=495*Math.exp(-Math.pow(Math.hypot((lat-22.352)*111,(lon-114.187)*102.5)/3.4,1.8));
-    const inHarbour=lat>=22.286&&lat<=22.301&&lon>=114.13&&lon<=114.23;
-    if(inHarbour) return 0;
-    const kowloonFlat=(lat>=22.26&&lat<=22.39&&lon>=114.13&&lon<=114.25)?14+noise*5:0;
-    const h=Math.max(lantauPeak,sunsetPeak,vicPeak,taiMoShan,lionRock,kowloonFlat);
+    const tungChung=(lat>=22.280&&lat<=22.302&&lon>=113.924&&lon<=113.962)?9.5:0;
+    const hkIslandShore=(lat>=22.274&&lat<22.2862&&lon>=114.125&&lon<=114.245)?8.5+noise*2:0;
+    const kowloonFlat=(lat>=22.293&&lat<=22.48&&lon>=113.96&&lon<=114.29)?11+noise*4:0;
+    const h=Math.max(lantauPeak,sunsetPeak,vicPeak,taiMoShan,lionRock,tungChung,hkIslandShore,kowloonFlat);
     return h>4?h:0;
   }
   // 4. Seoul / Incheon (RKSI / Songdo / Han River / Namsan / Bukhansan)
@@ -280,7 +287,7 @@ function internationalTerrainHeight(x,z){
   if(lat>=14.25&&lat<=14.88&&lon>=120.40&&lon<=121.35){
     const bataan=1388*Math.exp(-Math.pow(Math.hypot((lat-14.52)*111,(lon-120.48)*107.5)/8.5,1.75));
     if(bataan>8) return bataan;
-    if(lon<120.975) return 0;
+    if(lon<120.962) return 0;
     const sierra=lon>121.12?(lon-121.12)*2400+noise*35:0;
     return Math.max(8,16+noise*6+sierra);
   }
@@ -290,7 +297,11 @@ function internationalTerrainHeight(x,z){
     if(kixKm<3.8) return 5.2;
     const awajiKm=Math.hypot((lat-34.34)*111,(lon-134.88)*91.5);
     if(awajiKm<12.5) return Math.max(8,520*Math.exp(-Math.pow(awajiKm/6.2,1.75))+noise*12);
-    const inOsakaBay=lat>=34.30&&lat<=34.68&&lon>=135.02&&lon<=135.42&&!(lat>=34.62&&lon>=135.38);
+    const isKobePort=lat>=34.655&&lon>=135.14&&lon<=135.38;
+    const isRinku=lat>=34.395&&lat<=34.432&&lon>=135.285&&lon<=135.345;
+    if(isRinku) return 7.5+Math.abs(noise)*1.8;
+    const shoreLon=lat>=34.56?(135.43-Math.max(0,lat-34.64)*4.5):(135.43-(34.56-lat)*0.85);
+    const inOsakaBay=!isKobePort&&!isRinku&&lat>=34.26&&lat<=34.675&&lon>=135.01&&lon<shoreLon;
     if(inOsakaBay) return 0;
     const rokko=931*Math.exp(-Math.pow(Math.hypot((lat-34.778)*111,(lon-135.264)*91.5)/6.2,1.75));
     const ikoma=642*Math.exp(-Math.pow(Math.hypot((lat-34.679)*111,(lon-135.680)*91.5)/5.8,1.75));

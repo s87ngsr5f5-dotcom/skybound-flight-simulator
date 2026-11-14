@@ -713,6 +713,8 @@ function initialize(){
     {root:new THREE.Group(),inside:()=>false,update(){}};
   const taiwanCity=typeof createTaiwanCity==='function'?createTaiwanCity(scene,renderedGround,airports):
     {root:new THREE.Group(),inside:()=>false,blocked:()=>false,stats:{ready:false,maskRevision:0},update(){}};
+  const worldCity=typeof createWorldCity==='function'?createWorldCity(scene,renderedGround,airports):
+    {root:new THREE.Group(),inside:()=>false,blocked:()=>false,stats:{ready:false,maskRevision:0},update(){}};
   const buildingGeo = new THREE.BoxGeometry();
   const windows=document.createElement('canvas');
   windows.width=windows.height=64;
@@ -742,7 +744,7 @@ function initialize(){
   const cityTones=[0xa6a3a1,0xc9c2ad,0x9fa9af,0xada299,0x9dada7,0xc7c8c2,0xa3a7b0];
   blocks.count=0;
   for(const [lat,lon,width,depth,height,tone] of cityLiteVolumes){
-    if(taipeiCity.inside(lat,lon))continue;
+    if(taipeiCity.inside(lat,lon)||taiwanCity.inside?.(lat,lon)||worldCity.inside?.(lat,lon))continue;
     const {x,z}=geoPoint(lat,lon),ground=renderedGround(x,z);
     if(ground<.8||airports.some(a=>{
       const reach=a.length/2+Math.max(width,depth)+460;
@@ -793,7 +795,7 @@ function initialize(){
     yield;
     const taipei={update(){}}; // Taipei geometry now streams in all device modes.
     const region=yield* buildRegionalScenery(sceneryLayers,renderedGround,airports,taiwanHighways,airportCityVolumes,taipeiData.bounds);
-    const plants=yield* buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways,(x,z)=>Boolean(taipeiCity.blocked?.(x,z)||taiwanCity.blocked?.(x,z)));
+    const plants=yield* buildVegetation(sceneryLayers,renderedGround,airports,taipeiData,cover,taiwanHighways,(x,z)=>Boolean(taipeiCity.blocked?.(x,z)||taiwanCity.blocked?.(x,z)||worldCity.blocked?.(x,z)));
     detailedScenery={taipei,region,plants};
     treeCover=cover;
     terrainColorRevision++;
@@ -1670,19 +1672,21 @@ function initialize(){
       const ok=purchaseHangar(selectedAircraft(),item);
       byId('shopMessage').textContent=ok?'已購買':'餘額不足或無法儲存';
       updateAirlinePlan();
+      if(ok) window.SkyboundCampaign?.refreshCareerUI?.();
     };
   }
   byId('servicePlane').onclick=()=>{
     const ok=serviceHangar(selectedAircraft());
     byId('shopMessage').textContent=ok?'維修完成，機況已恢復至 100%':'目前無法維修';
     updateAirlinePlan();
+    if(ok) window.SkyboundCampaign?.refreshCareerUI?.();
   };
   function updateAirlinePlan(){
     updateHangar();
     const active=byId('lesson').value==='airline';
     byId('airlinePlan').hidden=!active;
     const career=readCareer();
-    byId('wallet').textContent='遊戲金幣 '+career.money.toLocaleString()+' · 存在目前瀏覽器';
+    byId('wallet').textContent='帳戶資金 $'+career.money.toLocaleString()+'（與故事／改裝共用 · 存在目前瀏覽器）';
     const passengers=passengerCheckpoints(career);
     const missions=missionCheckpoints();
     function fillSaved(select,flights,id){
@@ -1870,8 +1874,10 @@ function initialize(){
           context.strokeStyle='rgba(76, 198, 245, 0.78)';
           context.lineWidth=Math.max(1.4,Math.min(4.2,pxPer10km*0.09));
           for(const rv of reg.rivers){
+            const pts=Array.isArray(rv)?rv:rv?.pts;
+            if(!Array.isArray(pts)||pts.length<2) continue;
             context.beginPath();
-            rv.forEach((pt,i)=>{const [rx,ry]=project(pt);i?context.lineTo(rx,ry):context.moveTo(rx,ry);});
+            pts.forEach((pt,i)=>{const [rx,ry]=project(pt);i?context.lineTo(rx,ry):context.moveTo(rx,ry);});
             context.stroke();
           }
         }
@@ -1881,8 +1887,10 @@ function initialize(){
           context.lineWidth=1.8;
           context.setLineDash([3,2]);
           for(const br of reg.bridges){
+            const pts=Array.isArray(br)?br:br?.pts;
+            if(!Array.isArray(pts)||pts.length<2) continue;
             context.beginPath();
-            br.forEach((pt,i)=>{const [bx,by]=project(pt);i?context.lineTo(bx,by):context.moveTo(bx,by);});
+            pts.forEach((pt,i)=>{const [bx,by]=project(pt);i?context.lineTo(bx,by):context.moveTo(bx,by);});
             context.stroke();
           }
           context.restore();
@@ -2598,19 +2606,27 @@ function initialize(){
       window.SkyboundCampaign?.closeHub?.();
     }
     if(typeof multiplayer!=='undefined'){
-      const r=byId('mpRoomInput')?.value||'8888';
-      const c=byId('mpCallsignInput')?.value||('SKY-'+Math.floor(100+Math.random()*900));
-      if(!multiplayer.isConnected()){
-        multiplayer.joinRoom(r,c);
-      }else if(multiplayer.getRoomId()!==r.toUpperCase()){
-        multiplayer.switchRoom(r,c);
+      const wantsOnline = byId('lesson')?.value === 'multiplayer' || Boolean(window.SkyboundCampaign?.isOnlineFlight?.()) || multiplayer.isConnected();
+      if(wantsOnline){
+        const r=byId('mpRoomInput')?.value||'8888';
+        const c=byId('mpCallsignInput')?.value||('SKY-'+Math.floor(100+Math.random()*900));
+        if(!multiplayer.isConnected()){
+          multiplayer.joinRoom(r,c);
+        }else if(multiplayer.getRoomId()!==r.toUpperCase()){
+          multiplayer.switchRoom(r,c);
+        }
       }
+      const isOnlineNow = multiplayer.isConnected();
+      const roomLabel = isOnlineNow
+        ? `🌐 房間 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`
+        : '🔒 單人離線（點選切換連線）';
       const headerMp=byId('headerMpBtn');
-      const roomLabel=`🌐 房間 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`;
       if(headerMp){
         headerMp.hidden=false;
         const text=byId('headerMpText');
-        if(text) text.textContent=`🌐 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`;
+        if(text) text.textContent = isOnlineNow
+          ? `🌐 ${multiplayer.getRoomId()} (${multiplayer.getPeers().length}機)`
+          : '🔒 單人離線';
       }
       const mobMp=byId('mobileMultiplayer');
       if(mobMp) mobMp.textContent=roomLabel;
@@ -2824,7 +2840,7 @@ function initialize(){
       }
       beginFlight();
       if(savesMission){
-        flight.checkpointId=crypto.randomUUID();
+        flight.checkpointId=(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
         saveCurrentMission(flight,replacedId);
       }
     }catch(error){byId('message').textContent=error.message;}
@@ -3418,8 +3434,10 @@ function initialize(){
     resizeOverview();
     const hdr=document.querySelector('header');
     if(hdr){
-      const hb=Math.max(46,Math.ceil(hdr.getBoundingClientRect().bottom+6));
+      const hdrBottom=Math.ceil(hdr.getBoundingClientRect().bottom);
+      const hb=Math.max(46,hdrBottom+6);
       document.documentElement.style.setProperty('--hdr-h',hb+'px');
+      document.documentElement.style.setProperty('--hub-top',Math.max(44,hdrBottom)+'px');
     }
     if(typeof supermaneuverGforce!=='undefined'&&supermaneuverGforce.resizeOverlay){
       supermaneuverGforce.resizeOverlay();
@@ -3683,7 +3701,7 @@ function initialize(){
       qBtn.type='button';
       qBtn.id='quickMpRoomBtn';
       qBtn.className='secondary';
-      qBtn.textContent='🌐 房間 8888 (0機)';
+      qBtn.textContent='🔒 單人離線（點選切換連線）';
       qBtn.onclick=()=>toggleHudMpDropdown();
       quickControlsEl.prepend(qBtn);
     }
@@ -3910,19 +3928,22 @@ function initialize(){
       const peers=multiplayer.getPeers();
       peerCount.textContent=peers.length;
       peerList.replaceChildren();
+      const isOnlineNow=typeof multiplayer!=='undefined'&&multiplayer.isConnected();
       const headerText=byId('headerMpText');
       if(headerText&&typeof multiplayer!=='undefined'){
-        headerText.textContent=`🌐 ${multiplayer.getRoomId()||'8888'} (${peers.length}機)`;
+        headerText.textContent=isOnlineNow
+          ?`🌐 ${multiplayer.getRoomId()||'8888'} (${peers.length}機)`
+          :'🔒 單人離線';
       }
-      const menuRoomLabel=typeof multiplayer!=='undefined'&&multiplayer.isConnected()
+      const menuRoomLabel=isOnlineNow
         ?`🌐 房間 ${multiplayer.getRoomId()||'8888'} (${peers.length}機)`
-        :'🌐 多人連線房間';
+        :'🔒 單人離線（點選切換連線）';
       const mobMp=byId('mobileMultiplayer');
       if(mobMp) mobMp.textContent=menuRoomLabel;
       const quickMpRoom=byId('quickMpRoomBtn');
       if(quickMpRoom) quickMpRoom.textContent=menuRoomLabel;
       const roomDisp=byId('hudMpRoomDisplay'), callDisp=byId('hudMpCallsignDisplay'), countDisp=byId('hudMpPeerCountDisplay');
-      if(roomDisp&&typeof multiplayer!=='undefined') roomDisp.textContent=multiplayer.getRoomId()||'--';
+      if(roomDisp&&typeof multiplayer!=='undefined') roomDisp.textContent=isOnlineNow?(multiplayer.getRoomId()||'--'):'單人離線';
       if(callDisp&&typeof multiplayer!=='undefined') callDisp.textContent=multiplayer.getCallsign()||'--';
       if(countDisp) countDisp.textContent=peers.length;
       const hudPeerList=byId('hudMpPeerListDisplay');
@@ -5990,7 +6011,10 @@ function initialize(){
     taiwanCity.root.visible=!hangarMode;
     if(!renderer.instrumentOnly&&!hangarMode)taiwanCity.update(dt,camera.position.x,camera.position.z,
       renderingQuality(),activeDay,byId('weather').value==='wet'||byId('weather').value==='storm');
-    blocks.visible=!(detailedScenery&&sceneryLayers.visible)&&!taiwanCity.stats?.ready;
+    worldCity.root.visible=!hangarMode;
+    if(!renderer.instrumentOnly&&!hangarMode)worldCity.update(dt,camera.position.x,camera.position.z,
+      renderingQuality(),activeDay,byId('weather').value==='wet'||byId('weather').value==='storm');
+    blocks.visible=!(detailedScenery&&sceneryLayers.visible)&&!(taiwanCity.stats?.ready||worldCity.stats?.ready);
     cityWall.emissiveIntensity=(1-activeDay)*.85;
     sunlight.target.position.set(viewerX,model.position.y,viewerZ);
     sunlight.position.copy(sunlight.target.position).add(sunDirection);
@@ -6007,7 +6031,7 @@ function initialize(){
       const {x,y,z}=camera.position;
       const heightAboveGround=y-renderedGround(x,z);
       const groundTraffic=heightAboveGround<1500;
-      detailedScenery.plants.update(x,z,renderingQuality(),heightAboveGround<3200,(taipeiCity.stats?.maskRevision??0)+(taiwanCity.stats?.maskRevision??0));
+      detailedScenery.plants.update(x,z,renderingQuality(),heightAboveGround<3200,(taipeiCity.stats?.maskRevision??0)+(taiwanCity.stats?.maskRevision??0)+(worldCity.stats?.maskRevision??0));
       detailedScenery.region.update(x,z,renderingQuality(),dt,activeDay,groundTraffic);
       detailedScenery.taipei.update(dt,viewerX,viewerZ,activeDay,byId('weather').value==='wet',
         paused||Boolean(replay),renderingQuality(),groundTraffic);
@@ -6170,6 +6194,7 @@ function initialize(){
     }
   }
   drawPlan();showLog();updateReplayButton();activeDay=setEnvironment();
+  if(typeof window!=='undefined'){ window.__skyboundSyncWallet=updateAirlinePlan; }
   byId('time').addEventListener('change',()=>{activeDay=setEnvironment();});
   byId('weather').addEventListener('change',()=>{activeDay=setEnvironment();});
   requestAnimationFrame(render);
