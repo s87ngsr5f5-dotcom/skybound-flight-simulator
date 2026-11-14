@@ -56,5 +56,5 @@
     return null;
   }
   function reset(){cells.clear();groups.clear();total=0;}
-  globalScope.BuildingCollision={add,addCircle,clearGroup,test,reset,get count(){return total;},get groups(){return groups.size;}};
+  globalScope.BuildingCollision={add,addBox:add,addCircle,clearGroup,test,reset,get count(){return total;},get groups(){return groups.size;}};
 })(typeof window!=='undefined'?window:globalThis);

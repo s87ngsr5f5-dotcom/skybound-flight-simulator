@@ -1067,7 +1067,7 @@
       <aside class="hub-sidebar">
         <div>
           <div class="hub-brand">
-            <span class="hub-kicker">SKYBOUND GLOBAL · v0.65</span>
+            <span class="hub-kicker">SKYBOUND GLOBAL · v0.66</span>
             <h1 class="hub-title">蒼穹守望者</h1>
             <p class="hub-subtitle">Formosa Wings · 故事模式 · 線上連線 · 每日挑戰</p>
           </div>

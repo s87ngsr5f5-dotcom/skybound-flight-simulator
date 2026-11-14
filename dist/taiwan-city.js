@@ -544,7 +544,7 @@ function createTaiwanCity(scene,ground,airports){
         }
         if(typeof BuildingCollision!=='undefined'&&bh>28){
           const wx=site.x+bx,wz=site.z+bz,gy=ground(wx,wz);
-          BuildingCollision.addBox('intl:'+site.seed,wx-bw*.45,wz-bd*.45,wx+bw*.45,wz+bd*.45,gy+bh,gy-2);
+          BuildingCollision.add('intl:'+site.seed,wx-bw*.45,wz-bd*.45,wx+bw*.45,wz+bd*.45,gy+bh,gy-2);
         }
       }
     }else if(site.type==='secret_monolith'){
